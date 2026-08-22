@@ -1,0 +1,176 @@
+.runtime-activity-dock {
+  position: fixed;
+  right: 12px;
+  bottom: 34px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 24px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.runtime-activity-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(13, 16, 20, 0.96);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.runtime-activity-toggle:hover {
+  color: var(--text, #e8edf2);
+  border-color: #3a4450;
+}
+
+.runtime-activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint, #5d6670);
+}
+
+.runtime-activity-dot.busy {
+  background: var(--success, #65c995);
+  box-shadow: 0 0 10px rgba(101, 201, 149, 0.45);
+}
+
+.runtime-activity-count {
+  color: var(--faint, #5d6670);
+  font-size: 9px;
+}
+
+.runtime-activity-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 11px;
+  background: rgba(13, 16, 20, 0.98);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+
+.runtime-activity-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 10px 11px;
+}
+
+.runtime-activity-panel > header div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.runtime-activity-panel > header strong {
+  font-size: 10px;
+}
+
+.runtime-activity-panel > header small {
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+.runtime-activity-panel > header button {
+  border: 1px solid var(--border, #20262d);
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: transparent;
+  color: var(--muted, #87919c);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.runtime-activity-panel > header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.runtime-activity-list {
+  display: flex;
+  max-height: min(440px, 56vh);
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.runtime-activity-empty {
+  padding: 18px 10px;
+  color: var(--faint, #5d6670);
+  text-align: center;
+}
+
+.runtime-activity-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border, #20262d);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: var(--panel-2, #11151a);
+}
+
+.runtime-activity-card.phase-running {
+  border-color: rgba(127, 149, 255, 0.42);
+  background: rgba(127, 149, 255, 0.08);
+}
+
+.runtime-activity-card-head,
+.runtime-activity-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.runtime-activity-card-head span {
+  color: var(--accent, #7f95ff);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.runtime-activity-card-head em {
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+  font-style: normal;
+}
+
+.runtime-activity-card > strong,
+.runtime-activity-card > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-activity-card > strong {
+  font: 10px/1.4 "SFMono-Regular", Consolas, monospace;
+  color: var(--text, #e8edf2);
+}
+
+.runtime-activity-card > small {
+  color: var(--muted, #87919c);
+  font-size: 9px;
+}
+
+.runtime-activity-card footer {
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+@media (max-width: 720px) {
+  .runtime-activity-dock {
+    right: 8px;
+    bottom: 30px;
+    width: calc(100vw - 16px);
+  }
+}
