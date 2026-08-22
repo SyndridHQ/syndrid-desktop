@@ -113,7 +113,20 @@ button:disabled, textarea:disabled { cursor: not-allowed; opacity: 0.55; }
 .diagnostic-grid dt { color: var(--muted); }
 .diagnostic-grid dd { color: var(--text); max-width: 155px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-section { margin: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); overflow: hidden; }
-.mini-heading { display: flex; justify-content: space-between; padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; }
+.mini-heading { display: flex; justify-content: space-between; align-items: center; padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; }
+.mini-action { border: 0; background: transparent; color: var(--accent); font-size: 8px; text-transform: uppercase; cursor: pointer; }
+.model-list { display: flex; flex-direction: column; padding: 6px 9px; }
+.model-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 1px; border-bottom: 1px solid rgba(32,38,45,0.65); }
+.model-row:last-child { border-bottom: 0; }
+.model-row > span { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.model-row strong, .model-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-row strong { font-size: 9px; color: var(--text); }
+.model-row small { font-size: 8px; color: var(--faint); }
+.model-row em { font-style: normal; font-size: 7px; text-transform: uppercase; color: var(--success); border: 1px solid rgba(101,201,149,0.25); border-radius: 999px; padding: 2px 5px; }
+.capability-row { display: flex; gap: 5px; padding: 8px 9px; border-top: 1px solid var(--border); }
+.capability-row span { font-size: 8px; border: 1px solid var(--border); border-radius: 999px; padding: 3px 6px; color: var(--faint); }
+.capability-row .enabled { color: var(--success); border-color: rgba(101,201,149,0.25); }
+.capability-row .disabled { text-decoration: line-through; }
 .healthy { color: var(--success); }
 .architecture-stack { display: grid; place-items: center; gap: 5px; padding: 12px; color: var(--muted); font-size: 10px; }
 .architecture-stack span { width: 100%; padding: 7px; text-align: center; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: #0d1014; }
