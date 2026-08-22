@@ -39,7 +39,7 @@ export interface RuntimeServerRequest {
   params?: unknown;
 }
 
-export type RuntimeServerRequestHandler = (request: RuntimeServerRequest) => void;
+export type RuntimeServerRequestHandler = (request: RuntimeServerRequest) => boolean;
 
 interface PendingRequest {
   resolve: (value: unknown) => void;
@@ -261,7 +261,17 @@ export class SyndridAppServerClient {
         method: message.method,
         params: message.params,
       };
-      for (const handler of this.serverRequestHandlers) handler(serverRequest);
+      let handled = false;
+      for (const handler of this.serverRequestHandlers) {
+        handled = handler(serverRequest) || handled;
+      }
+      if (!handled) {
+        for (const handler of this.logHandlers) {
+          handler(
+            `unhandled app-server request: ${serverRequest.method} (${String(serverRequest.id)})`,
+          );
+        }
+      }
       return;
     }
 
