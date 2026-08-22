@@ -8,6 +8,7 @@ import "./approvalDock.css";
 const COMMAND_APPROVAL = "item/commandExecution/requestApproval";
 const FILE_APPROVAL = "item/fileChange/requestApproval";
 const PERMISSIONS_APPROVAL = "item/permissions/requestApproval";
+const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
 
 type ApprovalDecision = "accept" | "acceptForSession" | "decline";
 type PermissionScope = "turn" | "session";
@@ -33,7 +34,7 @@ export function ApprovalDock() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    return appServerClient.onServerRequest((request) => {
+    const offRequest = appServerClient.onServerRequest((request) => {
       const approval = normalizeApproval(request);
       if (!approval) return;
 
@@ -42,6 +43,21 @@ export function ApprovalDock() {
         return [...current, approval];
       });
     });
+    const offNotification = appServerClient.onNotification((notification) => {
+      if (notification.method !== SERVER_REQUEST_RESOLVED || !isRecord(notification.params)) {
+        return;
+      }
+      const requestId = notification.params.requestId;
+      if (!isRequestId(requestId)) return;
+      setApprovals((current) =>
+        current.filter((entry) => entry.request.id !== requestId),
+      );
+    });
+
+    return () => {
+      offRequest();
+      offNotification();
+    };
   }, []);
 
   const current = approvals[0] ?? null;
@@ -289,6 +305,10 @@ function stringArray(value: unknown): string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isRequestId(value: unknown): value is RuntimeServerRequest["id"] {
+  return typeof value === "string" || typeof value === "number";
 }
 
 function stringValue(value: unknown): string | null {
