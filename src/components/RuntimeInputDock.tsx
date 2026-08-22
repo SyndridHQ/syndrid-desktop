@@ -40,11 +40,12 @@ export function RuntimeInputDock() {
   useEffect(() => {
     const offRequest = appServerClient.onServerRequest((request) => {
       const inputRequest = normalizeInputRequest(request);
-      if (!inputRequest) return;
+      if (!inputRequest) return false;
       setQueue((current) => {
         if (current.some((entry) => entry.request.id === request.id)) return current;
         return [...current, inputRequest];
       });
+      return true;
     });
     const offNotification = appServerClient.onNotification((notification) => {
       if (notification.method !== SERVER_REQUEST_RESOLVED || !isRecord(notification.params)) {
