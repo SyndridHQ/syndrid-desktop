@@ -1,6 +1,8 @@
 import {
   type FsReadDirectoryParams,
   type FsReadDirectoryResponse,
+  type FuzzyFileSearchParams,
+  type FuzzyFileSearchResponse,
   type InitializeParams,
   type InitializeResponse,
   type JsonRpcFailure,
@@ -183,6 +185,12 @@ export class SyndridAppServerClient {
     params: FsReadDirectoryParams,
   ): Promise<FsReadDirectoryResponse> {
     return this.request<FsReadDirectoryResponse>(methods.fsReadDirectory, params);
+  }
+
+  async fuzzyFileSearch(
+    params: FuzzyFileSearchParams,
+  ): Promise<FuzzyFileSearchResponse> {
+    return this.request<FuzzyFileSearchResponse>(methods.fuzzyFileSearch, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {
