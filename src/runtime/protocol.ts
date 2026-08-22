@@ -62,6 +62,10 @@ export interface FsReadDirectoryParams { path: string; }
 export interface FsReadDirectoryEntry { fileName: string; isDirectory: boolean; isFile: boolean; }
 export interface FsReadDirectoryResponse { entries: FsReadDirectoryEntry[]; }
 
+export interface FuzzyFileSearchParams { query: string; roots: string[]; cancellationToken: string | null; }
+export interface FuzzyFileSearchResult { root: string; path: string; match_type: unknown; file_name: string; score: number; indices: number[] | null; }
+export interface FuzzyFileSearchResponse { files: FuzzyFileSearchResult[]; }
+
 export interface AgentMessageDeltaNotification { threadId: string; turnId: string; itemId: string; delta: string; }
 export interface TurnLifecycleNotification { threadId: string; turn: TurnSummary; }
 
@@ -78,6 +82,7 @@ export const methods = {
   mcpServerStatusList: "mcpServerStatus/list",
   mcpServerOauthLogin: "mcpServer/oauth/login",
   fsReadDirectory: "fs/readDirectory",
+  fuzzyFileSearch: "fuzzyFileSearch",
 } as const;
 
 export const notifications = {
