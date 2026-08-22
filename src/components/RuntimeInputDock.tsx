@@ -6,6 +6,7 @@ import {
 import "./runtimeInputDock.css";
 
 const TOOL_USER_INPUT = "item/tool/requestUserInput";
+const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
 
 interface RuntimeInputOption {
   label: string;
@@ -37,7 +38,7 @@ export function RuntimeInputDock() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    return appServerClient.onServerRequest((request) => {
+    const offRequest = appServerClient.onServerRequest((request) => {
       const inputRequest = normalizeInputRequest(request);
       if (!inputRequest) return;
       setQueue((current) => {
@@ -45,6 +46,21 @@ export function RuntimeInputDock() {
         return [...current, inputRequest];
       });
     });
+    const offNotification = appServerClient.onNotification((notification) => {
+      if (notification.method !== SERVER_REQUEST_RESOLVED || !isRecord(notification.params)) {
+        return;
+      }
+      const requestId = notification.params.requestId;
+      if (!isRequestId(requestId)) return;
+      setQueue((current) =>
+        current.filter((entry) => entry.request.id !== requestId),
+      );
+    });
+
+    return () => {
+      offRequest();
+      offNotification();
+    };
   }, []);
 
   const current = queue[0] ?? null;
@@ -214,6 +230,10 @@ function normalizeOption(value: unknown): RuntimeInputOption | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isRequestId(value: unknown): value is RuntimeServerRequest["id"] {
+  return typeof value === "string" || typeof value === "number";
 }
 
 function stringValue(value: unknown): string | null {
