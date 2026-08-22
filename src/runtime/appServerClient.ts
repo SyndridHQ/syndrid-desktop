@@ -33,6 +33,14 @@ import {
 export type RuntimeNotificationHandler = (notification: JsonRpcNotification) => void;
 export type RuntimeLogHandler = (line: string) => void;
 
+export interface RuntimeServerRequest {
+  id: RequestId;
+  method: string;
+  params?: unknown;
+}
+
+export type RuntimeServerRequestHandler = (request: RuntimeServerRequest) => void;
+
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
@@ -53,6 +61,7 @@ export class SyndridAppServerClient {
   private nextId = 1;
   private pending = new Map<RequestId, PendingRequest>();
   private notificationHandlers = new Set<RuntimeNotificationHandler>();
+  private serverRequestHandlers = new Set<RuntimeServerRequestHandler>();
   private logHandlers = new Set<RuntimeLogHandler>();
   private unlistenMessage: (() => void) | null = null;
   private unlistenStderr: (() => void) | null = null;
@@ -154,9 +163,32 @@ export class SyndridAppServerClient {
     return () => this.notificationHandlers.delete(handler);
   }
 
+  onServerRequest(handler: RuntimeServerRequestHandler): () => void {
+    this.serverRequestHandlers.add(handler);
+    return () => this.serverRequestHandlers.delete(handler);
+  }
+
   onLog(handler: RuntimeLogHandler): () => void {
     this.logHandlers.add(handler);
     return () => this.logHandlers.delete(handler);
+  }
+
+  async respondToServerRequest(id: RequestId, result: unknown): Promise<void> {
+    await sendNativeAppServerLine(JSON.stringify({ id, result }));
+  }
+
+  async rejectServerRequest(
+    id: RequestId,
+    code: number,
+    message: string,
+    data?: unknown,
+  ): Promise<void> {
+    await sendNativeAppServerLine(
+      JSON.stringify({
+        id,
+        error: data === undefined ? { code, message } : { code, message, data },
+      }),
+    );
   }
 
   private async ensureListeners(): Promise<void> {
@@ -220,18 +252,33 @@ export class SyndridAppServerClient {
 
     if (!isRecord(message)) return;
 
-    if (typeof message.id === "number") {
+    if (isRequestId(message.id)) {
       const pending = this.pending.get(message.id);
-      if (!pending) return;
+      if (pending) {
+        window.clearTimeout(pending.timeout);
+        this.pending.delete(message.id);
 
-      window.clearTimeout(pending.timeout);
-      this.pending.delete(message.id);
+        const response = message as unknown as JsonRpcResponse;
+        if ("error" in response) {
+          pending.reject(toRpcError(response));
+        } else {
+          pending.resolve(response.result);
+        }
+        return;
+      }
 
-      const response = message as unknown as JsonRpcResponse;
-      if ("error" in response) {
-        pending.reject(toRpcError(response));
-      } else {
-        pending.resolve(response.result);
+      if (typeof message.method === "string") {
+        const serverRequest: RuntimeServerRequest = {
+          id: message.id,
+          method: message.method,
+          params: message.params,
+        };
+        for (const handler of this.serverRequestHandlers) handler(serverRequest);
+        return;
+      }
+
+      for (const handler of this.logHandlers) {
+        handler(`orphan app-server response id: ${String(message.id)}`);
       }
       return;
     }
@@ -245,6 +292,10 @@ export class SyndridAppServerClient {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isRequestId(value: unknown): value is RequestId {
+  return typeof value === "number" || typeof value === "string";
 }
 
 function toRpcError(response: JsonRpcFailure): Error {
