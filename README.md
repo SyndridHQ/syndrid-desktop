@@ -13,7 +13,7 @@ The desktop is intentionally a client of [`SyndridHQ/syndridcli`](https://github
 - native app-server process supervision
 - stdio JSONL transport (the app-server's default production-oriented local transport)
 - required `initialize` / `initialized` handshake
-- real `thread/list` session loading
+- real `thread/list`, `thread/read`, and `thread/resume` session flows
 - event-driven runtime notifications and stderr diagnostics
 - measured shell first-frame diagnostic
 - no second agent harness in the desktop process

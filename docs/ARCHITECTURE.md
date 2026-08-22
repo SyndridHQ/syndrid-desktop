@@ -27,7 +27,7 @@ Agent-owned commands remain SyndridCLI-owned.
 
 ## Protocol client
 
-The initial client implements the required initialize -> initialized handshake and real `thread/list` requests. The method names and fields in this slice were verified against SyndridCLI main at `f7c52d2332c2854d177c26e3e2edcd9e979d5602`.
+The initial client implements the required initialize -> initialized handshake and real `thread/list`, `thread/read`, and `thread/resume` requests. The method names and fields in this slice were verified against SyndridCLI main at `f7c52d2332c2854d177c26e3e2edcd9e979d5602`.
 
 The repository should move toward consuming the complete generated TypeScript schema from `codex-rs/app-server-protocol/schema/typescript` rather than hand-maintaining an expanding protocol mirror. Keep the handwritten facade narrow until protocol generation/sync is automated.
 

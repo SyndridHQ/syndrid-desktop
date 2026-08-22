@@ -7,6 +7,9 @@ import {
   type RequestId,
   type ThreadListParams,
   type ThreadListResponse,
+  type ThreadReadParams,
+  type ThreadReadResponse,
+  type ThreadResumeResponse,
   methods,
 } from "./protocol";
 import {
@@ -107,6 +110,14 @@ export class SyndridAppServerClient {
 
   async listThreads(params: ThreadListParams = {}): Promise<ThreadListResponse> {
     return this.request<ThreadListResponse>(methods.threadList, params);
+  }
+
+  async readThread(params: ThreadReadParams): Promise<ThreadReadResponse> {
+    return this.request<ThreadReadResponse>(methods.threadRead, params);
+  }
+
+  async resumeThread(threadId: string): Promise<ThreadResumeResponse> {
+    return this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {

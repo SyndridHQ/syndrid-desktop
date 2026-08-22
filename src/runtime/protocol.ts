@@ -64,14 +64,17 @@ export interface ThreadListParams {
 
 export interface ThreadSummary {
   id: string;
-  name?: string | null;
-  title?: string | null;
-  cwd?: string | null;
-  modelProvider?: string | null;
-  model?: string | null;
-  createdAt?: number | string | null;
-  updatedAt?: number | string | null;
-  status?: unknown;
+  sessionId: string;
+  forkedFromId: string | null;
+  parentThreadId: string | null;
+  preview: string;
+  ephemeral: boolean;
+  modelProvider: string;
+  createdAt: number;
+  updatedAt: number;
+  cwd: string;
+  name: string | null;
+  status: unknown;
 }
 
 export interface ThreadListResponse {
@@ -80,7 +83,30 @@ export interface ThreadListResponse {
   backwardsCursor: string | null;
 }
 
+export interface ThreadReadParams {
+  threadId: string;
+  includeTurns?: boolean;
+}
+
+export interface ThreadReadResponse {
+  thread: ThreadSummary;
+}
+
+export interface ThreadResumeParams {
+  threadId: string;
+}
+
+export interface ThreadResumeResponse {
+  thread: ThreadSummary;
+  model: string;
+  modelProvider: string;
+  serviceTier: string | null;
+  cwd: string;
+}
+
 export const methods = {
   initialize: "initialize",
   threadList: "thread/list",
+  threadRead: "thread/read",
+  threadResume: "thread/resume",
 } as const;
