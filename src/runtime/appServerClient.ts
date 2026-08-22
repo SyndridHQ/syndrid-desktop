@@ -4,6 +4,8 @@ import {
   type JsonRpcFailure,
   type JsonRpcNotification,
   type JsonRpcResponse,
+  type McpServerStatusListParams,
+  type McpServerStatusListResponse,
   type ModelListParams,
   type ModelListResponse,
   type ModelProviderCapabilities,
@@ -159,6 +161,12 @@ export class SyndridAppServerClient {
 
   async readModelProviderCapabilities(): Promise<ModelProviderCapabilities> {
     return this.request<ModelProviderCapabilities>(methods.modelProviderCapabilitiesRead, {});
+  }
+
+  async listMcpServerStatus(
+    params: McpServerStatusListParams = {},
+  ): Promise<McpServerStatusListResponse> {
+    return this.request<McpServerStatusListResponse>(methods.mcpServerStatusList, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {
