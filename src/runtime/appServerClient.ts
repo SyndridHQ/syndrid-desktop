@@ -252,33 +252,33 @@ export class SyndridAppServerClient {
 
     if (!isRecord(message)) return;
 
+    if (isRequestId(message.id) && typeof message.method === "string") {
+      const serverRequest: RuntimeServerRequest = {
+        id: message.id,
+        method: message.method,
+        params: message.params,
+      };
+      for (const handler of this.serverRequestHandlers) handler(serverRequest);
+      return;
+    }
+
     if (isRequestId(message.id)) {
       const pending = this.pending.get(message.id);
-      if (pending) {
-        window.clearTimeout(pending.timeout);
-        this.pending.delete(message.id);
-
-        const response = message as unknown as JsonRpcResponse;
-        if ("error" in response) {
-          pending.reject(toRpcError(response));
-        } else {
-          pending.resolve(response.result);
+      if (!pending) {
+        for (const handler of this.logHandlers) {
+          handler(`orphan app-server response id: ${String(message.id)}`);
         }
         return;
       }
 
-      if (typeof message.method === "string") {
-        const serverRequest: RuntimeServerRequest = {
-          id: message.id,
-          method: message.method,
-          params: message.params,
-        };
-        for (const handler of this.serverRequestHandlers) handler(serverRequest);
-        return;
-      }
+      window.clearTimeout(pending.timeout);
+      this.pending.delete(message.id);
 
-      for (const handler of this.logHandlers) {
-        handler(`orphan app-server response id: ${String(message.id)}`);
+      const response = message as unknown as JsonRpcResponse;
+      if ("error" in response) {
+        pending.reject(toRpcError(response));
+      } else {
+        pending.resolve(response.result);
       }
       return;
     }
