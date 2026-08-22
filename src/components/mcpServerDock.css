@@ -1,0 +1,68 @@
+.mcp-server-dock {
+  position: fixed;
+  right: 384px;
+  bottom: 34px;
+  z-index: 41;
+  width: min(360px, calc(100vw - 24px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.mcp-server-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(13, 16, 20, 0.96);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.mcp-server-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
+.mcp-server-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #7f95ff); }
+.mcp-server-count { color: var(--faint, #5d6670); font-size: 9px; }
+
+.mcp-server-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 11px;
+  background: rgba(13, 16, 20, 0.98);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+
+.mcp-server-panel > header,
+.mcp-server-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mcp-server-panel > header { border-bottom: 1px solid var(--border, #20262d); padding: 10px 11px; }
+.mcp-server-panel > header div { display: flex; flex-direction: column; gap: 2px; }
+.mcp-server-panel > header strong { font-size: 10px; }
+.mcp-server-panel > header small { color: var(--faint, #5d6670); font-size: 8px; }
+.mcp-server-panel > header button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
+.mcp-server-panel > header button:disabled { opacity: .45; cursor: not-allowed; }
+
+.mcp-server-list { display: flex; max-height: min(440px, 56vh); flex-direction: column; gap: 6px; overflow: auto; padding: 8px; }
+.mcp-server-state { padding: 18px 10px; color: var(--faint, #5d6670); text-align: center; }
+.mcp-server-state.error { color: #e6a6a6; }
+.mcp-server-card { display: grid; gap: 6px; border: 1px solid var(--border, #20262d); border-radius: 8px; padding: 8px 9px; background: var(--panel-2, #11151a); }
+.mcp-server-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.mcp-server-card > small { color: var(--faint, #5d6670); font-size: 8px; }
+.auth { border-radius: 999px; padding: 2px 6px; font-size: 8px; color: var(--muted, #87919c); background: rgba(135,145,156,.1); }
+.auth-oAuth, .auth-bearerToken { color: var(--success, #65c995); background: rgba(101,201,149,.1); }
+.auth-notLoggedIn { color: #dfb36f; background: rgba(223,179,111,.1); }
+.mcp-tool-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.mcp-tool-list code, .mcp-tool-list span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 5px; padding: 2px 5px; background: rgba(127,149,255,.08); color: var(--muted, #87919c); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; }
+
+@media (max-width: 900px) {
+  .mcp-server-dock { right: 8px; bottom: 72px; width: calc(100vw - 16px); }
+}
