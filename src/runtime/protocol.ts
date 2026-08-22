@@ -1,12 +1,14 @@
 /**
- * Narrow desktop-side protocol facade for the first vertical slice.
+ * Narrow desktop-side protocol facade for the current vertical slice.
  *
- * Method names and initialization semantics are verified against
- * SyndridHQ/syndridcli main at f7c52d2332c2854d177c26e3e2edcd9e979d5602.
- * The authoritative generated TypeScript schema lives in
- * codex-rs/app-server-protocol/schema/typescript and will be vendored/generated
- * as the desktop protocol surface expands.
+ * Method names and shapes are verified against SyndridHQ/syndridcli main at
+ * afaa8520e2bee261251ba970a31a6534b9788a38. The authoritative generated
+ * TypeScript schema lives in codex-rs/app-server-protocol/schema/typescript.
+ * Keep this facade deliberately small until generated schema sync is wired in.
  */
+
+export const PROTOCOL_SOURCE_SHA = "afaa8520e2bee261251ba970a31a6534b9788a38";
+export const PROTOCOL_SOURCE_SHORT_SHA = PROTOCOL_SOURCE_SHA.slice(0, 7);
 
 export type RequestId = number;
 
@@ -56,10 +58,14 @@ export interface InitializeResponse {
 export interface ThreadListParams {
   cursor?: string | null;
   limit?: number | null;
+  sortKey?: string | null;
+  sortDirection?: string | null;
+  modelProviders?: string[] | null;
+  sourceKinds?: string[] | null;
   archived?: boolean | null;
   cwd?: string | string[] | null;
-  searchTerm?: string | null;
   useStateDbOnly?: boolean;
+  searchTerm?: string | null;
 }
 
 export interface ThreadSummary {
@@ -72,15 +78,55 @@ export interface ThreadSummary {
   modelProvider: string;
   createdAt: number;
   updatedAt: number;
-  cwd: string;
-  name: string | null;
+  recencyAt: number | null;
   status: unknown;
+  path: string | null;
+  cwd: string;
+  cliVersion: string;
+  source: unknown;
+  threadSource: unknown | null;
+  agentNickname: string | null;
+  agentRole: string | null;
+  gitInfo: unknown | null;
+  name: string | null;
+  turns: unknown[];
 }
 
 export interface ThreadListResponse {
   data: ThreadSummary[];
   nextCursor: string | null;
   backwardsCursor: string | null;
+}
+
+export interface ThreadStartParams {
+  model?: string | null;
+  modelProvider?: string | null;
+  serviceTier?: string | null;
+  cwd?: string | null;
+  approvalPolicy?: unknown;
+  approvalsReviewer?: unknown;
+  sandbox?: unknown;
+  config?: Record<string, unknown> | null;
+  serviceName?: string | null;
+  baseInstructions?: string | null;
+  developerInstructions?: string | null;
+  personality?: unknown;
+  ephemeral?: boolean | null;
+  sessionStartSource?: unknown;
+  threadSource?: unknown;
+}
+
+export interface ThreadStartResponse {
+  thread: ThreadSummary;
+  model: string;
+  modelProvider: string;
+  serviceTier: string | null;
+  cwd: string;
+  instructionSources: string[];
+  approvalPolicy: unknown;
+  approvalsReviewer: unknown;
+  sandbox: unknown;
+  reasoningEffort: unknown | null;
 }
 
 export interface ThreadReadParams {
@@ -107,6 +153,7 @@ export interface ThreadResumeResponse {
 export const methods = {
   initialize: "initialize",
   threadList: "thread/list",
+  threadStart: "thread/start",
   threadRead: "thread/read",
   threadResume: "thread/resume",
 } as const;

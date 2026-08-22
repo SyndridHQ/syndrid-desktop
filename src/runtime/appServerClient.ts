@@ -10,6 +10,8 @@ import {
   type ThreadReadParams,
   type ThreadReadResponse,
   type ThreadResumeResponse,
+  type ThreadStartParams,
+  type ThreadStartResponse,
   methods,
 } from "./protocol";
 import {
@@ -110,6 +112,10 @@ export class SyndridAppServerClient {
 
   async listThreads(params: ThreadListParams = {}): Promise<ThreadListResponse> {
     return this.request<ThreadListResponse>(methods.threadList, params);
+  }
+
+  async startThread(params: ThreadStartParams = {}): Promise<ThreadStartResponse> {
+    return this.request<ThreadStartResponse>(methods.threadStart, params);
   }
 
   async readThread(params: ThreadReadParams): Promise<ThreadReadResponse> {

@@ -4,7 +4,10 @@ import {
   appServerClient,
   type RuntimeConnectionSnapshot,
 } from "./runtime/appServerClient";
-import type { ThreadSummary } from "./runtime/protocol";
+import {
+  PROTOCOL_SOURCE_SHORT_SHA,
+  type ThreadSummary,
+} from "./runtime/protocol";
 
 interface AppProps {
   bootStartedAt: number;
@@ -25,6 +28,7 @@ export function App({ bootStartedAt }: AppProps) {
   const [shellReadyMs, setShellReadyMs] = useState<number | null>(null);
   const [selectedThread, setSelectedThread] = useState<ThreadSummary | null>(null);
   const [activeModel, setActiveModel] = useState<string | null>(null);
+  const [creatingThread, setCreatingThread] = useState(false);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setShellReadyMs(performance.now() - bootStartedAt));
@@ -77,6 +81,28 @@ export function App({ bootStartedAt }: AppProps) {
       ]);
     }
   }, [runtime.phase]);
+
+  const createThread = useCallback(async () => {
+    if (runtime.phase !== "ready" || creatingThread) return;
+
+    setCreatingThread(true);
+    try {
+      const result = await appServerClient.startThread();
+      setSelectedThread(result.thread);
+      setActiveModel(`${result.modelProvider} / ${result.model}`);
+      setThreads((current) => [
+        result.thread,
+        ...current.filter((thread) => thread.id !== result.thread.id),
+      ]);
+    } catch (error) {
+      setRuntimeLogs((logs) => [
+        ...logs.slice(-39),
+        error instanceof Error ? error.message : String(error),
+      ]);
+    } finally {
+      setCreatingThread(false);
+    }
+  }, [creatingThread, runtime.phase]);
 
   const selectThread = useCallback(async (thread: ThreadSummary) => {
     setSelectedThread(thread);
@@ -160,7 +186,18 @@ export function App({ bootStartedAt }: AppProps) {
             <span className="eyebrow">Workspace</span>
             <h2>Sessions</h2>
           </div>
-          <button className="icon-button" onClick={refreshThreads} type="button" title="Refresh sessions">↻</button>
+          <span>
+            <button
+              className="icon-button"
+              disabled={runtime.phase !== "ready" || creatingThread}
+              onClick={() => void createThread()}
+              type="button"
+              title="New session"
+            >
+              {creatingThread ? "…" : "+"}
+            </button>
+            <button className="icon-button" onClick={refreshThreads} type="button" title="Refresh sessions">↻</button>
+          </span>
         </div>
 
         {runtime.phase !== "ready" ? (
@@ -174,7 +211,10 @@ export function App({ bootStartedAt }: AppProps) {
           <div className="empty-state compact">
             <span className="empty-icon">◌</span>
             <strong>No active sessions</strong>
-            <p>The runtime is connected. New and resumed threads will appear here.</p>
+            <p>The runtime is connected. Start a real Syndrid thread to begin.</p>
+            <button className="primary-button" disabled={creatingThread} onClick={() => void createThread()} type="button">
+              {creatingThread ? "Starting…" : "New session"}
+            </button>
           </div>
         ) : (
           <div className="session-list">
@@ -241,7 +281,7 @@ export function App({ bootStartedAt }: AppProps) {
             <section className="working-card">
               <div className="working-line complete"><span>✓</span><div><strong>Desktop shell</strong><small>Tauri + React foundation</small></div></div>
               <div className="working-line active"><span>●</span><div><strong>Runtime bridge</strong><small>stdio JSONL app-server supervision</small></div></div>
-              <div className="working-line"><span>○</span><div><strong>Session workspace</strong><small>Ready for thread lifecycle UI</small></div></div>
+              <div className="working-line"><span>○</span><div><strong>Session workspace</strong><small>Ready for real thread creation</small></div></div>
             </section>
           )}
         </div>
@@ -283,7 +323,7 @@ export function App({ bootStartedAt }: AppProps) {
         <span>main</span>
         <span>0 problems</span>
         <span className="status-spacer" />
-        <span>Protocol source: syndridcli@f7c52d2</span>
+        <span>Protocol source: syndridcli@{PROTOCOL_SOURCE_SHORT_SHA}</span>
       </footer>
     </main>
   );
