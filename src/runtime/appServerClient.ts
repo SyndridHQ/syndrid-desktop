@@ -1,4 +1,6 @@
 import {
+  type FsReadDirectoryParams,
+  type FsReadDirectoryResponse,
   type InitializeParams,
   type InitializeResponse,
   type JsonRpcFailure,
@@ -175,6 +177,12 @@ export class SyndridAppServerClient {
     params: McpServerOauthLoginParams,
   ): Promise<McpServerOauthLoginResponse> {
     return this.request<McpServerOauthLoginResponse>(methods.mcpServerOauthLogin, params);
+  }
+
+  async readDirectory(
+    params: FsReadDirectoryParams,
+  ): Promise<FsReadDirectoryResponse> {
+    return this.request<FsReadDirectoryResponse>(methods.fsReadDirectory, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {
