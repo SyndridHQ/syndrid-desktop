@@ -2,12 +2,12 @@
  * Narrow desktop-side protocol facade for the current vertical slice.
  *
  * Method names and shapes are verified against SyndridHQ/syndridcli main at
- * afaa8520e2bee261251ba970a31a6534b9788a38. The authoritative generated
+ * 5a83a6b21e7f7e4287be9ef20a33f50262c771f2. The authoritative generated
  * TypeScript schema lives in codex-rs/app-server-protocol/schema/typescript.
  * Keep this facade deliberately small until generated schema sync is wired in.
  */
 
-export const PROTOCOL_SOURCE_SHA = "afaa8520e2bee261251ba970a31a6534b9788a38";
+export const PROTOCOL_SOURCE_SHA = "5a83a6b21e7f7e4287be9ef20a33f50262c771f2";
 export const PROTOCOL_SOURCE_SHORT_SHA = PROTOCOL_SOURCE_SHA.slice(0, 7);
 
 export type RequestId = number;
