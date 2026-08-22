@@ -110,7 +110,7 @@ async fn start_app_server(
     }
 
     Err(format!(
-        "Unable to start the Syndrid app-server. Tried: {}. Set SYNDRID_APP_SERVER_BINARY or configure an explicit binary.",
+        "Unable to start the Syndrid app-server. Tried: {}. Set SYNDRID_APP_SERVER_BINARY or configure an explicit Syndrid binary.",
         errors.join(", ")
     ))
 }
@@ -182,7 +182,6 @@ fn runtime_candidates(explicit: Option<String>) -> Vec<String> {
         }
     }
     candidates.push("syndrid".to_string());
-    candidates.push("codex".to_string());
     candidates.dedup();
     candidates
 }
