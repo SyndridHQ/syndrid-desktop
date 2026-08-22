@@ -92,7 +92,7 @@ export function McpElicitationDock() {
     const defaults: Record<string, PrimitiveValue> = {};
     for (const field of current.fields) {
       if (field.defaultValue !== null) defaults[field.key] = field.defaultValue;
-      else if (field.kind === "boolean") defaults[field.key] = false;
+      else if (field.kind === "boolean" && field.required) defaults[field.key] = false;
     }
     setValues(defaults);
     setError(null);
@@ -100,13 +100,7 @@ export function McpElicitationDock() {
 
   const canSubmit = useMemo(() => {
     if (!current) return false;
-    return current.fields.every((field) => {
-      if (!field.required) return true;
-      const value = values[field.key];
-      if (field.kind === "boolean") return typeof value === "boolean";
-      if (field.kind === "number" || field.kind === "integer") return typeof value === "number";
-      return typeof value === "string" && value.trim().length > 0;
-    });
+    return current.fields.every((field) => fieldValueValid(field, values[field.key]));
   }, [current, values]);
 
   if (!current) return null;
@@ -120,7 +114,7 @@ export function McpElicitationDock() {
     if (action === "accept") {
       for (const field of current.fields) {
         const value = values[field.key];
-        if (value === undefined) continue;
+        if (value === undefined || !fieldValueValid(field, value)) continue;
         if (typeof value === "string" && value.length === 0 && !field.required) continue;
         content[field.key] = value;
       }
@@ -142,6 +136,15 @@ export function McpElicitationDock() {
     }
   };
 
+  const updateField = (field: McpFormField, value: PrimitiveValue | undefined) => {
+    setValues((currentValues) => {
+      const next = { ...currentValues };
+      if (value === undefined) delete next[field.key];
+      else next[field.key] = value;
+      return next;
+    });
+  };
+
   return (
     <section className="mcp-elicitation-dock" role="dialog" aria-live="polite">
       <header>
@@ -161,12 +164,7 @@ export function McpElicitationDock() {
               {field.required && <b> required</b>}
             </span>
             {field.description && <small>{field.description}</small>}
-            {renderField(field, values[field.key], (value) =>
-              setValues((currentValues) => ({
-                ...currentValues,
-                [field.key]: value,
-              })),
-            )}
+            {renderField(field, values[field.key], (value) => updateField(field, value))}
           </label>
         ))}
         {error && <p className="mcp-elicitation-error">{error}</p>}
@@ -195,7 +193,7 @@ export function McpElicitationDock() {
 function renderField(
   field: McpFormField,
   value: PrimitiveValue | undefined,
-  onChange: (value: PrimitiveValue) => void,
+  onChange: (value: PrimitiveValue | undefined) => void,
 ) {
   if (field.kind === "boolean") {
     return (
@@ -210,7 +208,7 @@ function renderField(
   if (field.kind === "enum") {
     return (
       <select
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(event.target.value || undefined)}
         value={typeof value === "string" ? value : ""}
       >
         <option value="">Select…</option>
@@ -227,8 +225,18 @@ function renderField(
         max={field.maximum ?? undefined}
         min={field.minimum ?? undefined}
         onChange={(event) => {
+          if (event.target.value === "") {
+            onChange(undefined);
+            return;
+          }
           const next = event.target.valueAsNumber;
-          if (Number.isFinite(next)) onChange(field.kind === "integer" ? Math.trunc(next) : next);
+          onChange(
+            Number.isFinite(next)
+              ? field.kind === "integer"
+                ? Math.trunc(next)
+                : next
+              : undefined,
+          );
         }}
         step={field.kind === "integer" ? 1 : "any"}
         type="number"
@@ -246,6 +254,30 @@ function renderField(
       value={typeof value === "string" ? value : ""}
     />
   );
+}
+
+function fieldValueValid(field: McpFormField, value: PrimitiveValue | undefined): boolean {
+  if (value === undefined) return !field.required;
+
+  if (field.kind === "boolean") return typeof value === "boolean";
+
+  if (field.kind === "enum") {
+    return typeof value === "string" && field.options.includes(value);
+  }
+
+  if (field.kind === "number" || field.kind === "integer") {
+    if (typeof value !== "number" || !Number.isFinite(value)) return false;
+    if (field.kind === "integer" && !Number.isInteger(value)) return false;
+    if (field.minimum !== null && value < field.minimum) return false;
+    if (field.maximum !== null && value > field.maximum) return false;
+    return true;
+  }
+
+  if (typeof value !== "string") return false;
+  if (field.required && value.trim().length === 0) return false;
+  if (field.minLength !== null && value.length < field.minLength) return false;
+  if (field.maxLength !== null && value.length > field.maxLength) return false;
+  return true;
 }
 
 function normalizeMcpForm(request: RuntimeServerRequest): McpFormRequest | null {
@@ -292,6 +324,7 @@ function normalizeField(
     const options = stringArray(rawField.enum);
     if (options.length === 0) return null;
     const defaultValue = typeof rawField.default === "string" ? rawField.default : null;
+    if (defaultValue !== null && !options.includes(defaultValue)) return null;
     return baseField(key, "enum", title, description, required, {
       options,
       defaultValue,
