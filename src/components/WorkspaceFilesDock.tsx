@@ -1,7 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
-import type { FsReadDirectoryEntry } from "../runtime/protocol";
+import type {
+  FsReadDirectoryEntry,
+  FuzzyFileSearchResult,
+} from "../runtime/protocol";
 import "./workspaceFilesDock.css";
+
+const MAX_ROOT_ENTRIES = 250;
+const MAX_SEARCH_RESULTS = 80;
 
 export function WorkspaceFilesDock() {
   const [open, setOpen] = useState(false);
@@ -9,6 +15,10 @@ export function WorkspaceFilesDock() {
   const [loaded, setLoaded] = useState(false);
   const [rootPath, setRootPath] = useState<string | null>(null);
   const [entries, setEntries] = useState<FsReadDirectoryEntry[]>([]);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<FuzzyFileSearchResult[]>([]);
+  const [searchAttempted, setSearchAttempted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -38,6 +48,8 @@ export function WorkspaceFilesDock() {
       const result = await appServerClient.readDirectory({ path: root });
       setRootPath(root);
       setEntries(result.entries);
+      setSearchResults([]);
+      setSearchAttempted(false);
       setLoaded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -45,6 +57,34 @@ export function WorkspaceFilesDock() {
       setLoading(false);
     }
   }, [loading]);
+
+  const search = useCallback(async () => {
+    const normalized = query.trim();
+    if (!rootPath || searching || !normalized) return;
+
+    setSearching(true);
+    setError(null);
+    setSearchAttempted(true);
+    try {
+      const result = await appServerClient.fuzzyFileSearch({
+        query: normalized,
+        roots: [rootPath],
+        cancellationToken: null,
+      });
+      setSearchResults(result.files.slice(0, MAX_SEARCH_RESULTS));
+    } catch (cause) {
+      setSearchResults([]);
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSearching(false);
+    }
+  }, [query, rootPath, searching]);
+
+  const clearSearch = useCallback(() => {
+    setQuery("");
+    setSearchResults([]);
+    setSearchAttempted(false);
+  }, []);
 
   const sortedEntries = useMemo(
     () => [...entries].sort(compareEntries),
@@ -56,6 +96,8 @@ export function WorkspaceFilesDock() {
     setOpen(next);
     if (next && !loaded && !loading) void load();
   };
+
+  const showingSearch = searchAttempted || query.trim().length > 0;
 
   return (
     <aside className="workspace-files-dock" aria-label="Workspace files">
@@ -77,36 +119,101 @@ export function WorkspaceFilesDock() {
               {loading ? "Loading…" : "Refresh"}
             </button>
           </header>
+
+          {rootPath && (
+            <form
+              className="workspace-file-search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void search();
+              }}
+            >
+              <input
+                aria-label="Find workspace files"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find files in workspace…"
+                value={query}
+              />
+              {showingSearch && (
+                <button onClick={clearSearch} type="button">
+                  Clear
+                </button>
+              )}
+              <button disabled={searching || !query.trim()} type="submit">
+                {searching ? "Finding…" : "Find"}
+              </button>
+            </form>
+          )}
+
           {error ? (
             <div className="workspace-files-state error">{error}</div>
           ) : loading && !loaded ? (
             <div className="workspace-files-state">Reading workspace root…</div>
           ) : !rootPath ? (
             <div className="workspace-files-state">No session workspace reported.</div>
+          ) : showingSearch ? (
+            <SearchResults
+              attempted={searchAttempted}
+              results={searchResults}
+              searching={searching}
+            />
           ) : sortedEntries.length === 0 ? (
             <div className="workspace-files-state">Workspace root is empty.</div>
           ) : (
             <div className="workspace-files-list">
-              {sortedEntries.slice(0, 250).map((entry) => (
+              {sortedEntries.slice(0, MAX_ROOT_ENTRIES).map((entry) => (
                 <div className="workspace-file-row" key={entry.fileName}>
                   <span aria-hidden="true">{entry.isDirectory ? "▸" : "·"}</span>
                   <code title={entry.fileName}>{entry.fileName}</code>
                   <small>{entry.isDirectory ? "folder" : entry.isFile ? "file" : "other"}</small>
                 </div>
               ))}
-              {sortedEntries.length > 250 && (
+              {sortedEntries.length > MAX_ROOT_ENTRIES && (
                 <div className="workspace-files-state compact">
-                  Showing 250 of {sortedEntries.length} root entries.
+                  Showing {MAX_ROOT_ENTRIES} of {sortedEntries.length} root entries.
                 </div>
               )}
             </div>
           )}
           <footer>
-            Root-only by design · no recursive scan or filesystem polling
+            Runtime-backed · root listing and explicit file search only · no polling
           </footer>
         </section>
       )}
     </aside>
+  );
+}
+
+interface SearchResultsProps {
+  attempted: boolean;
+  results: FuzzyFileSearchResult[];
+  searching: boolean;
+}
+
+function SearchResults({ attempted, results, searching }: SearchResultsProps) {
+  if (searching && !attempted) {
+    return <div className="workspace-files-state">Searching runtime index…</div>;
+  }
+  if (attempted && results.length === 0 && !searching) {
+    return <div className="workspace-files-state">No matching files reported.</div>;
+  }
+
+  return (
+    <div className="workspace-files-list search-results" aria-live="polite">
+      {results.map((result, index) => (
+        <div
+          className="workspace-file-row search-result"
+          key={`${result.root}:${result.path}:${index}`}
+        >
+          <span aria-hidden="true">·</span>
+          <code title={result.path}>{result.path}</code>
+          <small>{result.file_name}</small>
+        </div>
+      ))}
+      {searching && (
+        <div className="workspace-files-state compact">Refreshing search…</div>
+      )}
+    </div>
   );
 }
 
