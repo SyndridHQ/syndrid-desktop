@@ -36,12 +36,13 @@ export function ApprovalDock() {
   useEffect(() => {
     const offRequest = appServerClient.onServerRequest((request) => {
       const approval = normalizeApproval(request);
-      if (!approval) return;
+      if (!approval) return false;
 
       setApprovals((current) => {
         if (current.some((entry) => entry.request.id === request.id)) return current;
         return [...current, approval];
       });
+      return true;
     });
     const offNotification = appServerClient.onNotification((notification) => {
       if (notification.method !== SERVER_REQUEST_RESOLVED || !isRecord(notification.params)) {
