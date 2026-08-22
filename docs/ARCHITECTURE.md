@@ -25,6 +25,8 @@ The Tauri Rust layer may own OS integration such as process supervision, PTY/Con
 
 Agent-owned commands remain SyndridCLI-owned. Windows and macOS implementations must remain platform-guarded rather than assuming WSL, a POSIX shell, or a single path model.
 
+App-server supervision starts only the Syndrid runtime: an explicit configured binary, `SYNDRID_APP_SERVER_BINARY`, or `syndrid` from the native PATH. It must not silently fall back to another installed agent runtime.
+
 ## Protocol client
 
 The client implements the required `initialize` -> `initialized` handshake and currently connects real runtime flows including:
@@ -35,19 +37,23 @@ The client implements the required `initialize` -> `initialized` handshake and c
 - persisted transcript hydration through `thread/read(includeTurns: true)`
 - runtime-discovered `model/list` and `modelProvider/capabilities/read`
 - structured execution activity from `item/started` and `item/completed`
-- bidirectional server requests for command/file approval UI
+- bidirectional command, file-change, and additional-permission approval requests
+- `item/tool/requestUserInput` questions and responses
+- `serverRequest/resolved` lifecycle cleanup for stale request UI
 
 The narrow facade is pinned to SyndridCLI commit `5a83a6b21e7f7e4287be9ef20a33f50262c771f2`. The authoritative generated TypeScript schema lives under `codex-rs/app-server-protocol/schema/typescript` in `SyndridHQ/syndridcli`.
 
 App-server `RequestId` values are `string | number`. Client-originated requests and server-originated requests use independent ID namespaces, so inbound messages are classified structurally: `{ id, method, ... }` is a server request, `{ id, result/error }` is a response, and `{ method, ... }` without an ID is a notification. Do not infer direction from the numeric value of an ID.
 
+Initialize explicitly opts into `experimentalApi` because the desktop handles experimental user-input requests. Attestation requests remain disabled and OpenAI extended MCP form elicitation is not advertised until those request families have a real desktop handler. Unknown server requests are surfaced in runtime diagnostics rather than silently disappearing.
+
 The repository should move toward consuming the complete generated TypeScript schema rather than hand-maintaining an expanding protocol mirror. Keep the handwritten facade narrow until protocol generation/sync is automated.
 
 ## Approval ownership
 
-SyndridCLI decides when approval is required and sends the corresponding server request. Desktop only presents the request and returns a schema-supported decision. It must not independently infer whether a command or file change is safe enough to bypass the runtime policy engine.
+SyndridCLI decides when approval is required and sends the corresponding server request. Desktop only presents the request and returns a schema-supported response. It must not independently infer whether a command, file change, or permission escalation is safe enough to bypass the runtime policy engine.
 
-Current desktop coverage includes command execution and file-change approvals. Other server-request families must be added from their generated request/response contracts rather than answered generically.
+Current desktop coverage includes command execution, file-change, and additional sandbox permission approvals. Permission grants return only the runtime-requested profile, scoped to the current turn or session; denying the request returns an empty granted profile. Other server-request families must be added from their generated request/response contracts rather than answered generically.
 
 ## Performance posture
 
