@@ -4,6 +4,8 @@ import {
   type JsonRpcFailure,
   type JsonRpcNotification,
   type JsonRpcResponse,
+  type McpServerOauthLoginParams,
+  type McpServerOauthLoginResponse,
   type McpServerStatusListParams,
   type McpServerStatusListResponse,
   type ModelListParams,
@@ -167,6 +169,12 @@ export class SyndridAppServerClient {
     params: McpServerStatusListParams = {},
   ): Promise<McpServerStatusListResponse> {
     return this.request<McpServerStatusListResponse>(methods.mcpServerStatusList, params);
+  }
+
+  async startMcpServerOauthLogin(
+    params: McpServerOauthLoginParams,
+  ): Promise<McpServerOauthLoginResponse> {
+    return this.request<McpServerOauthLoginResponse>(methods.mcpServerOauthLogin, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {
