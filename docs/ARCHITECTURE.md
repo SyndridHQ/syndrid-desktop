@@ -39,13 +39,14 @@ The client implements the required `initialize` -> `initialized` handshake and c
 - structured execution activity from `item/started` and `item/completed`
 - bidirectional command, file-change, and additional-permission approval requests
 - `item/tool/requestUserInput` questions and responses
+- standard typed `mcpServer/elicitation/request` form handling
 - `serverRequest/resolved` lifecycle cleanup for stale request UI
 
 The narrow facade is pinned to SyndridCLI commit `5a83a6b21e7f7e4287be9ef20a33f50262c771f2`. The authoritative generated TypeScript schema lives under `codex-rs/app-server-protocol/schema/typescript` in `SyndridHQ/syndridcli`.
 
 App-server `RequestId` values are `string | number`. Client-originated requests and server-originated requests use independent ID namespaces, so inbound messages are classified structurally: `{ id, method, ... }` is a server request, `{ id, result/error }` is a response, and `{ method, ... }` without an ID is a notification. Do not infer direction from the numeric value of an ID.
 
-Initialize explicitly opts into `experimentalApi` because the desktop handles experimental user-input requests. Attestation requests remain disabled and OpenAI extended MCP form elicitation is not advertised until those request families have a real desktop handler. Unknown server requests are surfaced in runtime diagnostics rather than silently disappearing.
+Initialize explicitly opts into `experimentalApi` because the desktop handles experimental user-input requests. Attestation requests remain disabled and OpenAI extended MCP form elicitation is not advertised until that opaque form family has a dedicated renderer. Standard MCP typed forms support string, single-select enum, number/integer, and boolean fields with required/bounds validation. Unsupported MCP modes or schemas are declined rather than left pending. Unknown server requests are surfaced in runtime diagnostics rather than silently disappearing.
 
 The repository should move toward consuming the complete generated TypeScript schema rather than hand-maintaining an expanding protocol mirror. Keep the handwritten facade narrow until protocol generation/sync is automated.
 
@@ -62,6 +63,7 @@ Current desktop coverage includes command execution, file-change, and additional
 - One JSONL stream feeds request completion, server requests, and runtime notifications.
 - Runtime activity history is bounded in memory.
 - Model/provider catalogs are loaded only after runtime connection.
+- MCP/request forms are rendered with native React controls and no form dependency.
 - Heavy editor, terminal, graph, browser, and document features are not dependencies of the base shell yet.
 - Measured shell first-frame timing is shown as a diagnostic rather than claiming an unmeasured startup target.
 - Long/unbounded collections must be virtualized when introduced.
