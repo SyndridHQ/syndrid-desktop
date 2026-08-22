@@ -1,0 +1,238 @@
+use serde::Serialize;
+use std::env;
+use std::process::Stdio;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager, State};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::Mutex;
+
+const MESSAGE_EVENT: &str = "syndrid://app-server/message";
+const STDERR_EVENT: &str = "syndrid://app-server/stderr";
+
+#[derive(Default)]
+struct AppServerInner {
+    process: Option<Child>,
+    stdin: Option<ChildStdin>,
+    binary: Option<String>,
+}
+
+#[derive(Clone, Default)]
+struct AppServerState(Arc<Mutex<AppServerInner>>);
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+enum AppServerStatus {
+    Stopped,
+    Running { pid: u32, binary: String },
+    Exited { code: Option<i32> },
+}
+
+#[tauri::command]
+async fn start_app_server(
+    app: AppHandle,
+    state: State<'_, AppServerState>,
+    binary: Option<String>,
+) -> Result<AppServerStatus, String> {
+    let mut inner = state.0.lock().await;
+
+    let active_binary = inner.binary.clone().unwrap_or_else(|| "syndrid".to_string());
+    if let Some(child) = inner.process.as_mut() {
+        match child.try_wait().map_err(|error| error.to_string())? {
+            None => {
+                let pid = child.id().unwrap_or_default();
+                return Ok(AppServerStatus::Running {
+                    pid,
+                    binary: active_binary,
+                });
+            }
+            Some(status) => {
+                inner.process = None;
+                inner.stdin = None;
+                inner.binary = None;
+                let _ = app.emit(
+                    STDERR_EVENT,
+                    format!("previous app-server exited with status {:?}", status.code()),
+                );
+            }
+        }
+    }
+
+    let candidates = runtime_candidates(binary);
+    let mut errors = Vec::new();
+
+    for candidate in candidates {
+        let mut command = Command::new(&candidate);
+        command
+            .arg("app-server")
+            .arg("--listen")
+            .arg("stdio://")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+
+        match command.spawn() {
+            Ok(mut child) => {
+                let pid = child.id().unwrap_or_default();
+                let stdin = child
+                    .stdin
+                    .take()
+                    .ok_or_else(|| "app-server stdin unavailable".to_string())?;
+                let stdout = child
+                    .stdout
+                    .take()
+                    .ok_or_else(|| "app-server stdout unavailable".to_string())?;
+                let stderr = child
+                    .stderr
+                    .take()
+                    .ok_or_else(|| "app-server stderr unavailable".to_string())?;
+
+                spawn_line_forwarder(app.clone(), stdout, MESSAGE_EVENT);
+                spawn_line_forwarder(app.clone(), stderr, STDERR_EVENT);
+
+                inner.stdin = Some(stdin);
+                inner.process = Some(child);
+                inner.binary = Some(candidate.clone());
+
+                return Ok(AppServerStatus::Running {
+                    pid,
+                    binary: candidate,
+                });
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                errors.push(format!("{candidate}: not found"));
+            }
+            Err(error) => {
+                errors.push(format!("{candidate}: {error}"));
+            }
+        }
+    }
+
+    Err(format!(
+        "Unable to start the Syndrid app-server. Tried: {}. Set SYNDRID_APP_SERVER_BINARY or configure an explicit binary.",
+        errors.join(", ")
+    ))
+}
+
+#[tauri::command]
+async fn app_server_send(state: State<'_, AppServerState>, line: String) -> Result<(), String> {
+    let mut inner = state.0.lock().await;
+    let stdin = inner
+        .stdin
+        .as_mut()
+        .ok_or_else(|| "Syndrid app-server is not running.".to_string())?;
+
+    stdin
+        .write_all(line.trim_end_matches(&['\r', '\n'][..]).as_bytes())
+        .await
+        .map_err(|error| error.to_string())?;
+    stdin
+        .write_all(b"\n")
+        .await
+        .map_err(|error| error.to_string())?;
+    stdin.flush().await.map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+async fn app_server_status(state: State<'_, AppServerState>) -> Result<AppServerStatus, String> {
+    let mut inner = state.0.lock().await;
+    let active_binary = inner.binary.clone().unwrap_or_else(|| "syndrid".to_string());
+    let Some(child) = inner.process.as_mut() else {
+        return Ok(AppServerStatus::Stopped);
+    };
+
+    match child.try_wait().map_err(|error| error.to_string())? {
+        None => Ok(AppServerStatus::Running {
+            pid: child.id().unwrap_or_default(),
+            binary: active_binary,
+        }),
+        Some(status) => {
+            inner.process = None;
+            inner.stdin = None;
+            inner.binary = None;
+            Ok(AppServerStatus::Exited {
+                code: status.code(),
+            })
+        }
+    }
+}
+
+#[tauri::command]
+async fn stop_app_server(state: State<'_, AppServerState>) -> Result<(), String> {
+    let mut inner = state.0.lock().await;
+    if let Some(mut child) = inner.process.take() {
+        child.kill().await.map_err(|error| error.to_string())?;
+        let _ = child.wait().await;
+    }
+    inner.stdin = None;
+    inner.binary = None;
+    Ok(())
+}
+
+fn runtime_candidates(explicit: Option<String>) -> Vec<String> {
+    if let Some(binary) = explicit.filter(|value| !value.trim().is_empty()) {
+        return vec![binary];
+    }
+
+    let mut candidates = Vec::new();
+    if let Ok(binary) = env::var("SYNDRID_APP_SERVER_BINARY") {
+        if !binary.trim().is_empty() {
+            candidates.push(binary);
+        }
+    }
+    candidates.push("syndrid".to_string());
+    candidates.push("codex".to_string());
+    candidates.dedup();
+    candidates
+}
+
+fn spawn_line_forwarder<R>(app: AppHandle, reader: R, event: &'static str)
+where
+    R: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    tauri::async_runtime::spawn(async move {
+        let mut lines = BufReader::new(reader).lines();
+        loop {
+            match lines.next_line().await {
+                Ok(Some(line)) => {
+                    let _ = app.emit(event, line);
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    let _ = app.emit(STDERR_EVENT, format!("stream read error: {error}"));
+                    break;
+                }
+            }
+        }
+    });
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .manage(AppServerState::default())
+        .invoke_handler(tauri::generate_handler![
+            start_app_server,
+            app_server_send,
+            app_server_status,
+            stop_app_server
+        ])
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                let state = window.state::<AppServerState>();
+                let state = state.inner().clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut inner = state.0.lock().await;
+                    if let Some(mut child) = inner.process.take() {
+                        let _ = child.kill().await;
+                        let _ = child.wait().await;
+                    }
+                    inner.stdin = None;
+                    inner.binary = None;
+                });
+            }
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running Syndrid Desktop");
+}
