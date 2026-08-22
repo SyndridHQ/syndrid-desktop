@@ -3,12 +3,19 @@ import { appServerClient } from "../runtime/appServerClient";
 import type { McpServerStatus } from "../runtime/protocol";
 import "./mcpServerDock.css";
 
+interface PendingOauth {
+  serverName: string;
+  authorizationUrl: string;
+}
+
 export function McpServerDock() {
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<McpServerStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [oauthStarting, setOauthStarting] = useState<string | null>(null);
+  const [pendingOauth, setPendingOauth] = useState<PendingOauth | null>(null);
 
   const load = useCallback(async () => {
     if (loading) return;
@@ -40,6 +47,31 @@ export function McpServerDock() {
     }
   }, [loading]);
 
+  const startOauth = useCallback(async (serverName: string) => {
+    if (oauthStarting) return;
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setError("Connect the Syndrid runtime before signing in to an MCP server.");
+      return;
+    }
+
+    setOauthStarting(serverName);
+    setPendingOauth(null);
+    setError(null);
+    try {
+      const result = await appServerClient.startMcpServerOauthLogin({
+        name: serverName,
+      });
+      setPendingOauth({
+        serverName,
+        authorizationUrl: result.authorizationUrl,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setOauthStarting(null);
+    }
+  }, [oauthStarting]);
+
   const toggle = () => {
     const next = !open;
     setOpen(next);
@@ -64,6 +96,31 @@ export function McpServerDock() {
               {loading ? "Loading…" : "Refresh"}
             </button>
           </header>
+          {pendingOauth && (
+            <div className="mcp-oauth-banner">
+              <span>
+                <strong>Authorization ready</strong>
+                <small>{pendingOauth.serverName} · credentials stay in SyndridCLI</small>
+              </span>
+              <a
+                href={pendingOauth.authorizationUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Open sign-in
+              </a>
+              <button
+                disabled={loading}
+                onClick={() => {
+                  setPendingOauth(null);
+                  void load();
+                }}
+                type="button"
+              >
+                Check status
+              </button>
+            </div>
+          )}
           {error ? (
             <div className="mcp-server-state error">{error}</div>
           ) : loading && !loaded ? (
@@ -74,6 +131,7 @@ export function McpServerDock() {
             <div className="mcp-server-list">
               {servers.map((server) => {
                 const tools = Object.keys(server.tools ?? {});
+                const canOauth = server.authStatus === "notLoggedIn";
                 return (
                   <article className="mcp-server-card" key={server.name}>
                     <div className="mcp-server-card-head">
@@ -82,7 +140,18 @@ export function McpServerDock() {
                         {authLabel(server.authStatus)}
                       </span>
                     </div>
-                    <small>{tools.length} tool{tools.length === 1 ? "" : "s"}</small>
+                    <div className="mcp-server-summary">
+                      <small>{tools.length} tool{tools.length === 1 ? "" : "s"}</small>
+                      {canOauth && (
+                        <button
+                          disabled={oauthStarting !== null}
+                          onClick={() => void startOauth(server.name)}
+                          type="button"
+                        >
+                          {oauthStarting === server.name ? "Starting…" : "Sign in"}
+                        </button>
+                      )}
+                    </div>
                     {tools.length > 0 && (
                       <div className="mcp-tool-list">
                         {tools.slice(0, 8).map((tool) => <code key={tool}>{tool}</code>)}
