@@ -7,12 +7,15 @@ import "./approvalDock.css";
 
 const COMMAND_APPROVAL = "item/commandExecution/requestApproval";
 const FILE_APPROVAL = "item/fileChange/requestApproval";
+const PERMISSIONS_APPROVAL = "item/permissions/requestApproval";
 
 type ApprovalDecision = "accept" | "acceptForSession" | "decline";
+type PermissionScope = "turn" | "session";
+type ApprovalKind = "command" | "file" | "permissions";
 
 interface PendingApproval {
   request: RuntimeServerRequest;
-  kind: "command" | "file";
+  kind: ApprovalKind;
   threadId: string;
   turnId: string;
   itemId: string;
@@ -20,6 +23,8 @@ interface PendingApproval {
   detail: string | null;
   reason: string | null;
   startedAtMs: number | null;
+  requestedPermissions: Record<string, unknown> | null;
+  permissionSummary: string[];
 }
 
 export function ApprovalDock() {
@@ -45,21 +50,45 @@ export function ApprovalDock() {
     [approvals.length],
   );
 
-  const respond = async (decision: ApprovalDecision) => {
-    if (!current || respondingId !== null) return;
+  const finishCurrent = (requestId: RuntimeServerRequest["id"]) => {
+    setApprovals((entries) =>
+      entries.filter((entry) => entry.request.id !== requestId),
+    );
+  };
+
+  const respondDecision = async (decision: ApprovalDecision) => {
+    if (!current || current.kind === "permissions" || respondingId !== null) return;
     const responseKey = String(current.request.id);
     setRespondingId(responseKey);
     setError(null);
 
     try {
       await appServerClient.respondToServerRequest(current.request.id, { decision });
-      setApprovals((entries) =>
-        entries.filter((entry) => entry.request.id !== current.request.id),
-      );
+      finishCurrent(current.request.id);
     } catch (responseError) {
-      setError(
-        responseError instanceof Error ? responseError.message : String(responseError),
-      );
+      setError(errorMessage(responseError));
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
+  const respondPermissions = async (
+    scope: PermissionScope,
+    grantRequested: boolean,
+  ) => {
+    if (!current || current.kind !== "permissions" || respondingId !== null) return;
+    const responseKey = String(current.request.id);
+    setRespondingId(responseKey);
+    setError(null);
+
+    try {
+      await appServerClient.respondToServerRequest(current.request.id, {
+        permissions: grantRequested ? current.requestedPermissions ?? {} : {},
+        scope,
+      });
+      finishCurrent(current.request.id);
+    } catch (responseError) {
+      setError(errorMessage(responseError));
     } finally {
       setRespondingId(null);
     }
@@ -68,13 +97,14 @@ export function ApprovalDock() {
   if (!current) return null;
 
   const busy = respondingId === String(current.request.id);
+  const heading = approvalHeading(current.kind);
 
   return (
     <section className="approval-dock" role="alertdialog" aria-live="assertive">
       <header>
         <div>
           <span className="approval-eyebrow">{queueLabel}</span>
-          <strong>{current.kind === "command" ? "Run command?" : "Allow file changes?"}</strong>
+          <strong>{heading}</strong>
         </div>
         <span className="approval-kind">{current.kind}</span>
       </header>
@@ -83,6 +113,13 @@ export function ApprovalDock() {
         <code title={current.title}>{current.title}</code>
         {current.detail && <small title={current.detail}>{current.detail}</small>}
         {current.reason && <p>{current.reason}</p>}
+        {current.permissionSummary.length > 0 && (
+          <ul className="permission-summary" aria-label="Requested permissions">
+            {current.permissionSummary.map((permission) => (
+              <li key={permission}>{permission}</li>
+            ))}
+          </ul>
+        )}
         <div className="approval-meta">
           <span>thread {current.threadId.slice(0, 8)}</span>
           <span>turn {current.turnId.slice(0, 8)}</span>
@@ -90,38 +127,71 @@ export function ApprovalDock() {
         {error && <p className="approval-error">{error}</p>}
       </div>
 
-      <footer>
-        <button
-          className="approval-decline"
-          disabled={busy}
-          onClick={() => void respond("decline")}
-          type="button"
-        >
-          Deny
-        </button>
-        <span />
-        <button
-          disabled={busy}
-          onClick={() => void respond("acceptForSession")}
-          type="button"
-        >
-          Allow session
-        </button>
-        <button
-          className="approval-accept"
-          disabled={busy}
-          onClick={() => void respond("accept")}
-          type="button"
-        >
-          {busy ? "Responding…" : "Allow once"}
-        </button>
-      </footer>
+      {current.kind === "permissions" ? (
+        <footer>
+          <button
+            className="approval-decline"
+            disabled={busy}
+            onClick={() => void respondPermissions("turn", false)}
+            type="button"
+          >
+            Deny
+          </button>
+          <span />
+          <button
+            disabled={busy}
+            onClick={() => void respondPermissions("session", true)}
+            type="button"
+          >
+            Allow session
+          </button>
+          <button
+            className="approval-accept"
+            disabled={busy}
+            onClick={() => void respondPermissions("turn", true)}
+            type="button"
+          >
+            {busy ? "Responding…" : "Allow turn"}
+          </button>
+        </footer>
+      ) : (
+        <footer>
+          <button
+            className="approval-decline"
+            disabled={busy}
+            onClick={() => void respondDecision("decline")}
+            type="button"
+          >
+            Deny
+          </button>
+          <span />
+          <button
+            disabled={busy}
+            onClick={() => void respondDecision("acceptForSession")}
+            type="button"
+          >
+            Allow session
+          </button>
+          <button
+            className="approval-accept"
+            disabled={busy}
+            onClick={() => void respondDecision("accept")}
+            type="button"
+          >
+            {busy ? "Responding…" : "Allow once"}
+          </button>
+        </footer>
+      )}
     </section>
   );
 }
 
 function normalizeApproval(request: RuntimeServerRequest): PendingApproval | null {
-  if (request.method !== COMMAND_APPROVAL && request.method !== FILE_APPROVAL) {
+  if (
+    request.method !== COMMAND_APPROVAL &&
+    request.method !== FILE_APPROVAL &&
+    request.method !== PERMISSIONS_APPROVAL
+  ) {
     return null;
   }
   if (!isRecord(request.params)) return null;
@@ -143,21 +213,78 @@ function normalizeApproval(request: RuntimeServerRequest): PendingApproval | nul
       detail: stringValue(request.params.cwd),
       reason: stringValue(request.params.reason),
       startedAtMs: numberValue(request.params.startedAtMs),
+      requestedPermissions: null,
+      permissionSummary: [],
     };
   }
 
-  const grantRoot = stringValue(request.params.grantRoot);
+  if (request.method === FILE_APPROVAL) {
+    const grantRoot = stringValue(request.params.grantRoot);
+    return {
+      request,
+      kind: "file",
+      threadId,
+      turnId,
+      itemId,
+      title: grantRoot ? `Write under ${grantRoot}` : "Workspace file changes",
+      detail: grantRoot,
+      reason: stringValue(request.params.reason),
+      startedAtMs: numberValue(request.params.startedAtMs),
+      requestedPermissions: null,
+      permissionSummary: [],
+    };
+  }
+
+  const requestedPermissions = isRecord(request.params.permissions)
+    ? request.params.permissions
+    : {};
+  const cwd = stringValue(request.params.cwd);
   return {
     request,
-    kind: "file",
+    kind: "permissions",
     threadId,
     turnId,
     itemId,
-    title: grantRoot ? `Write under ${grantRoot}` : "Workspace file changes",
-    detail: grantRoot,
+    title: "Additional sandbox permissions",
+    detail: cwd,
     reason: stringValue(request.params.reason),
     startedAtMs: numberValue(request.params.startedAtMs),
+    requestedPermissions,
+    permissionSummary: summarizePermissions(requestedPermissions),
   };
+}
+
+function approvalHeading(kind: ApprovalKind): string {
+  if (kind === "command") return "Run command?";
+  if (kind === "file") return "Allow file changes?";
+  return "Grant additional access?";
+}
+
+function summarizePermissions(permissions: Record<string, unknown>): string[] {
+  const summary: string[] = [];
+  const network = permissions.network;
+  if (isRecord(network) && network.enabled === true) {
+    summary.push("Network access");
+  }
+
+  const fileSystem = permissions.fileSystem;
+  if (isRecord(fileSystem)) {
+    const reads = stringArray(fileSystem.read);
+    const writes = stringArray(fileSystem.write);
+    for (const path of reads) summary.push(`Read: ${path}`);
+    for (const path of writes) summary.push(`Write: ${path}`);
+
+    if (Array.isArray(fileSystem.entries) && fileSystem.entries.length > 0) {
+      summary.push(`${fileSystem.entries.length} filesystem rule${fileSystem.entries.length === 1 ? "" : "s"}`);
+    }
+  }
+
+  return summary.length > 0 ? summary : ["Runtime-requested sandbox access"];
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -170,4 +297,8 @@ function stringValue(value: unknown): string | null {
 
 function numberValue(value: unknown): number | null {
   return typeof value === "number" ? value : null;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
