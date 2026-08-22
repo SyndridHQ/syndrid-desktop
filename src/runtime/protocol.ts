@@ -66,6 +66,11 @@ export interface FuzzyFileSearchParams { query: string; roots: string[]; cancell
 export interface FuzzyFileSearchResult { root: string; path: string; match_type: unknown; file_name: string; score: number; indices: number[] | null; }
 export interface FuzzyFileSearchResponse { files: FuzzyFileSearchResult[]; }
 
+export interface SkillsListParams { cwds?: string[]; forceReload?: boolean; }
+export interface SkillMetadata { name: string; description: string; shortDescription?: string; interface?: unknown; dependencies?: unknown; path: string; scope: unknown; enabled: boolean; }
+export interface SkillsListEntry { cwd: string; skills: SkillMetadata[]; errors: unknown[]; }
+export interface SkillsListResponse { data: SkillsListEntry[]; }
+
 export interface AgentMessageDeltaNotification { threadId: string; turnId: string; itemId: string; delta: string; }
 export interface TurnLifecycleNotification { threadId: string; turn: TurnSummary; }
 
@@ -83,6 +88,7 @@ export const methods = {
   mcpServerOauthLogin: "mcpServer/oauth/login",
   fsReadDirectory: "fs/readDirectory",
   fuzzyFileSearch: "fuzzyFileSearch",
+  skillsList: "skills/list",
 } as const;
 
 export const notifications = {
