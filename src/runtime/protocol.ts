@@ -58,6 +58,10 @@ export interface McpServerStatusListResponse { data: McpServerStatus[]; nextCurs
 export interface McpServerOauthLoginParams { name: string; threadId?: string | null; scopes?: string[] | null; timeoutSecs?: bigint | null; }
 export interface McpServerOauthLoginResponse { authorizationUrl: string; }
 
+export interface FsReadDirectoryParams { path: string; }
+export interface FsReadDirectoryEntry { fileName: string; isDirectory: boolean; isFile: boolean; }
+export interface FsReadDirectoryResponse { entries: FsReadDirectoryEntry[]; }
+
 export interface AgentMessageDeltaNotification { threadId: string; turnId: string; itemId: string; delta: string; }
 export interface TurnLifecycleNotification { threadId: string; turn: TurnSummary; }
 
@@ -73,6 +77,7 @@ export const methods = {
   modelProviderCapabilitiesRead: "modelProvider/capabilities/read",
   mcpServerStatusList: "mcpServerStatus/list",
   mcpServerOauthLogin: "mcpServer/oauth/login",
+  fsReadDirectory: "fs/readDirectory",
 } as const;
 
 export const notifications = {
