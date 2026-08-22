@@ -61,10 +61,8 @@ export function McpServerDock() {
       const result = await appServerClient.startMcpServerOauthLogin({
         name: serverName,
       });
-      setPendingOauth({
-        serverName,
-        authorizationUrl: result.authorizationUrl,
-      });
+      const authorizationUrl = safeAuthorizationUrl(result.authorizationUrl);
+      setPendingOauth({ serverName, authorizationUrl });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -167,6 +165,14 @@ export function McpServerDock() {
       )}
     </aside>
   );
+}
+
+function safeAuthorizationUrl(raw: string): string {
+  const url = new URL(raw);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(`Unsupported MCP authorization URL scheme: ${url.protocol}`);
+  }
+  return url.toString();
 }
 
 function authLabel(status: McpServerStatus["authStatus"]): string {
