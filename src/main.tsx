@@ -6,6 +6,7 @@ import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
+import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
 
 const bootStartedAt = performance.now();
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
     <RuntimeInputDock />
     <McpElicitationDock />
     <McpServerDock />
+    <WorkspaceFilesDock />
     <RuntimeActivityDock />
   </StrictMode>,
 );
