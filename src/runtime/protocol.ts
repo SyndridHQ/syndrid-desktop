@@ -39,13 +39,20 @@ export interface JsonRpcFailure {
 
 export type JsonRpcResponse<TResult = unknown> = JsonRpcSuccess<TResult> | JsonRpcFailure;
 
+export interface InitializeCapabilities {
+  experimentalApi: boolean;
+  requestAttestation: boolean;
+  mcpServerOpenaiFormElicitation?: boolean;
+  optOutNotificationMethods?: string[] | null;
+}
+
 export interface InitializeParams {
   clientInfo: {
     name: string;
     title: string;
     version: string;
   };
-  capabilities: null;
+  capabilities: InitializeCapabilities | null;
 }
 
 export interface InitializeResponse {
@@ -256,4 +263,5 @@ export const notifications = {
   turnStarted: "turn/started",
   turnCompleted: "turn/completed",
   agentMessageDelta: "item/agentMessage/delta",
+  serverRequestResolved: "serverRequest/resolved",
 } as const;
