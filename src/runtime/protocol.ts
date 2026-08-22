@@ -10,7 +10,7 @@
 export const PROTOCOL_SOURCE_SHA = "5a83a6b21e7f7e4287be9ef20a33f50262c771f2";
 export const PROTOCOL_SOURCE_SHORT_SHA = PROTOCOL_SOURCE_SHA.slice(0, 7);
 
-export type RequestId = number;
+export type RequestId = string | number;
 
 export interface JsonRpcRequest<TParams = unknown> {
   method: string;
