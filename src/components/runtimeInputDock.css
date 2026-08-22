@@ -1,0 +1,158 @@
+.runtime-input-dock {
+  position: fixed;
+  left: 50%;
+  top: 62px;
+  z-index: 55;
+  width: min(520px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  overflow: hidden;
+  border: 1px solid rgba(127, 149, 255, 0.46);
+  border-radius: 12px;
+  background: rgba(13, 16, 20, 0.99);
+  color: var(--text, #e8edf2);
+  box-shadow: 0 20px 64px rgba(0, 0, 0, 0.52);
+  font: 11px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.runtime-input-dock > header,
+.runtime-input-dock > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.runtime-input-dock > header {
+  border-bottom: 1px solid var(--border, #20262d);
+  background: rgba(127, 149, 255, 0.07);
+}
+
+.runtime-input-dock > header div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.runtime-input-dock > header span {
+  color: var(--accent, #7f95ff);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.runtime-input-dock > header strong {
+  font-size: 12px;
+}
+
+.runtime-input-dock > header em {
+  color: var(--faint, #5d6670);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.runtime-input-body {
+  display: grid;
+  max-height: min(520px, 65vh);
+  gap: 10px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.runtime-input-body fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid var(--border, #20262d);
+  border-radius: 9px;
+  padding: 10px;
+}
+
+.runtime-input-body legend {
+  padding: 0 4px;
+  color: var(--muted, #87919c);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.runtime-input-body p {
+  margin: 0;
+  color: var(--text, #e8edf2);
+  font-size: 10px;
+}
+
+.runtime-input-options {
+  display: grid;
+  gap: 6px;
+}
+
+.runtime-input-options button {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border, #20262d);
+  border-radius: 7px;
+  padding: 7px 8px;
+  background: var(--panel-2, #11151a);
+  color: var(--text, #e8edf2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.runtime-input-options button.selected {
+  border-color: var(--accent, #7f95ff);
+  background: rgba(127, 149, 255, 0.12);
+}
+
+.runtime-input-options small {
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+.runtime-input-body input {
+  width: 100%;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 7px;
+  padding: 8px 9px;
+  background: var(--panel-2, #11151a);
+  color: var(--text, #e8edf2);
+  outline: none;
+  font: inherit;
+}
+
+.runtime-input-body input:focus {
+  border-color: var(--accent, #7f95ff);
+}
+
+.runtime-input-error {
+  color: var(--danger, #e27272) !important;
+}
+
+.runtime-input-dock > footer {
+  border-top: 1px solid var(--border, #20262d);
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+.runtime-input-dock > footer button {
+  border: 1px solid #8296ff;
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: #7188f7;
+  color: #0c1020;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.runtime-input-dock > footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 720px) {
+  .runtime-input-dock {
+    top: 52px;
+    width: calc(100vw - 16px);
+  }
+}
