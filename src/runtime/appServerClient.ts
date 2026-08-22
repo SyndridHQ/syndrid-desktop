@@ -16,6 +16,8 @@ import {
   type ModelListResponse,
   type ModelProviderCapabilities,
   type RequestId,
+  type SkillsListParams,
+  type SkillsListResponse,
   type ThreadListParams,
   type ThreadListResponse,
   type ThreadReadParams,
@@ -191,6 +193,10 @@ export class SyndridAppServerClient {
     params: FuzzyFileSearchParams,
   ): Promise<FuzzyFileSearchResponse> {
     return this.request<FuzzyFileSearchResponse>(methods.fuzzyFileSearch, params);
+  }
+
+  async listSkills(params: SkillsListParams = {}): Promise<SkillsListResponse> {
+    return this.request<SkillsListResponse>(methods.skillsList, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {
