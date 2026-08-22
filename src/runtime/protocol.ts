@@ -138,10 +138,6 @@ export interface ThreadReadResponse {
   thread: ThreadSummary;
 }
 
-export interface ThreadResumeParams {
-  threadId: string;
-}
-
 export interface ThreadResumeResponse {
   thread: ThreadSummary;
   model: string;
@@ -189,6 +185,13 @@ export interface TurnStartResponse {
   turn: TurnSummary;
 }
 
+export interface TurnInterruptParams {
+  threadId: string;
+  turnId: string;
+}
+
+export type TurnInterruptResponse = Record<string, never>;
+
 export interface AgentMessageDeltaNotification {
   threadId: string;
   turnId: string;
@@ -208,6 +211,7 @@ export const methods = {
   threadRead: "thread/read",
   threadResume: "thread/resume",
   turnStart: "turn/start",
+  turnInterrupt: "turn/interrupt",
 } as const;
 
 export const notifications = {
