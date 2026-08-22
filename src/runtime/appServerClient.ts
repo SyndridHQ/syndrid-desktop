@@ -92,7 +92,10 @@ export class SyndridAppServerClient {
           title: "Syndrid Desktop",
           version: "0.1.0",
         },
-        capabilities: null,
+        capabilities: {
+          experimentalApi: true,
+          requestAttestation: false,
+        },
       };
 
       const server = await this.request<InitializeResponse>(
