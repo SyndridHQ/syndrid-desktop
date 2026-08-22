@@ -235,6 +235,37 @@ export interface ModelProviderCapabilities {
   webSearch: boolean;
 }
 
+export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
+export type McpAuthStatus = "unsupported" | "notLoggedIn" | "bearerToken" | "oAuth";
+
+export interface McpServerStatusListParams {
+  cursor?: string | null;
+  limit?: number | null;
+  detail?: McpServerStatusDetail | null;
+  threadId?: string | null;
+}
+
+export interface McpToolSummary {
+  name?: string;
+  title?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+export interface McpServerStatus {
+  name: string;
+  serverInfo: unknown | null;
+  tools: Record<string, McpToolSummary | undefined>;
+  resources: unknown[];
+  resourceTemplates: unknown[];
+  authStatus: McpAuthStatus;
+}
+
+export interface McpServerStatusListResponse {
+  data: McpServerStatus[];
+  nextCursor: string | null;
+}
+
 export interface AgentMessageDeltaNotification {
   threadId: string;
   turnId: string;
@@ -257,6 +288,7 @@ export const methods = {
   turnInterrupt: "turn/interrupt",
   modelList: "model/list",
   modelProviderCapabilitiesRead: "modelProvider/capabilities/read",
+  mcpServerStatusList: "mcpServerStatus/list",
 } as const;
 
 export const notifications = {
