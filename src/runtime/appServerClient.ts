@@ -12,6 +12,8 @@ import {
   type ThreadResumeResponse,
   type ThreadStartParams,
   type ThreadStartResponse,
+  type TurnStartParams,
+  type TurnStartResponse,
   methods,
 } from "./protocol";
 import {
@@ -124,6 +126,10 @@ export class SyndridAppServerClient {
 
   async resumeThread(threadId: string): Promise<ThreadResumeResponse> {
     return this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
+  }
+
+  async startTurn(params: TurnStartParams): Promise<TurnStartResponse> {
+    return this.request<TurnStartResponse>(methods.turnStart, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {

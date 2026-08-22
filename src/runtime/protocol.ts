@@ -150,10 +150,68 @@ export interface ThreadResumeResponse {
   cwd: string;
 }
 
+export interface UserTextInput {
+  type: "text";
+  text: string;
+  text_elements: unknown[];
+}
+
+export type UserInput = UserTextInput;
+
+export interface TurnSummary {
+  id: string;
+  items: unknown[];
+  itemsView: unknown;
+  status: unknown;
+  error: unknown | null;
+  startedAt: number | null;
+  completedAt: number | null;
+  durationMs: number | null;
+}
+
+export interface TurnStartParams {
+  threadId: string;
+  clientUserMessageId?: string | null;
+  input: UserInput[];
+  cwd?: string | null;
+  approvalPolicy?: unknown;
+  approvalsReviewer?: unknown;
+  sandboxPolicy?: unknown;
+  model?: string | null;
+  serviceTier?: string | null;
+  effort?: unknown;
+  summary?: unknown;
+  personality?: unknown;
+  outputSchema?: unknown;
+}
+
+export interface TurnStartResponse {
+  turn: TurnSummary;
+}
+
+export interface AgentMessageDeltaNotification {
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  delta: string;
+}
+
+export interface TurnLifecycleNotification {
+  threadId: string;
+  turn: TurnSummary;
+}
+
 export const methods = {
   initialize: "initialize",
   threadList: "thread/list",
   threadStart: "thread/start",
   threadRead: "thread/read",
   threadResume: "thread/resume",
+  turnStart: "turn/start",
+} as const;
+
+export const notifications = {
+  turnStarted: "turn/started",
+  turnCompleted: "turn/completed",
+  agentMessageDelta: "item/agentMessage/delta",
 } as const;
