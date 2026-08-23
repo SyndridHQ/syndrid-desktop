@@ -44,6 +44,28 @@ export interface ModelSummary { id: string; model: string; upgrade: string | nul
 export interface ModelListResponse { data: ModelSummary[]; nextCursor: string | null; }
 export interface ModelProviderCapabilities { namespaceTools: boolean; imageGeneration: boolean; webSearch: boolean; }
 
+export interface ConfigReadParams { includeLayers?: boolean; cwd?: string | null; }
+export interface ConfigLayerMetadata { name: unknown; version: string; }
+export interface RuntimeConfig {
+  model?: string | null;
+  review_model?: string | null;
+  model_provider?: string | null;
+  service_tier?: string | null;
+  model_reasoning_effort?: unknown;
+  model_reasoning_summary?: unknown;
+  model_verbosity?: unknown;
+  approval_policy?: unknown;
+  sandbox_mode?: unknown;
+  web_search?: unknown;
+  desktop?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+export interface ConfigReadResponse {
+  config: RuntimeConfig;
+  origins: Record<string, ConfigLayerMetadata | undefined>;
+  layers?: unknown[];
+}
+
 export interface EnvironmentInfoParams { environmentId: string; }
 export interface EnvironmentShellInfo { name: string; path: string; }
 export interface EnvironmentInfoResponse { shell: EnvironmentShellInfo; cwd: string | null; }
@@ -118,6 +140,7 @@ export const methods = {
   turnInterrupt: "turn/interrupt",
   modelList: "model/list",
   modelProviderCapabilitiesRead: "modelProvider/capabilities/read",
+  configRead: "config/read",
   environmentInfo: "environment/info",
   commandExec: "command/exec",
   commandExecWrite: "command/exec/write",
