@@ -22,6 +22,7 @@ export function GitDock() {
   const [baseSha, setBaseSha] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
   const [diffTruncated, setDiffTruncated] = useState(false);
+  const [fileFilter, setFileFilter] = useState("");
   const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const gitInfo = workspace?.git ?? null;
@@ -32,6 +33,7 @@ export function GitDock() {
     setBaseSha(null);
     setDiff("");
     setDiffTruncated(false);
+    setFileFilter("");
     setSelectedSectionKey(null);
     setError(null);
   }, [workspace?.threadId, workspace?.cwd]);
@@ -55,6 +57,7 @@ export function GitDock() {
       setBaseSha(result.sha);
       setDiff(retainedDiff);
       setDiffTruncated(isTruncated);
+      setFileFilter("");
       setSelectedSectionKey(firstDiffSectionKey(retainedDiff));
       setDiffLoaded(true);
     } catch (cause) {
@@ -70,9 +73,19 @@ export function GitDock() {
 
   const diffStats = useMemo(() => summarizeDiff(diff), [diff]);
   const allDiffSections = useMemo(() => splitUnifiedDiff(diff), [diff]);
+  const normalizedFileFilter = fileFilter.trim().toLocaleLowerCase();
+  const matchingDiffSections = useMemo(
+    () =>
+      normalizedFileFilter
+        ? allDiffSections.filter((section) =>
+            section.path.toLocaleLowerCase().includes(normalizedFileFilter),
+          )
+        : allDiffSections,
+    [allDiffSections, normalizedFileFilter],
+  );
   const diffSections = useMemo(
-    () => allDiffSections.slice(0, MAX_DIFF_FILES),
-    [allDiffSections],
+    () => matchingDiffSections.slice(0, MAX_DIFF_FILES),
+    [matchingDiffSections],
   );
   const selectedSection = useMemo(
     () =>
@@ -151,6 +164,27 @@ export function GitDock() {
                   </div>
                   {diff ? (
                     <>
+                      {allDiffSections.length > 0 && (
+                        <div className="git-diff-filter">
+                          <input
+                            aria-label="Filter changed files"
+                            onChange={(event) => setFileFilter(event.target.value)}
+                            placeholder="Filter changed files…"
+                            spellCheck={false}
+                            value={fileFilter}
+                          />
+                          <small>
+                            {normalizedFileFilter
+                              ? `${matchingDiffSections.length} of ${allDiffSections.length}`
+                              : `${allDiffSections.length} changed`}
+                          </small>
+                          {fileFilter && (
+                            <button onClick={() => setFileFilter("")} type="button">
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {diffSections.length > 0 ? (
                         <div className="git-diff-layout">
                           <nav className="git-diff-files" aria-label="Changed files">
@@ -166,9 +200,9 @@ export function GitDock() {
                                 <small>+{section.added} −{section.removed}</small>
                               </button>
                             ))}
-                            {allDiffSections.length > MAX_DIFF_FILES && (
+                            {matchingDiffSections.length > MAX_DIFF_FILES && (
                               <div className="git-diff-file-limit">
-                                Showing {MAX_DIFF_FILES} of {allDiffSections.length} files.
+                                Showing {MAX_DIFF_FILES} of {matchingDiffSections.length} matching files.
                               </div>
                             )}
                           </nav>
@@ -179,6 +213,8 @@ export function GitDock() {
                             <pre>{selectedSection?.text ?? diff}</pre>
                           </div>
                         </div>
+                      ) : normalizedFileFilter ? (
+                        <div className="git-state compact">No changed files match this filter.</div>
                       ) : (
                         <pre>{diff}</pre>
                       )}
