@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getRuntimeBinaryOverride } from "./runtimeBinaryPreference";
 
 export const APP_SERVER_MESSAGE_EVENT = "syndrid://app-server/message";
 export const APP_SERVER_STDERR_EVENT = "syndrid://app-server/stderr";
@@ -14,8 +15,9 @@ export async function startNativeAppServer(binary?: string): Promise<NativeAppSe
     throw new Error("Syndrid app-server supervision is only available inside the Tauri desktop runtime.");
   }
 
+  const configuredBinary = binary?.trim() || getRuntimeBinaryOverride();
   return invoke<NativeAppServerStatus>("start_app_server", {
-    binary: binary ?? null,
+    binary: configuredBinary ?? null,
   });
 }
 
