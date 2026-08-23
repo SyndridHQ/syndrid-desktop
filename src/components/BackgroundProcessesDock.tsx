@@ -6,6 +6,7 @@ import "./backgroundProcessesDock.css";
 
 const PAGE_SIZE = 50;
 const MAX_RETAINED_PROCESSES = 200;
+type ProcessSort = "runtime" | "cpu" | "memory" | "command";
 
 export function BackgroundProcessesDock() {
   const workspace = useRuntimeWorkspace();
@@ -14,6 +15,7 @@ export function BackgroundProcessesDock() {
   const [processes, setProcesses] = useState<ThreadBackgroundTerminal[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<ProcessSort>("runtime");
   const [terminating, setTerminating] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -70,6 +72,7 @@ export function BackgroundProcessesDock() {
     setProcesses([]);
     setCursor(null);
     setQuery("");
+    setSort("runtime");
     setTerminating(new Set());
     setError(null);
     if (open) void load(false);
@@ -82,6 +85,10 @@ export function BackgroundProcessesDock() {
   const filteredProcesses = useMemo(
     () => filterProcesses(processes, query),
     [processes, query],
+  );
+  const visibleProcesses = useMemo(
+    () => sortProcesses(filteredProcesses, sort),
+    [filteredProcesses, sort],
   );
   const normalizedQuery = query.trim();
 
@@ -159,6 +166,16 @@ export function BackgroundProcessesDock() {
                 placeholder="Filter command, cwd, process ID, or PID…"
                 value={query}
               />
+              <select
+                aria-label="Sort background processes"
+                onChange={(event) => setSort(event.target.value as ProcessSort)}
+                value={sort}
+              >
+                <option value="runtime">Runtime order</option>
+                <option value="cpu">CPU high to low</option>
+                <option value="memory">Memory high to low</option>
+                <option value="command">Command A–Z</option>
+              </select>
               {normalizedQuery && (
                 <button onClick={() => setQuery("")} type="button">
                   Clear
@@ -184,7 +201,7 @@ export function BackgroundProcessesDock() {
             <div className="background-processes-state">No retained processes match this filter.</div>
           ) : (
             <div className="background-processes-list">
-              {filteredProcesses.map((process) => (
+              {visibleProcesses.map((process) => (
                 <ProcessRow
                   key={process.processId}
                   process={process}
@@ -270,6 +287,31 @@ function filterProcesses(
     ];
     return fields.some((field) => field.toLocaleLowerCase().includes(normalized));
   });
+}
+
+function sortProcesses(
+  processes: ThreadBackgroundTerminal[],
+  sort: ProcessSort,
+): ThreadBackgroundTerminal[] {
+  if (sort === "runtime") return processes;
+  const sorted = [...processes];
+  if (sort === "cpu") {
+    sorted.sort((a, b) => compareNullableNumberDescending(a.cpuPercent, b.cpuPercent));
+  } else if (sort === "memory") {
+    sorted.sort((a, b) => compareNullableNumberDescending(a.rssKb, b.rssKb));
+  } else {
+    sorted.sort((a, b) =>
+      a.command.localeCompare(b.command, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }
+  return sorted;
+}
+
+function compareNullableNumberDescending(a: number | null, b: number | null): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return b - a;
 }
 
 function summarize(processes: ThreadBackgroundTerminal[]): { cpuPercent: number | null; rssKb: number | null } {
