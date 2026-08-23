@@ -9,6 +9,7 @@ import { McpServerDock } from "./components/McpServerDock";
 import { ProviderDock } from "./components/ProviderDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
+import { SettingsDock } from "./components/SettingsDock";
 import { SkillsDock } from "./components/SkillsDock";
 import { TerminalDock } from "./components/TerminalDock";
 import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
@@ -29,6 +30,7 @@ createRoot(document.getElementById("root")!).render(
     <ProviderDock />
     <GitDock />
     <TerminalDock />
+    <SettingsDock />
     <RuntimeActivityDock />
   </StrictMode>,
 );
