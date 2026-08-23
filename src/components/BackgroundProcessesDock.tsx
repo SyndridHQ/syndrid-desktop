@@ -99,6 +99,7 @@ export function BackgroundProcessesDock() {
           setError(`Runtime did not terminate process ${process.processId}. Refresh to reconcile.`);
         }
       } catch (cause) {
+        if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
         setTerminating((current) => {
