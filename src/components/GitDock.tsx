@@ -6,6 +6,7 @@ import "./gitDock.css";
 
 const MAX_DIFF_CHARS = 250_000;
 const MAX_DIFF_FILES = 200;
+const MAX_TYPED_DIFF_CHANGES = 2_500;
 
 interface DiffSection {
   key: string;
@@ -13,6 +14,12 @@ interface DiffSection {
   previousPath: string | null;
   kind: GitDiffChangeKind | null;
   text: string;
+  added: number;
+  removed: number;
+}
+
+interface RuntimeChangeSummary {
+  files: number;
   added: number;
   removed: number;
 }
@@ -25,6 +32,7 @@ export function GitDock() {
   const [baseSha, setBaseSha] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
   const [runtimeChanges, setRuntimeChanges] = useState<GitDiffChange[] | null>(null);
+  const [runtimeChangeSummary, setRuntimeChangeSummary] = useState<RuntimeChangeSummary | null>(null);
   const [diffTruncated, setDiffTruncated] = useState(false);
   const [fileFilter, setFileFilter] = useState("");
   const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(null);
@@ -37,6 +45,7 @@ export function GitDock() {
     setBaseSha(null);
     setDiff("");
     setRuntimeChanges(null);
+    setRuntimeChangeSummary(null);
     setDiffTruncated(false);
     setFileFilter("");
     setSelectedSectionKey(null);
@@ -59,13 +68,15 @@ export function GitDock() {
 
       const isTruncated = result.diff.length > MAX_DIFF_CHARS;
       const retainedDiff = isTruncated ? result.diff.slice(0, MAX_DIFF_CHARS) : result.diff;
-      const typedChanges = Array.isArray(result.changes) ? result.changes : null;
+      const allTypedChanges = Array.isArray(result.changes) ? result.changes : null;
+      const retainedTypedChanges = allTypedChanges?.slice(0, MAX_TYPED_DIFF_CHANGES) ?? null;
       setBaseSha(result.sha);
       setDiff(retainedDiff);
-      setRuntimeChanges(typedChanges);
+      setRuntimeChanges(retainedTypedChanges);
+      setRuntimeChangeSummary(allTypedChanges ? summarizeRuntimeChanges(allTypedChanges) : null);
       setDiffTruncated(isTruncated);
       setFileFilter("");
-      setSelectedSectionKey(firstDiffSectionKey(retainedDiff, typedChanges));
+      setSelectedSectionKey(firstDiffSectionKey(retainedDiff, retainedTypedChanges));
       setDiffLoaded(true);
     } catch (cause) {
       if (appServerClient.getWorkspaceSnapshot()?.cwd === cwd) {
@@ -79,24 +90,12 @@ export function GitDock() {
   }, [loadingDiff, workspace?.cwd]);
 
   const fallbackDiffStats = useMemo(() => summarizeDiff(diff), [diff]);
-  const diffStats = useMemo(
-    () =>
-      runtimeChanges
-        ? runtimeChanges.reduce(
-            (total, change) => ({
-              added: total.added + change.addedLines,
-              removed: total.removed + change.removedLines,
-            }),
-            { added: 0, removed: 0 },
-          )
-        : fallbackDiffStats,
-    [fallbackDiffStats, runtimeChanges],
-  );
+  const diffStats = runtimeChangeSummary ?? fallbackDiffStats;
   const allDiffSections = useMemo(
     () => splitUnifiedDiff(diff, runtimeChanges),
     [diff, runtimeChanges],
   );
-  const totalChangedFiles = runtimeChanges?.length ?? allDiffSections.length;
+  const totalChangedFiles = runtimeChangeSummary?.files ?? allDiffSections.length;
   const normalizedFileFilter = fileFilter.trim().toLocaleLowerCase();
   const matchingDiffSections = useMemo(
     () =>
@@ -271,7 +270,7 @@ export function GitDock() {
           )}
 
           <footer>
-            Runtime-owned Git · {runtimeChanges ? "typed file metadata" : "compatible diff fallback"} · no polling
+            Runtime-owned Git · {runtimeChangeSummary ? "typed file metadata" : "compatible diff fallback"} · no polling
           </footer>
         </section>
       )}
@@ -337,14 +336,29 @@ function cleanDiffPath(path: string): string {
 }
 
 function summarizeDiff(diff: string): { added: number; removed: number } {
+  let inHunk = false;
   let added = 0;
   let removed = 0;
   for (const line of diff.split("\n")) {
-    if (line.startsWith("+++") || line.startsWith("---")) continue;
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) continue;
     if (line.startsWith("+")) added += 1;
     else if (line.startsWith("-")) removed += 1;
   }
   return { added, removed };
+}
+
+function summarizeRuntimeChanges(changes: GitDiffChange[]): RuntimeChangeSummary {
+  let added = 0;
+  let removed = 0;
+  for (const change of changes) {
+    added += change.addedLines;
+    removed += change.removedLines;
+  }
+  return { files: changes.length, added, removed };
 }
 
 function changeKindShortLabel(kind: GitDiffChangeKind): string {
