@@ -16,6 +16,7 @@ import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { SessionHistoryDock } from "./components/SessionHistoryDock";
 import { SettingsDock } from "./components/SettingsDock";
 import { SkillsDock } from "./components/SkillsDock";
+import { SubagentsDock } from "./components/SubagentsDock";
 import { TerminalDock } from "./components/TerminalDock";
 import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
@@ -37,6 +38,7 @@ createRoot(document.getElementById("root")!).render(
     <GitDock />
     <TerminalDock />
     <BackgroundProcessesDock />
+    <SubagentsDock />
     <SessionHistoryDock />
     <ContextDock />
     <HooksDock />
