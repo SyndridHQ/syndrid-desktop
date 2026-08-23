@@ -60,9 +60,16 @@ export type RuntimeNotificationHandler = (notification: JsonRpcNotification) => 
 export type RuntimeLogHandler = (line: string) => void;
 export type RuntimeWorkspaceHandler = () => void;
 
+export interface RuntimeGitSnapshot {
+  sha: string | null;
+  branch: string | null;
+  originUrl: string | null;
+}
+
 export interface RuntimeWorkspaceSnapshot {
   threadId: string;
   cwd: string;
+  git: RuntimeGitSnapshot | null;
 }
 
 export interface RuntimeServerRequest {
@@ -306,18 +313,25 @@ export class SyndridAppServerClient {
     );
   }
 
-  private setWorkspaceFromThread(thread: { id: string; cwd: string }): void {
+  private setWorkspaceFromThread(thread: {
+    id: string;
+    cwd: string;
+    gitInfo?: unknown | null;
+  }): void {
     const cwd = thread.cwd.trim();
-    this.setWorkspaceSnapshot(cwd ? { threadId: thread.id, cwd } : null);
+    this.setWorkspaceSnapshot(
+      cwd
+        ? {
+            threadId: thread.id,
+            cwd,
+            git: parseRuntimeGitInfo(thread.gitInfo),
+          }
+        : null,
+    );
   }
 
   private setWorkspaceSnapshot(next: RuntimeWorkspaceSnapshot | null): void {
-    if (
-      this.workspaceSnapshot?.threadId === next?.threadId &&
-      this.workspaceSnapshot?.cwd === next?.cwd
-    ) {
-      return;
-    }
+    if (sameWorkspaceSnapshot(this.workspaceSnapshot, next)) return;
     this.workspaceSnapshot = next;
     for (const handler of this.workspaceHandlers) handler();
   }
@@ -432,6 +446,33 @@ export class SyndridAppServerClient {
       for (const handler of this.notificationHandlers) handler(notification);
     }
   }
+}
+
+function parseRuntimeGitInfo(value: unknown): RuntimeGitSnapshot | null {
+  if (!isRecord(value)) return null;
+  const sha = nullableString(value.sha);
+  const branch = nullableString(value.branch);
+  const originUrl = nullableString(value.originUrl);
+  if (sha === undefined || branch === undefined || originUrl === undefined) return null;
+  return { sha, branch, originUrl };
+}
+
+function nullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" ? value : undefined;
+}
+
+function sameWorkspaceSnapshot(
+  current: RuntimeWorkspaceSnapshot | null,
+  next: RuntimeWorkspaceSnapshot | null,
+): boolean {
+  return (
+    current?.threadId === next?.threadId &&
+    current?.cwd === next?.cwd &&
+    current?.git?.sha === next?.git?.sha &&
+    current?.git?.branch === next?.git?.branch &&
+    current?.git?.originUrl === next?.git?.originUrl
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
