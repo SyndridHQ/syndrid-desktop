@@ -102,6 +102,62 @@ button.workspace-file-row:disabled { opacity: 1; cursor: default; }
 .workspace-files-state { padding: 18px 10px; color: var(--faint, #5d6670); text-align: center; }
 .workspace-files-state.compact { padding: 8px; font-size: 8px; }
 .workspace-files-state.error { color: #e6a6a6; }
+
+.workspace-file-preview {
+  border-top: 1px solid var(--border, #20262d);
+  background: var(--panel-2, #11151a);
+}
+
+.workspace-file-preview > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+.workspace-file-preview > header > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.workspace-file-preview > header strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-file-preview > header small {
+  overflow: hidden;
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-file-preview-meta {
+  border-top: 1px solid var(--border, #20262d);
+  padding: 5px 8px;
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+}
+
+.workspace-file-preview pre {
+  max-height: min(300px, 36vh);
+  margin: 0;
+  overflow: auto;
+  border-top: 1px solid var(--border, #20262d);
+  padding: 8px;
+  color: var(--muted, #87919c);
+  font: 8px/1.5 "SFMono-Regular", Consolas, monospace;
+  tab-size: 2;
+  white-space: pre;
+}
+
 .workspace-files-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
 
 @media (max-width: 720px) {
