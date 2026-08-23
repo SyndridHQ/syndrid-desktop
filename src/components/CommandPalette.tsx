@@ -81,6 +81,13 @@ const commands: Command[] = [
     run: () => clickElement(".mcp-server-toggle"),
   },
   {
+    id: "settings",
+    label: "Open desktop settings",
+    detail: "Configure native Syndrid runtime supervision preferences",
+    keywords: "settings preferences runtime binary path executable supervision",
+    run: () => clickElement(".settings-toggle"),
+  },
+  {
     id: "activity",
     label: "Open runtime activity",
     detail: "Inspect streamed commands, tools, changes, and subagents",
