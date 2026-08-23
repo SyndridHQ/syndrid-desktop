@@ -112,7 +112,7 @@ export function GitDock() {
                 <section className="git-diff" aria-label="Remote-relative diff">
                   <div className="git-diff-heading">
                     <span>
-                      <strong>Working tree → remote</strong>
+                      <strong>Remote merge base → working tree</strong>
                       <small title={baseSha ?? undefined}>
                         Merge base {baseSha ? baseSha.slice(0, 12) : "unknown"}
                       </small>
