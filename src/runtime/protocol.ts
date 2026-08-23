@@ -70,6 +70,8 @@ export interface CommandExecWriteParams { processId: string; deltaBase64?: strin
 export type CommandExecWriteResponse = Record<string, never>;
 export interface CommandExecTerminateParams { processId: string; }
 export type CommandExecTerminateResponse = Record<string, never>;
+export interface CommandExecResizeParams { processId: string; size: CommandExecTerminalSize; }
+export type CommandExecResizeResponse = Record<string, never>;
 export interface CommandExecOutputDeltaNotification {
   processId: string;
   stream: "stdout" | "stderr";
@@ -119,6 +121,7 @@ export const methods = {
   environmentInfo: "environment/info",
   commandExec: "command/exec",
   commandExecWrite: "command/exec/write",
+  commandExecResize: "command/exec/resize",
   commandExecTerminate: "command/exec/terminate",
   mcpServerStatusList: "mcpServerStatus/list",
   mcpServerOauthLogin: "mcpServer/oauth/login",
