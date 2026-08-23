@@ -70,8 +70,15 @@ const commands: Command[] = [
     id: "skills",
     label: "Open skills",
     detail: "Open the selected-workspace skills inventory",
-    keywords: "skills extensions hooks",
+    keywords: "skills extensions",
     run: () => clickElement(".skills-toggle"),
+  },
+  {
+    id: "hooks",
+    label: "Open hook activity",
+    detail: "Inspect hook lifecycle streamed by the Syndrid runtime",
+    keywords: "hooks lifecycle pre tool post tool permission subagent runtime",
+    run: () => clickElement(".hooks-toggle"),
   },
   {
     id: "mcp",
