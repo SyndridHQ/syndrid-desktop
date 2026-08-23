@@ -60,6 +60,13 @@ const commands: Command[] = [
     run: () => clickElement(".background-processes-toggle"),
   },
   {
+    id: "subagents",
+    label: "Open subagents",
+    detail: "Inspect direct child agents in the selected runtime thread graph",
+    keywords: "subagents agents children orchestration delegation thread graph",
+    run: () => clickElement(".subagents-toggle"),
+  },
+  {
     id: "git",
     label: "Open source control",
     detail: "Inspect Git metadata reported by the selected Syndrid session",
