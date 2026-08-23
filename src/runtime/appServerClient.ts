@@ -7,6 +7,8 @@ import {
   type CommandExecTerminateResponse,
   type CommandExecWriteParams,
   type CommandExecWriteResponse,
+  type ConfigReadParams,
+  type ConfigReadResponse,
   type EnvironmentInfoParams,
   type EnvironmentInfoResponse,
   type FsGetMetadataParams,
@@ -202,6 +204,10 @@ export class SyndridAppServerClient {
 
   async readModelProviderCapabilities(): Promise<ModelProviderCapabilities> {
     return this.request<ModelProviderCapabilities>(methods.modelProviderCapabilitiesRead, {});
+  }
+
+  async readConfig(params: ConfigReadParams = {}): Promise<ConfigReadResponse> {
+    return this.request<ConfigReadResponse>(methods.configRead, params);
   }
 
   async readEnvironmentInfo(params: EnvironmentInfoParams): Promise<EnvironmentInfoResponse> {
