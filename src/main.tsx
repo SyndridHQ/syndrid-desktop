@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
+import { GitDock } from "./components/GitDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
 import { ProviderDock } from "./components/ProviderDock";
@@ -26,6 +27,7 @@ createRoot(document.getElementById("root")!).render(
     <WorkspaceFilesDock />
     <SkillsDock />
     <ProviderDock />
+    <GitDock />
     <TerminalDock />
     <RuntimeActivityDock />
   </StrictMode>,
