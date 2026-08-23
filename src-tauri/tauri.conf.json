@@ -31,7 +31,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.png"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
     "createUpdaterArtifacts": false,
     "category": "DeveloperTool",
     "shortDescription": "The native visual workbench for the Syndrid runtime",
