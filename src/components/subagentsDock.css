@@ -1,7 +1,7 @@
 .subagents-dock {
   position: fixed;
+  top: 58px;
   right: 16px;
-  bottom: 114px;
   z-index: 42;
   width: min(410px, calc(100vw - 32px));
   font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -115,5 +115,5 @@
 }
 
 @media (max-width: 720px) {
-  .subagents-dock { right: 8px; bottom: 194px; width: calc(100vw - 16px); }
+  .subagents-dock { top: 54px; right: 8px; width: calc(100vw - 16px); }
 }
