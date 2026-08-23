@@ -40,6 +40,8 @@ import {
   type RequestId,
   type SkillsListParams,
   type SkillsListResponse,
+  type ThreadArchiveParams,
+  type ThreadArchiveResponse,
   type ThreadBackgroundTerminalsCleanParams,
   type ThreadBackgroundTerminalsCleanResponse,
   type ThreadBackgroundTerminalsListParams,
@@ -53,6 +55,8 @@ import {
   type ThreadResumeResponse,
   type ThreadStartParams,
   type ThreadStartResponse,
+  type ThreadUnarchiveParams,
+  type ThreadUnarchiveResponse,
   type TurnInterruptParams,
   type TurnInterruptResponse,
   type TurnStartParams,
@@ -207,6 +211,14 @@ export class SyndridAppServerClient {
     const result = await this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
     this.setWorkspaceFromThread(result.thread);
     return result;
+  }
+
+  async archiveThread(params: ThreadArchiveParams): Promise<ThreadArchiveResponse> {
+    return this.request<ThreadArchiveResponse>(methods.threadArchive, params);
+  }
+
+  async unarchiveThread(params: ThreadUnarchiveParams): Promise<ThreadUnarchiveResponse> {
+    return this.request<ThreadUnarchiveResponse>(methods.threadUnarchive, params);
   }
 
   async listBackgroundTerminals(
