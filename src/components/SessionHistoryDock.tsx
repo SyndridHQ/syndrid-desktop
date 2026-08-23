@@ -23,7 +23,6 @@ export function SessionHistoryDock() {
 
   const load = useCallback(
     async (append = false) => {
-      if (loading) return;
       if (appServerClient.getSnapshot().phase !== "ready") {
         setError("Connect the Syndrid runtime before loading session history.");
         return;
@@ -57,7 +56,7 @@ export function SessionHistoryDock() {
         if (requestGeneration === generation.current) setLoading(false);
       }
     },
-    [cursor, historyKind, loading, scopeWorkspace, submittedQuery, workspace?.cwd],
+    [cursor, historyKind, scopeWorkspace, submittedQuery, workspace?.cwd],
   );
 
   useEffect(() => {
