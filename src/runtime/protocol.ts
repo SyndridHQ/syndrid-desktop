@@ -30,6 +30,21 @@ export interface ThreadStartResponse { thread: ThreadSummary; model: string; mod
 export interface ThreadReadParams { threadId: string; includeTurns?: boolean; }
 export interface ThreadReadResponse { thread: ThreadSummary; }
 export interface ThreadResumeResponse { thread: ThreadSummary; model: string; modelProvider: string; serviceTier: string | null; cwd: string; }
+export interface ThreadBackgroundTerminal {
+  itemId: string;
+  processId: string;
+  command: string;
+  cwd: string;
+  osPid: number | null;
+  cpuPercent: number | null;
+  rssKb: number | null;
+}
+export interface ThreadBackgroundTerminalsListParams { threadId: string; cursor?: string | null; limit?: number | null; }
+export interface ThreadBackgroundTerminalsListResponse { data: ThreadBackgroundTerminal[]; nextCursor: string | null; }
+export interface ThreadBackgroundTerminalsTerminateParams { threadId: string; processId: string; }
+export interface ThreadBackgroundTerminalsTerminateResponse { terminated: boolean; }
+export interface ThreadBackgroundTerminalsCleanParams { threadId: string; }
+export type ThreadBackgroundTerminalsCleanResponse = Record<string, never>;
 
 export interface UserTextInput { type: "text"; text: string; text_elements: unknown[]; }
 export type UserInput = UserTextInput;
@@ -179,6 +194,9 @@ export const methods = {
   threadStart: "thread/start",
   threadRead: "thread/read",
   threadResume: "thread/resume",
+  threadBackgroundTerminalsList: "thread/backgroundTerminals/list",
+  threadBackgroundTerminalsTerminate: "thread/backgroundTerminals/terminate",
+  threadBackgroundTerminalsClean: "thread/backgroundTerminals/clean",
   turnStart: "turn/start",
   turnInterrupt: "turn/interrupt",
   modelList: "model/list",
