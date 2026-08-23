@@ -59,7 +59,7 @@ export interface McpServerOauthLoginParams { name: string; threadId?: string | n
 export interface McpServerOauthLoginResponse { authorizationUrl: string; }
 
 export interface FsReadDirectoryParams { path: string; }
-export interface FsReadDirectoryEntry { fileName: string; isDirectory: boolean; isFile: boolean; }
+export interface FsReadDirectoryEntry { fileName: string; path?: string; isDirectory: boolean; isFile: boolean; }
 export interface FsReadDirectoryResponse { entries: FsReadDirectoryEntry[]; }
 
 export interface FuzzyFileSearchParams { query: string; roots: string[]; cancellationToken: string | null; }
