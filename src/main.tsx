@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
+import { BackgroundProcessesDock } from "./components/BackgroundProcessesDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { ContextDock } from "./components/ContextDock";
 import { GitDock } from "./components/GitDock";
@@ -35,6 +36,7 @@ createRoot(document.getElementById("root")!).render(
     <ProviderDock />
     <GitDock />
     <TerminalDock />
+    <BackgroundProcessesDock />
     <SessionHistoryDock />
     <ContextDock />
     <HooksDock />
