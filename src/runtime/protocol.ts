@@ -30,6 +30,10 @@ export interface ThreadStartResponse { thread: ThreadSummary; model: string; mod
 export interface ThreadReadParams { threadId: string; includeTurns?: boolean; }
 export interface ThreadReadResponse { thread: ThreadSummary; }
 export interface ThreadResumeResponse { thread: ThreadSummary; model: string; modelProvider: string; serviceTier: string | null; cwd: string; }
+export interface ThreadArchiveParams { threadId: string; }
+export type ThreadArchiveResponse = Record<string, never>;
+export interface ThreadUnarchiveParams { threadId: string; }
+export interface ThreadUnarchiveResponse { thread: ThreadSummary; }
 export interface ThreadBackgroundTerminal {
   itemId: string;
   processId: string;
@@ -194,6 +198,8 @@ export const methods = {
   threadStart: "thread/start",
   threadRead: "thread/read",
   threadResume: "thread/resume",
+  threadArchive: "thread/archive",
+  threadUnarchive: "thread/unarchive",
   threadBackgroundTerminalsList: "thread/backgroundTerminals/list",
   threadBackgroundTerminalsTerminate: "thread/backgroundTerminals/terminate",
   threadBackgroundTerminalsClean: "thread/backgroundTerminals/clean",
