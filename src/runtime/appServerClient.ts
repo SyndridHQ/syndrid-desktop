@@ -46,6 +46,12 @@ import {
 
 export type RuntimeNotificationHandler = (notification: JsonRpcNotification) => void;
 export type RuntimeLogHandler = (line: string) => void;
+export type RuntimeWorkspaceHandler = () => void;
+
+export interface RuntimeWorkspaceSnapshot {
+  threadId: string;
+  cwd: string;
+}
 
 export interface RuntimeServerRequest {
   id: RequestId;
@@ -77,8 +83,10 @@ export class SyndridAppServerClient {
   private notificationHandlers = new Set<RuntimeNotificationHandler>();
   private serverRequestHandlers = new Set<RuntimeServerRequestHandler>();
   private logHandlers = new Set<RuntimeLogHandler>();
+  private workspaceHandlers = new Set<RuntimeWorkspaceHandler>();
   private unlistenMessage: (() => void) | null = null;
   private unlistenStderr: (() => void) | null = null;
+  private workspaceSnapshot: RuntimeWorkspaceSnapshot | null = null;
   private snapshot: RuntimeConnectionSnapshot = {
     phase: "idle",
     native: null,
@@ -88,6 +96,10 @@ export class SyndridAppServerClient {
 
   getSnapshot(): RuntimeConnectionSnapshot {
     return this.snapshot;
+  }
+
+  getWorkspaceSnapshot(): RuntimeWorkspaceSnapshot | null {
+    return this.workspaceSnapshot;
   }
 
   async connect(binary?: string): Promise<RuntimeConnectionSnapshot> {
@@ -141,6 +153,7 @@ export class SyndridAppServerClient {
     this.pending.clear();
     await stopNativeAppServer();
     this.snapshot = { phase: "idle", native: null, server: null, error: null };
+    this.setWorkspaceSnapshot(null);
   }
 
   async listThreads(params: ThreadListParams = {}): Promise<ThreadListResponse> {
@@ -148,15 +161,21 @@ export class SyndridAppServerClient {
   }
 
   async startThread(params: ThreadStartParams = {}): Promise<ThreadStartResponse> {
-    return this.request<ThreadStartResponse>(methods.threadStart, params);
+    const result = await this.request<ThreadStartResponse>(methods.threadStart, params);
+    this.setWorkspaceFromThread(result.thread);
+    return result;
   }
 
   async readThread(params: ThreadReadParams): Promise<ThreadReadResponse> {
-    return this.request<ThreadReadResponse>(methods.threadRead, params);
+    const result = await this.request<ThreadReadResponse>(methods.threadRead, params);
+    this.setWorkspaceFromThread(result.thread);
+    return result;
   }
 
   async resumeThread(threadId: string): Promise<ThreadResumeResponse> {
-    return this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
+    const result = await this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
+    this.setWorkspaceFromThread(result.thread);
+    return result;
   }
 
   async startTurn(params: TurnStartParams): Promise<TurnStartResponse> {
@@ -226,6 +245,11 @@ export class SyndridAppServerClient {
     return () => this.logHandlers.delete(handler);
   }
 
+  onWorkspaceChange(handler: RuntimeWorkspaceHandler): () => void {
+    this.workspaceHandlers.add(handler);
+    return () => this.workspaceHandlers.delete(handler);
+  }
+
   async respondToServerRequest(id: RequestId, result: unknown): Promise<void> {
     await sendNativeAppServerLine(JSON.stringify({ id, result }));
   }
@@ -242,6 +266,22 @@ export class SyndridAppServerClient {
         error: data === undefined ? { code, message } : { code, message, data },
       }),
     );
+  }
+
+  private setWorkspaceFromThread(thread: { id: string; cwd: string }): void {
+    const cwd = thread.cwd.trim();
+    this.setWorkspaceSnapshot(cwd ? { threadId: thread.id, cwd } : null);
+  }
+
+  private setWorkspaceSnapshot(next: RuntimeWorkspaceSnapshot | null): void {
+    if (
+      this.workspaceSnapshot?.threadId === next?.threadId &&
+      this.workspaceSnapshot?.cwd === next?.cwd
+    ) {
+      return;
+    }
+    this.workspaceSnapshot = next;
+    for (const handler of this.workspaceHandlers) handler();
   }
 
   private async ensureListeners(): Promise<void> {
