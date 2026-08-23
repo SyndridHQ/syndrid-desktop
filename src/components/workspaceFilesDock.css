@@ -48,6 +48,7 @@
 .workspace-files-panel > header small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-files-panel button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
 .workspace-files-panel button:disabled { opacity: .45; cursor: not-allowed; }
+.workspace-files-actions { display: flex; gap: 5px; }
 
 .workspace-file-search {
   display: grid;
@@ -79,15 +80,20 @@
 
 .workspace-file-row {
   display: grid;
+  width: 100%;
   grid-template-columns: 12px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   min-height: 25px;
+  border: 0 !important;
   border-radius: 5px;
-  padding: 3px 5px;
+  padding: 3px 5px !important;
+  background: transparent;
+  text-align: left;
 }
 
-.workspace-file-row:hover { background: rgba(127,149,255,.07); }
+button.workspace-file-row:disabled { opacity: 1; cursor: default; }
+.workspace-file-row.navigable:hover, .workspace-file-row.search-result:hover { background: rgba(127,149,255,.07); }
 .workspace-file-row > span { color: var(--faint, #5d6670); font-size: 9px; }
 .workspace-file-row code { overflow: hidden; color: var(--text, #e8edf2); font: 9px/1.4 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-file-row small { color: var(--faint, #5d6670); font-size: 8px; }
