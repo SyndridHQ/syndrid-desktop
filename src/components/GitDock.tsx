@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
-import type { GitDiffChange, GitDiffChangeKind } from "../runtime/protocol";
+import {
+  notifications,
+  type GitDiffChange,
+  type GitDiffChangeKind,
+  type TurnDiffUpdatedNotification,
+} from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./gitDock.css";
 
@@ -29,6 +34,7 @@ export function GitDock() {
   const [open, setOpen] = useState(false);
   const [loadingDiff, setLoadingDiff] = useState(false);
   const [diffLoaded, setDiffLoaded] = useState(false);
+  const [diffStale, setDiffStale] = useState(false);
   const [baseSha, setBaseSha] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
   const [runtimeChanges, setRuntimeChanges] = useState<GitDiffChange[] | null>(null);
@@ -42,6 +48,7 @@ export function GitDock() {
   useEffect(() => {
     setLoadingDiff(false);
     setDiffLoaded(false);
+    setDiffStale(false);
     setBaseSha(null);
     setDiff("");
     setRuntimeChanges(null);
@@ -51,6 +58,15 @@ export function GitDock() {
     setSelectedSectionKey(null);
     setError(null);
   }, [workspace?.threadId, workspace?.cwd]);
+
+  useEffect(() => {
+    if (!diffLoaded || !workspace?.threadId) return;
+    return appServerClient.onNotification((notification) => {
+      if (notification.method !== notifications.turnDiffUpdated) return;
+      const event = notification.params as TurnDiffUpdatedNotification | undefined;
+      if (event?.threadId === workspace.threadId) setDiffStale(true);
+    });
+  }, [diffLoaded, workspace?.threadId]);
 
   const loadDiff = useCallback(async () => {
     const cwd = workspace?.cwd;
@@ -75,6 +91,7 @@ export function GitDock() {
       setRuntimeChanges(retainedTypedChanges);
       setRuntimeChangeSummary(allTypedChanges ? summarizeRuntimeChanges(allTypedChanges) : null);
       setDiffTruncated(isTruncated);
+      setDiffStale(false);
       setFileFilter("");
       setSelectedSectionKey(firstDiffSectionKey(retainedDiff, retainedTypedChanges));
       setDiffLoaded(true);
@@ -140,7 +157,13 @@ export function GitDock() {
             </span>
             {workspace && gitInfo && (
               <button disabled={loadingDiff} onClick={() => void loadDiff()} type="button">
-                {loadingDiff ? "Loading…" : diffLoaded ? "Refresh diff" : "Load diff"}
+                {loadingDiff
+                  ? "Loading…"
+                  : diffLoaded
+                    ? diffStale
+                      ? "Refresh diff · updated"
+                      : "Refresh diff"
+                    : "Load diff"}
               </button>
             )}
           </header>
@@ -176,7 +199,9 @@ export function GitDock() {
                     <span>
                       <strong>Remote merge base → working tree</strong>
                       <small title={baseSha ?? undefined}>
-                        Merge base {baseSha ? baseSha.slice(0, 12) : "unknown"}
+                        {diffStale
+                          ? "Runtime reports newer turn changes · refresh explicitly"
+                          : `Merge base ${baseSha ? baseSha.slice(0, 12) : "unknown"}`}
                       </small>
                     </span>
                     {diff && (
@@ -270,7 +295,7 @@ export function GitDock() {
           )}
 
           <footer>
-            Runtime-owned Git · {runtimeChangeSummary ? "typed file metadata" : "compatible diff fallback"} · no polling
+            Runtime-owned Git · {runtimeChangeSummary ? "typed file metadata" : "compatible diff fallback"} · event-invalidated · no polling
           </footer>
         </section>
       )}
