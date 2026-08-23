@@ -98,6 +98,16 @@ export function CommandPalette() {
   }, []);
 
   useEffect(() => {
+    const toolbarButton = document.querySelector<HTMLButtonElement>(
+      ".workspace-toolbar .ghost-button:last-child",
+    );
+    if (!toolbarButton || toolbarButton.textContent?.trim() !== "⌘ K") return;
+    const onClick = () => setOpen(true);
+    toolbarButton.addEventListener("click", onClick);
+    return () => toolbarButton.removeEventListener("click", onClick);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     setQuery("");
     setActiveIndex(0);
@@ -105,7 +115,11 @@ export function CommandPalette() {
   }, [open]);
 
   useEffect(() => {
-    if (activeIndex >= filtered.length) setActiveIndex(0);
+    if (filtered.length === 0) {
+      if (activeIndex !== 0) setActiveIndex(0);
+    } else if (activeIndex >= filtered.length) {
+      setActiveIndex(0);
+    }
   }, [activeIndex, filtered.length]);
 
   const execute = (command: Command | undefined) => {
@@ -136,10 +150,10 @@ export function CommandPalette() {
               setActiveIndex(0);
             }}
             onKeyDown={(event) => {
-              if (event.key === "ArrowDown") {
+              if (event.key === "ArrowDown" && filtered.length > 0) {
                 event.preventDefault();
                 setActiveIndex((index) => Math.min(index + 1, filtered.length - 1));
-              } else if (event.key === "ArrowUp") {
+              } else if (event.key === "ArrowUp" && filtered.length > 0) {
                 event.preventDefault();
                 setActiveIndex((index) => Math.max(index - 1, 0));
               } else if (event.key === "Enter") {
