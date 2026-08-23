@@ -8,6 +8,7 @@ import { McpServerDock } from "./components/McpServerDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { SkillsDock } from "./components/SkillsDock";
+import { TerminalDock } from "./components/TerminalDock";
 import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
 
@@ -23,6 +24,7 @@ createRoot(document.getElementById("root")!).render(
     <McpServerDock />
     <WorkspaceFilesDock />
     <SkillsDock />
+    <TerminalDock />
     <RuntimeActivityDock />
   </StrictMode>,
 );
