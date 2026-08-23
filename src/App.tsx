@@ -847,9 +847,11 @@ function upsertAgentDelta(
   }
 
   const next = [...current];
+  const existing = next[index];
+  if (!existing) return current;
   next[index] = {
-    ...next[index],
-    text: `${next[index].text}${delta.delta}`,
+    ...existing,
+    text: `${existing.text}${delta.delta}`,
     streaming: true,
   };
   return next;
