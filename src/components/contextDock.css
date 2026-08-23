@@ -1,0 +1,30 @@
+.context-dock {
+  position: fixed;
+  right: 20px;
+  bottom: 118px;
+  z-index: 42;
+  width: min(360px, calc(100vw - 24px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+.context-toggle { margin-left: auto; display: flex; align-items: center; gap: 8px; min-height: 32px; border: 1px solid var(--border-strong, #2b333c); border-radius: 9px; padding: 6px 9px; background: rgba(13,16,20,.96); color: var(--muted, #87919c); box-shadow: 0 8px 28px rgba(0,0,0,.3); cursor: pointer; }
+.context-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
+.context-toggle > span:last-child { color: var(--faint, #5d6670); font-size: 9px; }
+.context-panel { margin-top: 7px; overflow: hidden; border: 1px solid var(--border-strong, #2b333c); border-radius: 11px; background: rgba(13,16,20,.985); box-shadow: 0 16px 48px rgba(0,0,0,.42); }
+.context-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border, #20262d); padding: 10px 11px; }
+.context-panel > header > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.context-panel > header strong { font-size: 10px; }
+.context-panel > header small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.context-panel > header em { color: var(--faint, #5d6670); font: 7px/1.3 "SFMono-Regular", Consolas, monospace; font-style: normal; }
+.context-empty { padding: 24px 12px; color: var(--faint, #5d6670); text-align: center; }
+.context-meter { height: 5px; margin: 11px 11px 5px; overflow: hidden; border-radius: 999px; background: var(--border, #20262d); }
+.context-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--accent, #7f95ff); transition: width 120ms ease-out; }
+.context-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 6px 0 0; background: var(--border, #20262d); }
+.context-grid > div { min-width: 0; padding: 8px 9px; background: var(--panel-2, #11151a); }
+.context-grid dt { color: var(--faint, #5d6670); font-size: 7px; letter-spacing: .06em; text-transform: uppercase; }
+.context-grid dd { margin: 2px 0 0; color: var(--text, #e8edf2); font: 10px/1.35 "SFMono-Regular", Consolas, monospace; }
+.context-cumulative { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 8px 9px; border-top: 1px solid var(--border, #20262d); }
+.context-cumulative strong { width: 100%; font-size: 8px; }
+.context-cumulative span { border-radius: 4px; padding: 2px 5px; background: rgba(127,149,255,.07); color: var(--muted, #87919c); font-size: 7px; }
+.context-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
+@media (max-width: 720px) { .context-dock { right: 8px; bottom: 190px; width: calc(100vw - 16px); } }
