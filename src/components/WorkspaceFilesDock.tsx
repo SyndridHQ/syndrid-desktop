@@ -8,6 +8,16 @@ import "./workspaceFilesDock.css";
 
 const MAX_DIRECTORY_ENTRIES = 250;
 const MAX_SEARCH_RESULTS = 80;
+const MAX_PREVIEW_BYTES = 256 * 1024;
+
+interface FilePreview {
+  path: string;
+  name: string;
+  status: "loading" | "ready" | "unavailable" | "oversized" | "binary" | "error";
+  sizeBytes?: number;
+  text?: string;
+  message?: string;
+}
 
 export function WorkspaceFilesDock() {
   const [open, setOpen] = useState(false);
@@ -20,6 +30,7 @@ export function WorkspaceFilesDock() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<FuzzyFileSearchResult[]>([]);
   const [searchAttempted, setSearchAttempted] = useState(false);
+  const [preview, setPreview] = useState<FilePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const currentPath = pathStack.at(-1) ?? rootPath;
@@ -34,6 +45,7 @@ export function WorkspaceFilesDock() {
 
     setLoading(true);
     setError(null);
+    setPreview(null);
     try {
       const threads = await appServerClient.listThreads({
         limit: 1,
@@ -69,6 +81,7 @@ export function WorkspaceFilesDock() {
       if (loading) return;
       setLoading(true);
       setError(null);
+      setPreview(null);
       try {
         const result = await appServerClient.readDirectory({ path });
         setPathStack(stack);
@@ -92,6 +105,99 @@ export function WorkspaceFilesDock() {
     },
     [loading, navigateTo, pathStack],
   );
+
+  const previewFile = useCallback(async (entry: FsReadDirectoryEntry) => {
+    if (!entry.isFile || !entry.path) return;
+
+    const path = entry.path;
+    setPreview({ path, name: entry.fileName, status: "loading" });
+    try {
+      const metadata = await appServerClient.getMetadata({ path });
+      if (!metadata.isFile) {
+        setPreview({
+          path,
+          name: entry.fileName,
+          status: "unavailable",
+          message: "The selected path is no longer a regular file.",
+        });
+        return;
+      }
+
+      if (typeof metadata.sizeBytes !== "number") {
+        setPreview({
+          path,
+          name: entry.fileName,
+          status: "unavailable",
+          message: "This runtime cannot size-gate file previews yet.",
+        });
+        return;
+      }
+
+      if (metadata.sizeBytes > MAX_PREVIEW_BYTES) {
+        setPreview({
+          path,
+          name: entry.fileName,
+          status: "oversized",
+          sizeBytes: metadata.sizeBytes,
+          message: `Preview skipped because the file exceeds ${formatBytes(MAX_PREVIEW_BYTES)}.`,
+        });
+        return;
+      }
+
+      const result = await appServerClient.readFile({ path });
+      const bytes = decodeBase64(result.dataBase64);
+      if (bytes.byteLength > MAX_PREVIEW_BYTES) {
+        setPreview({
+          path,
+          name: entry.fileName,
+          status: "oversized",
+          sizeBytes: bytes.byteLength,
+          message: "Preview stopped because the returned content exceeded the preview limit.",
+        });
+        return;
+      }
+
+      if (bytes.includes(0)) {
+        setPreview({
+          path,
+          name: entry.fileName,
+          status: "binary",
+          sizeBytes: bytes.byteLength,
+          message: "Binary content is not rendered as text.",
+        });
+        return;
+      }
+
+      let text: string;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        setPreview({
+          path,
+          name: entry.fileName,
+          status: "binary",
+          sizeBytes: bytes.byteLength,
+          message: "The file is not valid UTF-8 text, so the desktop did not render it.",
+        });
+        return;
+      }
+
+      setPreview({
+        path,
+        name: entry.fileName,
+        status: "ready",
+        sizeBytes: bytes.byteLength,
+        text,
+      });
+    } catch (cause) {
+      setPreview({
+        path,
+        name: entry.fileName,
+        status: "error",
+        message: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+  }, []);
 
   const goBack = useCallback(() => {
     if (pathStack.length <= 1 || loading) return;
@@ -220,18 +326,23 @@ export function WorkspaceFilesDock() {
             <div className="workspace-files-list">
               {sortedEntries.slice(0, MAX_DIRECTORY_ENTRIES).map((entry) => {
                 const navigable = entry.isDirectory && Boolean(entry.path);
+                const previewable = entry.isFile && Boolean(entry.path);
+                const interactive = navigable || previewable;
                 return (
                   <button
-                    className={`workspace-file-row ${navigable ? "navigable" : ""}`}
-                    disabled={!navigable}
+                    className={`workspace-file-row ${interactive ? "navigable" : ""}`}
+                    disabled={!interactive}
                     key={entry.path ?? entry.fileName}
-                    onClick={() => openDirectory(entry)}
+                    onClick={() => {
+                      if (entry.isDirectory) openDirectory(entry);
+                      else if (entry.isFile) void previewFile(entry);
+                    }}
                     title={entry.path ?? entry.fileName}
                     type="button"
                   >
-                    <span aria-hidden="true">{entry.isDirectory ? "▸" : "·"}</span>
+                    <span aria-hidden="true">{entry.isDirectory ? "▸" : entry.isFile ? "·" : "?"}</span>
                     <code>{entry.fileName}</code>
-                    <small>{entry.isDirectory ? "folder" : entry.isFile ? "file" : "other"}</small>
+                    <small>{entry.isDirectory ? "folder" : entry.isFile ? "preview" : "other"}</small>
                   </button>
                 );
               })}
@@ -242,12 +353,52 @@ export function WorkspaceFilesDock() {
               )}
             </div>
           )}
+
+          {preview && (
+            <FilePreviewPanel preview={preview} onClose={() => setPreview(null)} />
+          )}
+
           <footer>
-            Runtime-backed · explicit reads only · {supportsResolvedPaths ? "lazy folder navigation" : "root-only on this runtime"} · no polling
+            Runtime-backed · explicit reads only · {supportsResolvedPaths ? "lazy navigation + bounded preview" : "root-only on this runtime"} · no polling
           </footer>
         </section>
       )}
     </aside>
+  );
+}
+
+function FilePreviewPanel({
+  preview,
+  onClose,
+}: {
+  preview: FilePreview;
+  onClose: () => void;
+}) {
+  return (
+    <section className="workspace-file-preview" aria-live="polite">
+      <header>
+        <span>
+          <strong>{preview.name}</strong>
+          <small title={preview.path}>{preview.path}</small>
+        </span>
+        <button onClick={onClose} type="button">Close</button>
+      </header>
+      {preview.status === "loading" ? (
+        <div className="workspace-files-state compact">Checking metadata…</div>
+      ) : preview.status === "ready" ? (
+        <>
+          <div className="workspace-file-preview-meta">
+            UTF-8 · {formatBytes(preview.sizeBytes ?? 0)} · read after metadata gate
+          </div>
+          <pre>{preview.text}</pre>
+        </>
+      ) : (
+        <div className={`workspace-files-state compact ${preview.status === "error" ? "error" : ""}`}>
+          {preview.message ?? "Preview unavailable."}
+          {preview.sizeBytes !== undefined && ` · ${formatBytes(preview.sizeBytes)}`}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -282,6 +433,21 @@ function SearchResults({ attempted, results, searching }: SearchResultsProps) {
       )}
     </div>
   );
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const decoded = window.atob(value);
+  const bytes = new Uint8Array(decoded.length);
+  for (let index = 0; index < decoded.length; index += 1) {
+    bytes[index] = decoded.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
 function compareEntries(a: FsReadDirectoryEntry, b: FsReadDirectoryEntry): number {
