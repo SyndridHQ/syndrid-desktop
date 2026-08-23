@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
+import { CommandPalette } from "./components/CommandPalette";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
@@ -15,6 +16,7 @@ const bootStartedAt = performance.now();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App bootStartedAt={bootStartedAt} />
+    <CommandPalette />
     <ApprovalDock />
     <RuntimeInputDock />
     <McpElicitationDock />
