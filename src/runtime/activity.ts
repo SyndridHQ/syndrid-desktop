@@ -167,10 +167,12 @@ export function upsertRuntimeActivity(
   if (index === -1) {
     updated.push(next);
   } else {
+    const previous = updated[index];
+    if (!previous) return updated;
     updated[index] = {
-      ...updated[index],
+      ...previous,
       ...next,
-      startedAtMs: next.startedAtMs ?? updated[index].startedAtMs,
+      startedAtMs: next.startedAtMs ?? previous.startedAtMs,
     };
   }
 
@@ -198,7 +200,7 @@ function summarizeAgents(value: unknown): string | null {
   if (!Array.isArray(value)) return null;
   const ids = value.filter((entry): entry is string => typeof entry === "string");
   if (ids.length === 0) return null;
-  return ids.length === 1 ? ids[0] : `${ids.length} agents`;
+  return ids.length === 1 ? (ids[0] ?? null) : `${ids.length} agents`;
 }
 
 function statusValue(status: unknown, exitCode: unknown): string | null {
