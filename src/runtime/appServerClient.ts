@@ -19,6 +19,8 @@ import {
   type FsReadFileResponse,
   type FuzzyFileSearchParams,
   type FuzzyFileSearchResponse,
+  type GitDiffToRemoteParams,
+  type GitDiffToRemoteResponse,
   type InitializeParams,
   type InitializeResponse,
   type JsonRpcFailure,
@@ -237,6 +239,10 @@ export class SyndridAppServerClient {
     params: CommandExecTerminateParams,
   ): Promise<CommandExecTerminateResponse> {
     return this.request<CommandExecTerminateResponse>(methods.commandExecTerminate, params);
+  }
+
+  async gitDiffToRemote(params: GitDiffToRemoteParams): Promise<GitDiffToRemoteResponse> {
+    return this.request<GitDiffToRemoteResponse>(methods.gitDiffToRemote, params);
   }
 
   async listMcpServerStatus(
