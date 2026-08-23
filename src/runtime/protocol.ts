@@ -18,12 +18,7 @@ export interface JsonRpcSuccess<TResult = unknown> { id: RequestId; result: TRes
 export interface JsonRpcFailure { id: RequestId; error: { code: number; message: string; data?: unknown; }; }
 export type JsonRpcResponse<TResult = unknown> = JsonRpcSuccess<TResult> | JsonRpcFailure;
 
-export interface InitializeCapabilities {
-  experimentalApi: boolean;
-  requestAttestation: boolean;
-  mcpServerOpenaiFormElicitation?: boolean;
-  optOutNotificationMethods?: string[] | null;
-}
+export interface InitializeCapabilities { experimentalApi: boolean; requestAttestation: boolean; mcpServerOpenaiFormElicitation?: boolean; optOutNotificationMethods?: string[] | null; }
 export interface InitializeParams { clientInfo: { name: string; title: string; version: string; }; capabilities: InitializeCapabilities | null; }
 export interface InitializeResponse { userAgent: string; codexHome: string; platformFamily: string; platformOs: string; }
 
@@ -61,6 +56,10 @@ export interface McpServerOauthLoginResponse { authorizationUrl: string; }
 export interface FsReadDirectoryParams { path: string; }
 export interface FsReadDirectoryEntry { fileName: string; path?: string; isDirectory: boolean; isFile: boolean; }
 export interface FsReadDirectoryResponse { entries: FsReadDirectoryEntry[]; }
+export interface FsGetMetadataParams { path: string; }
+export interface FsGetMetadataResponse { isDirectory: boolean; isFile: boolean; isSymlink: boolean; sizeBytes?: number; createdAtMs: number; modifiedAtMs: number; }
+export interface FsReadFileParams { path: string; }
+export interface FsReadFileResponse { dataBase64: string; }
 
 export interface FuzzyFileSearchParams { query: string; roots: string[]; cancellationToken: string | null; }
 export interface FuzzyFileSearchResult { root: string; path: string; match_type: unknown; file_name: string; score: number; indices: number[] | null; }
@@ -87,6 +86,8 @@ export const methods = {
   mcpServerStatusList: "mcpServerStatus/list",
   mcpServerOauthLogin: "mcpServer/oauth/login",
   fsReadDirectory: "fs/readDirectory",
+  fsGetMetadata: "fs/getMetadata",
+  fsReadFile: "fs/readFile",
   fuzzyFileSearch: "fuzzyFileSearch",
   skillsList: "skills/list",
 } as const;
