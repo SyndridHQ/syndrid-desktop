@@ -6,7 +6,7 @@ import type {
 } from "../runtime/protocol";
 import "./workspaceFilesDock.css";
 
-const MAX_ROOT_ENTRIES = 250;
+const MAX_DIRECTORY_ENTRIES = 250;
 const MAX_SEARCH_RESULTS = 80;
 
 export function WorkspaceFilesDock() {
@@ -14,6 +14,7 @@ export function WorkspaceFilesDock() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [rootPath, setRootPath] = useState<string | null>(null);
+  const [pathStack, setPathStack] = useState<string[]>([]);
   const [entries, setEntries] = useState<FsReadDirectoryEntry[]>([]);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -21,7 +22,10 @@ export function WorkspaceFilesDock() {
   const [searchAttempted, setSearchAttempted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const currentPath = pathStack.at(-1) ?? rootPath;
+  const supportsResolvedPaths = entries.some((entry) => Boolean(entry.path));
+
+  const loadRoot = useCallback(async () => {
     if (loading) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before browsing workspace files.");
@@ -40,6 +44,7 @@ export function WorkspaceFilesDock() {
       const root = threads.data[0]?.cwd?.trim();
       if (!root) {
         setRootPath(null);
+        setPathStack([]);
         setEntries([]);
         setLoaded(true);
         return;
@@ -47,6 +52,7 @@ export function WorkspaceFilesDock() {
 
       const result = await appServerClient.readDirectory({ path: root });
       setRootPath(root);
+      setPathStack([root]);
       setEntries(result.entries);
       setSearchResults([]);
       setSearchAttempted(false);
@@ -57,6 +63,50 @@ export function WorkspaceFilesDock() {
       setLoading(false);
     }
   }, [loading]);
+
+  const navigateTo = useCallback(
+    async (path: string, stack: string[]) => {
+      if (loading) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await appServerClient.readDirectory({ path });
+        setPathStack(stack);
+        setEntries(result.entries);
+        setSearchResults([]);
+        setSearchAttempted(false);
+        setQuery("");
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading],
+  );
+
+  const openDirectory = useCallback(
+    (entry: FsReadDirectoryEntry) => {
+      if (!entry.isDirectory || !entry.path || loading) return;
+      void navigateTo(entry.path, [...pathStack, entry.path]);
+    },
+    [loading, navigateTo, pathStack],
+  );
+
+  const goBack = useCallback(() => {
+    if (pathStack.length <= 1 || loading) return;
+    const nextStack = pathStack.slice(0, -1);
+    const target = nextStack.at(-1);
+    if (target) void navigateTo(target, nextStack);
+  }, [loading, navigateTo, pathStack]);
+
+  const refreshCurrent = useCallback(() => {
+    if (currentPath && pathStack.length > 0) {
+      void navigateTo(currentPath, pathStack);
+    } else {
+      void loadRoot();
+    }
+  }, [currentPath, loadRoot, navigateTo, pathStack]);
 
   const search = useCallback(async () => {
     const normalized = query.trim();
@@ -94,7 +144,7 @@ export function WorkspaceFilesDock() {
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    if (next && !loaded && !loading) void load();
+    if (next && !loaded && !loading) void loadRoot();
   };
 
   const showingSearch = searchAttempted || query.trim().length > 0;
@@ -111,13 +161,20 @@ export function WorkspaceFilesDock() {
           <header>
             <span>
               <strong>Workspace files</strong>
-              <small title={rootPath ?? undefined}>
-                {rootPath ?? "Latest active session workspace"}
+              <small title={currentPath ?? undefined}>
+                {currentPath ?? "Latest active session workspace"}
               </small>
             </span>
-            <button disabled={loading} onClick={() => void load()} type="button">
-              {loading ? "Loading…" : "Refresh"}
-            </button>
+            <div className="workspace-files-actions">
+              {pathStack.length > 1 && (
+                <button disabled={loading} onClick={goBack} type="button">
+                  Back
+                </button>
+              )}
+              <button disabled={loading} onClick={refreshCurrent} type="button">
+                {loading ? "Loading…" : "Refresh"}
+              </button>
+            </div>
           </header>
 
           {rootPath && (
@@ -158,25 +215,35 @@ export function WorkspaceFilesDock() {
               searching={searching}
             />
           ) : sortedEntries.length === 0 ? (
-            <div className="workspace-files-state">Workspace root is empty.</div>
+            <div className="workspace-files-state">This directory is empty.</div>
           ) : (
             <div className="workspace-files-list">
-              {sortedEntries.slice(0, MAX_ROOT_ENTRIES).map((entry) => (
-                <div className="workspace-file-row" key={entry.fileName}>
-                  <span aria-hidden="true">{entry.isDirectory ? "▸" : "·"}</span>
-                  <code title={entry.fileName}>{entry.fileName}</code>
-                  <small>{entry.isDirectory ? "folder" : entry.isFile ? "file" : "other"}</small>
-                </div>
-              ))}
-              {sortedEntries.length > MAX_ROOT_ENTRIES && (
+              {sortedEntries.slice(0, MAX_DIRECTORY_ENTRIES).map((entry) => {
+                const navigable = entry.isDirectory && Boolean(entry.path);
+                return (
+                  <button
+                    className={`workspace-file-row ${navigable ? "navigable" : ""}`}
+                    disabled={!navigable}
+                    key={entry.path ?? entry.fileName}
+                    onClick={() => openDirectory(entry)}
+                    title={entry.path ?? entry.fileName}
+                    type="button"
+                  >
+                    <span aria-hidden="true">{entry.isDirectory ? "▸" : "·"}</span>
+                    <code>{entry.fileName}</code>
+                    <small>{entry.isDirectory ? "folder" : entry.isFile ? "file" : "other"}</small>
+                  </button>
+                );
+              })}
+              {sortedEntries.length > MAX_DIRECTORY_ENTRIES && (
                 <div className="workspace-files-state compact">
-                  Showing {MAX_ROOT_ENTRIES} of {sortedEntries.length} root entries.
+                  Showing {MAX_DIRECTORY_ENTRIES} of {sortedEntries.length} entries.
                 </div>
               )}
             </div>
           )}
           <footer>
-            Runtime-backed · root listing and explicit file search only · no polling
+            Runtime-backed · explicit reads only · {supportsResolvedPaths ? "lazy folder navigation" : "root-only on this runtime"} · no polling
           </footer>
         </section>
       )}
