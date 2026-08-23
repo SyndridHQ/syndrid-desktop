@@ -51,6 +51,37 @@
 .provider-panel button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
 .provider-panel button:disabled { opacity: .45; cursor: not-allowed; }
 
+.provider-effective {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border-bottom: 1px solid var(--border, #20262d);
+  background: var(--border, #20262d);
+}
+
+.provider-effective > div {
+  min-width: 0;
+  padding: 7px 9px;
+  background: var(--panel-2, #11151a);
+}
+
+.provider-effective dt {
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.provider-effective dd {
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: var(--text, #e8edf2);
+  font: 8px/1.35 "SFMono-Regular", Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .provider-capabilities {
   display: flex;
   gap: 6px;
