@@ -1,0 +1,139 @@
+.background-processes-dock {
+  position: fixed;
+  right: 16px;
+  bottom: 74px;
+  z-index: 43;
+  width: min(430px, calc(100vw - 32px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.background-processes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-height: 32px;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(13, 16, 20, 0.96);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.background-processes-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
+.background-processes-toggle > span:last-child { color: var(--faint, #5d6670); font-size: 9px; }
+
+.background-processes-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 11px;
+  background: rgba(10, 13, 16, 0.99);
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.48);
+}
+
+.background-processes-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 10px 11px;
+}
+
+.background-processes-panel > header > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.background-processes-panel > header strong { font-size: 10px; }
+.background-processes-panel > header small {
+  overflow: hidden;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.background-processes-panel button {
+  border: 1px solid var(--border, #20262d);
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: transparent;
+  color: var(--muted, #87919c);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.background-processes-panel button:hover:not(:disabled) { color: var(--text, #e8edf2); border-color: #3a4450; }
+.background-processes-panel button:disabled { opacity: .45; cursor: not-allowed; }
+
+.background-processes-summary {
+  display: flex;
+  gap: 12px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 7px 10px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+.background-processes-list {
+  max-height: min(470px, 58vh);
+  overflow: auto;
+  padding: 6px;
+}
+
+.background-process-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 10px;
+  border-radius: 7px;
+  padding: 8px;
+}
+
+.background-process-row:hover { background: rgba(127, 149, 255, .06); }
+.background-process-command {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.background-process-command strong,
+.background-process-command small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.background-process-command strong { font: 9px/1.4 "SFMono-Regular", Consolas, monospace; }
+.background-process-command small { color: var(--faint, #5d6670); font-size: 8px; }
+.background-process-row > button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+
+.background-process-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+.background-process-meta code { color: var(--muted, #87919c); font-size: 8px; }
+
+.background-processes-state { padding: 20px 10px; color: var(--faint, #5d6670); text-align: center; }
+.background-processes-state.error { color: #e6a6a6; }
+.background-processes-more { display: block; width: calc(100% - 8px); margin: 6px 4px 2px; }
+.background-processes-panel > footer {
+  border-top: 1px solid var(--border, #20262d);
+  padding: 7px 9px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+@media (max-width: 720px) {
+  .background-processes-dock { right: 8px; bottom: 154px; width: calc(100vw - 16px); }
+}
