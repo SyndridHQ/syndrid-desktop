@@ -4,6 +4,7 @@ import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { GitDock } from "./components/GitDock";
+import { HooksDock } from "./components/HooksDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
 import { ProviderDock } from "./components/ProviderDock";
@@ -30,6 +31,7 @@ createRoot(document.getElementById("root")!).render(
     <ProviderDock />
     <GitDock />
     <TerminalDock />
+    <HooksDock />
     <SettingsDock />
     <RuntimeActivityDock />
   </StrictMode>,
