@@ -1,48 +1,41 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type { SkillMetadata, SkillsListEntry } from "../runtime/protocol";
+import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./skillsDock.css";
 
 const MAX_VISIBLE_SKILLS = 120;
 
 export function SkillsDock() {
+  const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [cwd, setCwd] = useState<string | null>(null);
   const [entries, setEntries] = useState<SkillsListEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
     async (forceReload = false) => {
-      if (loading) return;
       if (appServerClient.getSnapshot().phase !== "ready") {
         setError("Connect the Syndrid runtime before loading skills.");
+        return;
+      }
+
+      const root = workspace?.cwd.trim();
+      if (!root) {
+        setEntries([]);
+        setLoaded(true);
+        setLoading(false);
         return;
       }
 
       setLoading(true);
       setError(null);
       try {
-        const threads = await appServerClient.listThreads({
-          limit: 1,
-          archived: false,
-          sortKey: "updated_at",
-          sortDirection: "desc",
-        });
-        const root = threads.data[0]?.cwd?.trim();
-        if (!root) {
-          setCwd(null);
-          setEntries([]);
-          setLoaded(true);
-          return;
-        }
-
         const result = await appServerClient.listSkills({
           cwds: [root],
           forceReload,
         });
-        setCwd(root);
         setEntries(result.data);
         setLoaded(true);
       } catch (cause) {
@@ -51,8 +44,15 @@ export function SkillsDock() {
         setLoading(false);
       }
     },
-    [loading],
+    [workspace?.cwd],
   );
+
+  useEffect(() => {
+    setLoaded(false);
+    setEntries([]);
+    setError(null);
+    if (open) void load(false);
+  }, [load, open, workspace?.threadId]);
 
   const skills = useMemo(
     () =>
@@ -66,11 +66,8 @@ export function SkillsDock() {
     [entries],
   );
 
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    if (next && !loaded && !loading) void load(false);
-  };
+  const toggle = () => setOpen((current) => !current);
+  const cwd = workspace?.cwd ?? null;
 
   return (
     <aside className="skills-dock" aria-label="Skills manager">
@@ -84,7 +81,7 @@ export function SkillsDock() {
           <header>
             <span>
               <strong>Skills</strong>
-              <small title={cwd ?? undefined}>{cwd ?? "Active workspace"}</small>
+              <small title={cwd ?? undefined}>{cwd ?? "Selected session workspace"}</small>
             </span>
             <div>
               <button disabled={loading} onClick={() => void load(false)} type="button">
@@ -101,7 +98,7 @@ export function SkillsDock() {
           ) : loading && !loaded ? (
             <div className="skills-state">Loading cached runtime skills…</div>
           ) : !cwd ? (
-            <div className="skills-state">No session workspace reported.</div>
+            <div className="skills-state">No selected session workspace reported.</div>
           ) : skills.length === 0 ? (
             <div className="skills-state">No skills reported for this workspace.</div>
           ) : (
@@ -118,7 +115,7 @@ export function SkillsDock() {
           )}
 
           <footer>
-            <span>Cached by default · rescan is explicit</span>
+            <span>Selected session · cached by default · rescan is explicit</span>
             {errorCount > 0 && <em>{errorCount} discovery error{errorCount === 1 ? "" : "s"}</em>}
           </footer>
         </section>
