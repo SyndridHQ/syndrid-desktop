@@ -44,6 +44,39 @@ export interface ModelSummary { id: string; model: string; upgrade: string | nul
 export interface ModelListResponse { data: ModelSummary[]; nextCursor: string | null; }
 export interface ModelProviderCapabilities { namespaceTools: boolean; imageGeneration: boolean; webSearch: boolean; }
 
+export interface EnvironmentInfoParams { environmentId: string; }
+export interface EnvironmentShellInfo { name: string; path: string; }
+export interface EnvironmentInfoResponse { shell: EnvironmentShellInfo; cwd: string | null; }
+
+export interface CommandExecTerminalSize { rows: number; cols: number; }
+export interface CommandExecParams {
+  command: string[];
+  processId?: string | null;
+  tty?: boolean;
+  streamStdin?: boolean;
+  streamStdoutStderr?: boolean;
+  outputBytesCap?: number | null;
+  disableOutputCap?: boolean;
+  disableTimeout?: boolean;
+  timeoutMs?: number | null;
+  cwd?: string | null;
+  env?: Record<string, string | null> | null;
+  size?: CommandExecTerminalSize | null;
+  sandboxPolicy?: unknown;
+  permissionProfile?: string | null;
+}
+export interface CommandExecResponse { exitCode: number; stdout: string; stderr: string; }
+export interface CommandExecWriteParams { processId: string; deltaBase64?: string | null; closeStdin?: boolean; }
+export type CommandExecWriteResponse = Record<string, never>;
+export interface CommandExecTerminateParams { processId: string; }
+export type CommandExecTerminateResponse = Record<string, never>;
+export interface CommandExecOutputDeltaNotification {
+  processId: string;
+  stream: "stdout" | "stderr";
+  deltaBase64: string;
+  capReached: boolean;
+}
+
 export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
 export type McpAuthStatus = "unsupported" | "notLoggedIn" | "bearerToken" | "oAuth";
 export interface McpServerStatusListParams { cursor?: string | null; limit?: number | null; detail?: McpServerStatusDetail | null; threadId?: string | null; }
@@ -83,6 +116,10 @@ export const methods = {
   turnInterrupt: "turn/interrupt",
   modelList: "model/list",
   modelProviderCapabilitiesRead: "modelProvider/capabilities/read",
+  environmentInfo: "environment/info",
+  commandExec: "command/exec",
+  commandExecWrite: "command/exec/write",
+  commandExecTerminate: "command/exec/terminate",
   mcpServerStatusList: "mcpServerStatus/list",
   mcpServerOauthLogin: "mcpServer/oauth/login",
   fsReadDirectory: "fs/readDirectory",
@@ -96,5 +133,6 @@ export const notifications = {
   turnStarted: "turn/started",
   turnCompleted: "turn/completed",
   agentMessageDelta: "item/agentMessage/delta",
+  commandExecOutputDelta: "command/exec/outputDelta",
   serverRequestResolved: "serverRequest/resolved",
 } as const;
