@@ -6,6 +6,7 @@ import "./sessionHistoryDock.css";
 
 const PAGE_SIZE = 40;
 const MAX_RETAINED_THREADS = 160;
+type HistoryKind = "active" | "archived";
 
 export function SessionHistoryDock() {
   const workspace = useRuntimeWorkspace();
@@ -16,6 +17,7 @@ export function SessionHistoryDock() {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [scopeWorkspace, setScopeWorkspace] = useState(true);
+  const [historyKind, setHistoryKind] = useState<HistoryKind>("active");
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
 
@@ -34,7 +36,7 @@ export function SessionHistoryDock() {
         const result = await appServerClient.listThreads({
           cursor: append ? cursor : null,
           limit: PAGE_SIZE,
-          archived: false,
+          archived: historyKind === "archived",
           sortKey: "updated_at",
           sortDirection: "desc",
           cwd: scopeWorkspace && workspace?.cwd ? workspace.cwd : null,
@@ -55,7 +57,7 @@ export function SessionHistoryDock() {
         if (requestGeneration === generation.current) setLoading(false);
       }
     },
-    [cursor, loading, scopeWorkspace, submittedQuery, workspace?.cwd],
+    [cursor, historyKind, loading, scopeWorkspace, submittedQuery, workspace?.cwd],
   );
 
   useEffect(() => {
@@ -64,10 +66,10 @@ export function SessionHistoryDock() {
     setCursor(null);
     setError(null);
     if (open) void load(false);
-    // `load` intentionally stays out of this dependency list: workspace/scope
-    // changes invalidate and issue exactly one fresh panel read.
+    // Workspace/scope/history-kind changes invalidate and issue exactly one
+    // fresh panel read. The callback from this render carries those values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, scopeWorkspace, workspace?.threadId, workspace?.cwd]);
+  }, [historyKind, open, scopeWorkspace, workspace?.threadId, workspace?.cwd]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +84,7 @@ export function SessionHistoryDock() {
   }, [submittedQuery]);
 
   const visibleThreads = useMemo(() => dedupeThreads(threads), [threads]);
+  const normalizedQuery = query.trim();
 
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +94,11 @@ export function SessionHistoryDock() {
       return;
     }
     setSubmittedQuery(normalized);
+  };
+
+  const clearSearch = () => {
+    setQuery("");
+    if (submittedQuery) setSubmittedQuery("");
   };
 
   return (
@@ -113,7 +121,7 @@ export function SessionHistoryDock() {
               <small title={workspace?.cwd}>
                 {scopeWorkspace
                   ? workspace?.cwd || "Selected workspace"
-                  : "All active workspaces"}
+                  : "All workspaces"}
               </small>
             </span>
             <button disabled={loading} onClick={() => void load(false)} type="button">
@@ -121,13 +129,37 @@ export function SessionHistoryDock() {
             </button>
           </header>
 
+          <div className="session-history-kind" role="group" aria-label="Session history type">
+            <button
+              aria-pressed={historyKind === "active"}
+              className={historyKind === "active" ? "selected" : ""}
+              disabled={loading}
+              onClick={() => setHistoryKind("active")}
+              type="button"
+            >
+              Active
+            </button>
+            <button
+              aria-pressed={historyKind === "archived"}
+              className={historyKind === "archived" ? "selected" : ""}
+              disabled={loading}
+              onClick={() => setHistoryKind("archived")}
+              type="button"
+            >
+              Archived
+            </button>
+          </div>
+
           <form className="session-history-search" onSubmit={submitSearch}>
             <input
               aria-label="Search sessions"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search session history…"
+              placeholder={`Search ${historyKind} sessions…`}
               value={query}
             />
+            {normalizedQuery && (
+              <button onClick={clearSearch} type="button">Clear</button>
+            )}
             <button disabled={loading} type="submit">Search</button>
           </form>
 
@@ -146,12 +178,14 @@ export function SessionHistoryDock() {
           ) : loading && visibleThreads.length === 0 ? (
             <div className="session-history-state">Loading runtime sessions…</div>
           ) : visibleThreads.length === 0 ? (
-            <div className="session-history-state">No matching active sessions.</div>
+            <div className="session-history-state">
+              No matching {historyKind} sessions.
+            </div>
           ) : (
             <div className="session-history-list">
               {visibleThreads.map((thread) => (
                 <ThreadRow
-                  current={thread.id === workspace?.threadId}
+                  current={historyKind === "active" && thread.id === workspace?.threadId}
                   key={thread.id}
                   thread={thread}
                 />
@@ -170,7 +204,7 @@ export function SessionHistoryDock() {
           )}
 
           <footer>
-            Runtime-backed · explicit pagination · retains at most {MAX_RETAINED_THREADS} sessions
+            Runtime-backed · {historyKind} · explicit pagination · retains at most {MAX_RETAINED_THREADS} sessions
           </footer>
         </section>
       )}
