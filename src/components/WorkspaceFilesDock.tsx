@@ -404,7 +404,7 @@ export function WorkspaceFilesDock() {
               onSaved={(text, sizeBytes, modifiedAtMs) => {
                 setPreview((current) =>
                   current && current.path === preview.path
-                    ? { ...current, text, sizeBytes, modifiedAtMs, message: undefined }
+                    ? { ...current, text, sizeBytes, modifiedAtMs }
                     : current,
                 );
               }}
@@ -507,9 +507,11 @@ function FilePreviewPanel({
         dataBase64: encodeBase64(encoded),
       });
       const after = await appServerClient.getMetadata({ path: preview.path });
-      const nextModifiedAtMs = after.modifiedAtMs > 0 ? after.modifiedAtMs : Date.now();
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== preview.workspaceThreadId) {
+        throw new Error("The selected session changed after the save completed. Reopen the file to continue editing.");
+      }
       const nextSizeBytes = typeof after.sizeBytes === "number" ? after.sizeBytes : encoded.byteLength;
-      onSaved(draft, nextSizeBytes, nextModifiedAtMs);
+      onSaved(draft, nextSizeBytes, after.modifiedAtMs);
       setEditing(false);
       setSaveMessage("Saved through Syndrid runtime.");
     } catch (cause) {
