@@ -1,6 +1,10 @@
 import {
+  type FsGetMetadataParams,
+  type FsGetMetadataResponse,
   type FsReadDirectoryParams,
   type FsReadDirectoryResponse,
+  type FsReadFileParams,
+  type FsReadFileResponse,
   type FuzzyFileSearchParams,
   type FuzzyFileSearchResponse,
   type InitializeParams,
@@ -187,6 +191,14 @@ export class SyndridAppServerClient {
     params: FsReadDirectoryParams,
   ): Promise<FsReadDirectoryResponse> {
     return this.request<FsReadDirectoryResponse>(methods.fsReadDirectory, params);
+  }
+
+  async getMetadata(params: FsGetMetadataParams): Promise<FsGetMetadataResponse> {
+    return this.request<FsGetMetadataResponse>(methods.fsGetMetadata, params);
+  }
+
+  async readFile(params: FsReadFileParams): Promise<FsReadFileResponse> {
+    return this.request<FsReadFileResponse>(methods.fsReadFile, params);
   }
 
   async fuzzyFileSearch(
