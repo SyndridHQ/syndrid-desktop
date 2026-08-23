@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
+import { ContextDock } from "./components/ContextDock";
 import { GitDock } from "./components/GitDock";
 import { HooksDock } from "./components/HooksDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
@@ -31,6 +32,7 @@ createRoot(document.getElementById("root")!).render(
     <ProviderDock />
     <GitDock />
     <TerminalDock />
+    <ContextDock />
     <HooksDock />
     <SettingsDock />
     <RuntimeActivityDock />
