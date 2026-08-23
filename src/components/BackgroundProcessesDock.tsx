@@ -13,6 +13,7 @@ export function BackgroundProcessesDock() {
   const [loading, setLoading] = useState(false);
   const [processes, setProcesses] = useState<ThreadBackgroundTerminal[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [terminating, setTerminating] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -68,6 +69,7 @@ export function BackgroundProcessesDock() {
     generation.current += 1;
     setProcesses([]);
     setCursor(null);
+    setQuery("");
     setTerminating(new Set());
     setError(null);
     if (open) void load(false);
@@ -77,6 +79,11 @@ export function BackgroundProcessesDock() {
   }, [open, workspace?.threadId]);
 
   const totals = useMemo(() => summarize(processes), [processes]);
+  const filteredProcesses = useMemo(
+    () => filterProcesses(processes, query),
+    [processes, query],
+  );
+  const normalizedQuery = query.trim();
 
   const terminate = useCallback(
     async (process: ThreadBackgroundTerminal) => {
@@ -144,6 +151,27 @@ export function BackgroundProcessesDock() {
             <span>{formatMemory(totals.rssKb)} RSS</span>
           </div>
 
+          {processes.length > 0 && (
+            <div className="background-processes-filter">
+              <input
+                aria-label="Filter background processes"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Filter command, cwd, process ID, or PID…"
+                value={query}
+              />
+              {normalizedQuery && (
+                <button onClick={() => setQuery("")} type="button">
+                  Clear
+                </button>
+              )}
+              {normalizedQuery && (
+                <small>
+                  {filteredProcesses.length} of {processes.length}
+                </small>
+              )}
+            </div>
+          )}
+
           {error ? (
             <div className="background-processes-state error">{error}</div>
           ) : loading && processes.length === 0 ? (
@@ -152,9 +180,11 @@ export function BackgroundProcessesDock() {
             <div className="background-processes-state">Select a loaded session first.</div>
           ) : processes.length === 0 ? (
             <div className="background-processes-state">No running background terminals.</div>
+          ) : filteredProcesses.length === 0 ? (
+            <div className="background-processes-state">No retained processes match this filter.</div>
           ) : (
             <div className="background-processes-list">
-              {processes.map((process) => (
+              {filteredProcesses.map((process) => (
                 <ProcessRow
                   key={process.processId}
                   process={process}
@@ -222,6 +252,23 @@ function dedupeProcesses(processes: ThreadBackgroundTerminal[]): ThreadBackgroun
     if (seen.has(process.processId)) return false;
     seen.add(process.processId);
     return true;
+  });
+}
+
+function filterProcesses(
+  processes: ThreadBackgroundTerminal[],
+  query: string,
+): ThreadBackgroundTerminal[] {
+  const normalized = query.trim().toLocaleLowerCase();
+  if (!normalized) return processes;
+  return processes.filter((process) => {
+    const fields = [
+      process.command,
+      process.cwd,
+      process.processId,
+      process.osPid === null ? "" : String(process.osPid),
+    ];
+    return fields.some((field) => field.toLocaleLowerCase().includes(normalized));
   });
 }
 
