@@ -1,5 +1,7 @@
 import {
   type CommandExecParams,
+  type CommandExecResizeParams,
+  type CommandExecResizeResponse,
   type CommandExecResponse,
   type CommandExecTerminateParams,
   type CommandExecTerminateResponse,
@@ -212,6 +214,10 @@ export class SyndridAppServerClient {
 
   async writeCommand(params: CommandExecWriteParams): Promise<CommandExecWriteResponse> {
     return this.request<CommandExecWriteResponse>(methods.commandExecWrite, params);
+  }
+
+  async resizeCommand(params: CommandExecResizeParams): Promise<CommandExecResizeResponse> {
+    return this.request<CommandExecResizeResponse>(methods.commandExecResize, params);
   }
 
   async terminateCommand(
