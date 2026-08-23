@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
+import type { GitDiffChange, GitDiffChangeKind } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./gitDock.css";
 
@@ -9,6 +10,8 @@ const MAX_DIFF_FILES = 200;
 interface DiffSection {
   key: string;
   path: string;
+  previousPath: string | null;
+  kind: GitDiffChangeKind | null;
   text: string;
   added: number;
   removed: number;
@@ -21,6 +24,7 @@ export function GitDock() {
   const [diffLoaded, setDiffLoaded] = useState(false);
   const [baseSha, setBaseSha] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
+  const [runtimeChanges, setRuntimeChanges] = useState<GitDiffChange[] | null>(null);
   const [diffTruncated, setDiffTruncated] = useState(false);
   const [fileFilter, setFileFilter] = useState("");
   const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(null);
@@ -32,6 +36,7 @@ export function GitDock() {
     setDiffLoaded(false);
     setBaseSha(null);
     setDiff("");
+    setRuntimeChanges(null);
     setDiffTruncated(false);
     setFileFilter("");
     setSelectedSectionKey(null);
@@ -54,11 +59,13 @@ export function GitDock() {
 
       const isTruncated = result.diff.length > MAX_DIFF_CHARS;
       const retainedDiff = isTruncated ? result.diff.slice(0, MAX_DIFF_CHARS) : result.diff;
+      const typedChanges = Array.isArray(result.changes) ? result.changes : null;
       setBaseSha(result.sha);
       setDiff(retainedDiff);
+      setRuntimeChanges(typedChanges);
       setDiffTruncated(isTruncated);
       setFileFilter("");
-      setSelectedSectionKey(firstDiffSectionKey(retainedDiff));
+      setSelectedSectionKey(firstDiffSectionKey(retainedDiff, typedChanges));
       setDiffLoaded(true);
     } catch (cause) {
       if (appServerClient.getWorkspaceSnapshot()?.cwd === cwd) {
@@ -71,15 +78,33 @@ export function GitDock() {
     }
   }, [loadingDiff, workspace?.cwd]);
 
-  const diffStats = useMemo(() => summarizeDiff(diff), [diff]);
-  const allDiffSections = useMemo(() => splitUnifiedDiff(diff), [diff]);
+  const fallbackDiffStats = useMemo(() => summarizeDiff(diff), [diff]);
+  const diffStats = useMemo(
+    () =>
+      runtimeChanges
+        ? runtimeChanges.reduce(
+            (total, change) => ({
+              added: total.added + change.addedLines,
+              removed: total.removed + change.removedLines,
+            }),
+            { added: 0, removed: 0 },
+          )
+        : fallbackDiffStats,
+    [fallbackDiffStats, runtimeChanges],
+  );
+  const allDiffSections = useMemo(
+    () => splitUnifiedDiff(diff, runtimeChanges),
+    [diff, runtimeChanges],
+  );
+  const totalChangedFiles = runtimeChanges?.length ?? allDiffSections.length;
   const normalizedFileFilter = fileFilter.trim().toLocaleLowerCase();
   const matchingDiffSections = useMemo(
     () =>
       normalizedFileFilter
-        ? allDiffSections.filter((section) =>
-            section.path.toLocaleLowerCase().includes(normalizedFileFilter),
-          )
+        ? allDiffSections.filter((section) => {
+            const searchText = `${section.path} ${section.previousPath ?? ""}`.toLocaleLowerCase();
+            return searchText.includes(normalizedFileFilter);
+          })
         : allDiffSections,
     [allDiffSections, normalizedFileFilter],
   );
@@ -157,7 +182,7 @@ export function GitDock() {
                     </span>
                     {diff && (
                       <em>
-                        {allDiffSections.length > 0 && `${allDiffSections.length} files · `}
+                        {totalChangedFiles > 0 && `${totalChangedFiles} files · `}
                         +{diffStats.added} −{diffStats.removed}
                       </em>
                     )}
@@ -175,8 +200,8 @@ export function GitDock() {
                           />
                           <small>
                             {normalizedFileFilter
-                              ? `${matchingDiffSections.length} of ${allDiffSections.length}`
-                              : `${allDiffSections.length} changed`}
+                              ? `${matchingDiffSections.length} of ${allDiffSections.length} visible`
+                              : `${allDiffSections.length} visible`}
                           </small>
                           {fileFilter && (
                             <button onClick={() => setFileFilter("")} type="button">
@@ -193,10 +218,17 @@ export function GitDock() {
                                 className={section.key === selectedSection?.key ? "selected" : ""}
                                 key={section.key}
                                 onClick={() => setSelectedSectionKey(section.key)}
-                                title={section.path}
+                                title={diffSectionTitle(section)}
                                 type="button"
                               >
-                                <span>{section.path}</span>
+                                <span>
+                                  {section.kind && (
+                                    <b aria-label={changeKindLabel(section.kind)}>
+                                      {changeKindShortLabel(section.kind)}
+                                    </b>
+                                  )}
+                                  {section.path}
+                                </span>
                                 <small>+{section.added} −{section.removed}</small>
                               </button>
                             ))}
@@ -207,8 +239,10 @@ export function GitDock() {
                             )}
                           </nav>
                           <div className="git-diff-file-view">
-                            <div className="git-diff-file-title" title={selectedSection?.path}>
-                              {selectedSection?.path ?? "Diff"}
+                            <div className="git-diff-file-title" title={selectedSection ? diffSectionTitle(selectedSection) : undefined}>
+                              {selectedSection?.previousPath && selectedSection.kind === "renamed"
+                                ? `${selectedSection.previousPath} → ${selectedSection.path}`
+                                : selectedSection?.path ?? "Diff"}
                             </div>
                             <pre>{selectedSection?.text ?? diff}</pre>
                           </div>
@@ -237,7 +271,7 @@ export function GitDock() {
           )}
 
           <footer>
-            Runtime-owned Git · diff loads on demand · no polling or desktop git subprocesses
+            Runtime-owned Git · {runtimeChanges ? "typed file metadata" : "compatible diff fallback"} · no polling
           </footer>
         </section>
       )}
@@ -245,11 +279,11 @@ export function GitDock() {
   );
 }
 
-function firstDiffSectionKey(diff: string): string | null {
-  return splitUnifiedDiff(diff)[0]?.key ?? null;
+function firstDiffSectionKey(diff: string, runtimeChanges: GitDiffChange[] | null): string | null {
+  return splitUnifiedDiff(diff, runtimeChanges)[0]?.key ?? null;
 }
 
-function splitUnifiedDiff(diff: string): DiffSection[] {
+function splitUnifiedDiff(diff: string, runtimeChanges: GitDiffChange[] | null): DiffSection[] {
   if (!diff) return [];
 
   const lines = diff.split("\n");
@@ -260,14 +294,17 @@ function splitUnifiedDiff(diff: string): DiffSection[] {
     if (start < 0 || end <= start) return;
     const sectionLines = lines.slice(start, end);
     const text = sectionLines.join("\n");
-    const path = inferDiffPath(sectionLines, sections.length);
-    const stats = summarizeDiff(text);
+    const runtimeChange = runtimeChanges?.[sections.length];
+    const fallbackStats = runtimeChange ? null : summarizeDiff(text);
+    const path = runtimeChange?.path ?? inferDiffPath(sectionLines, sections.length);
     sections.push({
       key: `${sections.length}:${path}`,
       path,
+      previousPath: runtimeChange?.previousPath ?? null,
+      kind: runtimeChange?.kind ?? null,
       text,
-      added: stats.added,
-      removed: stats.removed,
+      added: runtimeChange?.addedLines ?? fallbackStats?.added ?? 0,
+      removed: runtimeChange?.removedLines ?? fallbackStats?.removed ?? 0,
     });
   };
 
@@ -308,4 +345,29 @@ function summarizeDiff(diff: string): { added: number; removed: number } {
     else if (line.startsWith("-")) removed += 1;
   }
   return { added, removed };
+}
+
+function changeKindShortLabel(kind: GitDiffChangeKind): string {
+  switch (kind) {
+    case "added": return "A";
+    case "deleted": return "D";
+    case "renamed": return "R";
+    case "modified": return "M";
+  }
+}
+
+function changeKindLabel(kind: GitDiffChangeKind): string {
+  switch (kind) {
+    case "added": return "Added";
+    case "deleted": return "Deleted";
+    case "renamed": return "Renamed";
+    case "modified": return "Modified";
+  }
+}
+
+function diffSectionTitle(section: DiffSection): string {
+  if (section.kind === "renamed" && section.previousPath) {
+    return `${changeKindLabel(section.kind)} · ${section.previousPath} → ${section.path}`;
+  }
+  return section.kind ? `${changeKindLabel(section.kind)} · ${section.path}` : section.path;
 }
