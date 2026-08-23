@@ -12,6 +12,7 @@ import "./gitDock.css";
 const MAX_DIFF_CHARS = 250_000;
 const MAX_DIFF_FILES = 200;
 const MAX_TYPED_DIFF_CHANGES = 2_500;
+const MAX_RENDERED_DIFF_LINES = 2_000;
 
 interface DiffSection {
   key: string;
@@ -27,6 +28,15 @@ interface RuntimeChangeSummary {
   files: number;
   added: number;
   removed: number;
+}
+
+type DiffLineKind = "metadata" | "hunk" | "added" | "removed" | "context";
+
+interface RenderedDiffLine {
+  kind: DiffLineKind;
+  text: string;
+  oldLine: number | null;
+  newLine: number | null;
 }
 
 export function GitDock() {
@@ -268,13 +278,13 @@ export function GitDock() {
                                 ? `${selectedSection.previousPath} → ${selectedSection.path}`
                                 : selectedSection?.path ?? "Diff"}
                             </div>
-                            <pre>{selectedSection?.text ?? diff}</pre>
+                            <DiffText text={selectedSection?.text ?? diff} />
                           </div>
                         </div>
                       ) : normalizedFileFilter ? (
                         <div className="git-state compact">No changed files match this filter.</div>
                       ) : (
-                        <pre>{diff}</pre>
+                        <DiffText text={diff} />
                       )}
                       {diffTruncated && (
                         <div className="git-state compact">
@@ -301,6 +311,74 @@ export function GitDock() {
       )}
     </aside>
   );
+}
+
+function DiffText({ text }: { text: string }) {
+  const lines = useMemo(() => parseRenderedDiffLines(text), [text]);
+  const visibleLines = lines.slice(0, MAX_RENDERED_DIFF_LINES);
+  const hiddenLineCount = lines.length - visibleLines.length;
+
+  return (
+    <div className="git-diff-text" role="region" aria-label="Unified diff contents">
+      {visibleLines.map((line, index) => (
+        <div className={`git-diff-line ${line.kind}`} key={`${index}:${line.oldLine ?? ""}:${line.newLine ?? ""}`}>
+          <span className="git-diff-line-number" aria-hidden="true">{line.oldLine ?? ""}</span>
+          <span className="git-diff-line-number" aria-hidden="true">{line.newLine ?? ""}</span>
+          <code>{line.text || " "}</code>
+        </div>
+      ))}
+      {hiddenLineCount > 0 && (
+        <div className="git-diff-line-limit">
+          Rendering capped at {MAX_RENDERED_DIFF_LINES.toLocaleString()} lines · {hiddenLineCount.toLocaleString()} additional lines retained but not mounted.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function parseRenderedDiffLines(text: string): RenderedDiffLine[] {
+  const lines = text.split("\n");
+  const rendered: RenderedDiffLine[] = [];
+  let oldLine = 0;
+  let newLine = 0;
+  let inHunk = false;
+
+  for (const textLine of lines) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(textLine);
+    if (hunk) {
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      inHunk = true;
+      rendered.push({ kind: "hunk", text: textLine, oldLine: null, newLine: null });
+      continue;
+    }
+
+    if (!inHunk) {
+      rendered.push({ kind: "metadata", text: textLine, oldLine: null, newLine: null });
+      continue;
+    }
+
+    if (textLine.startsWith("+")) {
+      rendered.push({ kind: "added", text: textLine, oldLine: null, newLine });
+      newLine += 1;
+      continue;
+    }
+    if (textLine.startsWith("-")) {
+      rendered.push({ kind: "removed", text: textLine, oldLine, newLine: null });
+      oldLine += 1;
+      continue;
+    }
+    if (textLine.startsWith(" ")) {
+      rendered.push({ kind: "context", text: textLine, oldLine, newLine });
+      oldLine += 1;
+      newLine += 1;
+      continue;
+    }
+
+    rendered.push({ kind: "metadata", text: textLine, oldLine: null, newLine: null });
+  }
+
+  return rendered;
 }
 
 function firstDiffSectionKey(diff: string, runtimeChanges: GitDiffChange[] | null): string | null {
