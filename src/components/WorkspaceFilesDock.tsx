@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type {
   FsReadDirectoryEntry,
   FuzzyFileSearchResult,
 } from "../runtime/protocol";
+import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./workspaceFilesDock.css";
 
 const MAX_DIRECTORY_ENTRIES = 250;
@@ -20,6 +21,7 @@ interface FilePreview {
 }
 
 export function WorkspaceFilesDock() {
+  const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -37,9 +39,21 @@ export function WorkspaceFilesDock() {
   const supportsResolvedPaths = entries.some((entry) => Boolean(entry.path));
 
   const loadRoot = useCallback(async () => {
-    if (loading) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before browsing workspace files.");
+      return;
+    }
+
+    const root = workspace?.cwd.trim();
+    if (!root) {
+      setRootPath(null);
+      setPathStack([]);
+      setEntries([]);
+      setSearchResults([]);
+      setSearchAttempted(false);
+      setPreview(null);
+      setLoaded(true);
+      setLoading(false);
       return;
     }
 
@@ -47,25 +61,11 @@ export function WorkspaceFilesDock() {
     setError(null);
     setPreview(null);
     try {
-      const threads = await appServerClient.listThreads({
-        limit: 1,
-        archived: false,
-        sortKey: "updated_at",
-        sortDirection: "desc",
-      });
-      const root = threads.data[0]?.cwd?.trim();
-      if (!root) {
-        setRootPath(null);
-        setPathStack([]);
-        setEntries([]);
-        setLoaded(true);
-        return;
-      }
-
       const result = await appServerClient.readDirectory({ path: root });
       setRootPath(root);
       setPathStack([root]);
       setEntries(result.entries);
+      setQuery("");
       setSearchResults([]);
       setSearchAttempted(false);
       setLoaded(true);
@@ -74,7 +74,20 @@ export function WorkspaceFilesDock() {
     } finally {
       setLoading(false);
     }
-  }, [loading]);
+  }, [workspace?.cwd]);
+
+  useEffect(() => {
+    setLoaded(false);
+    setRootPath(null);
+    setPathStack([]);
+    setEntries([]);
+    setQuery("");
+    setSearchResults([]);
+    setSearchAttempted(false);
+    setPreview(null);
+    setError(null);
+    if (open) void loadRoot();
+  }, [loadRoot, open, workspace?.threadId]);
 
   const navigateTo = useCallback(
     async (path: string, stack: string[]) => {
@@ -252,12 +265,7 @@ export function WorkspaceFilesDock() {
     [entries],
   );
 
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    if (next && !loaded && !loading) void loadRoot();
-  };
-
+  const toggle = () => setOpen((current) => !current);
   const showingSearch = searchAttempted || query.trim().length > 0;
 
   return (
@@ -272,8 +280,8 @@ export function WorkspaceFilesDock() {
           <header>
             <span>
               <strong>Workspace files</strong>
-              <small title={currentPath ?? undefined}>
-                {currentPath ?? "Latest active session workspace"}
+              <small title={currentPath ?? workspace?.cwd}>
+                {currentPath ?? workspace?.cwd ?? "Selected session workspace"}
               </small>
             </span>
             <div className="workspace-files-actions">
@@ -316,9 +324,9 @@ export function WorkspaceFilesDock() {
           {error ? (
             <div className="workspace-files-state error">{error}</div>
           ) : loading && !loaded ? (
-            <div className="workspace-files-state">Reading workspace root…</div>
+            <div className="workspace-files-state">Reading selected workspace…</div>
           ) : !rootPath ? (
-            <div className="workspace-files-state">No session workspace reported.</div>
+            <div className="workspace-files-state">No selected session workspace reported.</div>
           ) : showingSearch ? (
             <SearchResults
               attempted={searchAttempted}
@@ -365,7 +373,7 @@ export function WorkspaceFilesDock() {
           )}
 
           <footer>
-            Runtime-backed · explicit reads only · {supportsResolvedPaths ? "lazy navigation + bounded preview" : "root-only on this runtime"} · no polling
+            Runtime-backed · selected session · explicit reads only · {supportsResolvedPaths ? "lazy navigation + bounded preview" : "root-only on this runtime"} · no polling
           </footer>
         </section>
       )}
