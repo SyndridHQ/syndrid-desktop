@@ -106,17 +106,14 @@ export function WorkspaceFilesDock() {
     [loading, navigateTo, pathStack],
   );
 
-  const previewFile = useCallback(async (entry: FsReadDirectoryEntry) => {
-    if (!entry.isFile || !entry.path) return;
-
-    const path = entry.path;
-    setPreview({ path, name: entry.fileName, status: "loading" });
+  const previewPath = useCallback(async (path: string, name: string) => {
+    setPreview({ path, name, status: "loading" });
     try {
       const metadata = await appServerClient.getMetadata({ path });
       if (!metadata.isFile) {
         setPreview({
           path,
-          name: entry.fileName,
+          name,
           status: "unavailable",
           message: "The selected path is no longer a regular file.",
         });
@@ -126,7 +123,7 @@ export function WorkspaceFilesDock() {
       if (typeof metadata.sizeBytes !== "number") {
         setPreview({
           path,
-          name: entry.fileName,
+          name,
           status: "unavailable",
           message: "This runtime cannot size-gate file previews yet.",
         });
@@ -136,7 +133,7 @@ export function WorkspaceFilesDock() {
       if (metadata.sizeBytes > MAX_PREVIEW_BYTES) {
         setPreview({
           path,
-          name: entry.fileName,
+          name,
           status: "oversized",
           sizeBytes: metadata.sizeBytes,
           message: `Preview skipped because the file exceeds ${formatBytes(MAX_PREVIEW_BYTES)}.`,
@@ -149,7 +146,7 @@ export function WorkspaceFilesDock() {
       if (bytes.byteLength > MAX_PREVIEW_BYTES) {
         setPreview({
           path,
-          name: entry.fileName,
+          name,
           status: "oversized",
           sizeBytes: bytes.byteLength,
           message: "Preview stopped because the returned content exceeded the preview limit.",
@@ -160,7 +157,7 @@ export function WorkspaceFilesDock() {
       if (bytes.includes(0)) {
         setPreview({
           path,
-          name: entry.fileName,
+          name,
           status: "binary",
           sizeBytes: bytes.byteLength,
           message: "Binary content is not rendered as text.",
@@ -174,7 +171,7 @@ export function WorkspaceFilesDock() {
       } catch {
         setPreview({
           path,
-          name: entry.fileName,
+          name,
           status: "binary",
           sizeBytes: bytes.byteLength,
           message: "The file is not valid UTF-8 text, so the desktop did not render it.",
@@ -184,7 +181,7 @@ export function WorkspaceFilesDock() {
 
       setPreview({
         path,
-        name: entry.fileName,
+        name,
         status: "ready",
         sizeBytes: bytes.byteLength,
         text,
@@ -192,12 +189,20 @@ export function WorkspaceFilesDock() {
     } catch (cause) {
       setPreview({
         path,
-        name: entry.fileName,
+        name,
         status: "error",
         message: cause instanceof Error ? cause.message : String(cause),
       });
     }
   }, []);
+
+  const previewFile = useCallback(
+    (entry: FsReadDirectoryEntry) => {
+      if (!entry.isFile || !entry.path) return;
+      void previewPath(entry.path, entry.fileName);
+    },
+    [previewPath],
+  );
 
   const goBack = useCallback(() => {
     if (pathStack.length <= 1 || loading) return;
@@ -317,6 +322,7 @@ export function WorkspaceFilesDock() {
           ) : showingSearch ? (
             <SearchResults
               attempted={searchAttempted}
+              onPreview={(result) => void previewPath(result.path, result.file_name)}
               results={searchResults}
               searching={searching}
             />
@@ -335,7 +341,7 @@ export function WorkspaceFilesDock() {
                     key={entry.path ?? entry.fileName}
                     onClick={() => {
                       if (entry.isDirectory) openDirectory(entry);
-                      else if (entry.isFile) void previewFile(entry);
+                      else if (entry.isFile) previewFile(entry);
                     }}
                     title={entry.path ?? entry.fileName}
                     type="button"
@@ -404,11 +410,12 @@ function FilePreviewPanel({
 
 interface SearchResultsProps {
   attempted: boolean;
+  onPreview: (result: FuzzyFileSearchResult) => void;
   results: FuzzyFileSearchResult[];
   searching: boolean;
 }
 
-function SearchResults({ attempted, results, searching }: SearchResultsProps) {
+function SearchResults({ attempted, onPreview, results, searching }: SearchResultsProps) {
   if (searching && !attempted) {
     return <div className="workspace-files-state">Searching runtime index…</div>;
   }
@@ -419,14 +426,17 @@ function SearchResults({ attempted, results, searching }: SearchResultsProps) {
   return (
     <div className="workspace-files-list search-results" aria-live="polite">
       {results.map((result, index) => (
-        <div
-          className="workspace-file-row search-result"
+        <button
+          className="workspace-file-row search-result navigable"
           key={`${result.root}:${result.path}:${index}`}
+          onClick={() => onPreview(result)}
+          title={`Preview ${result.path}`}
+          type="button"
         >
           <span aria-hidden="true">·</span>
-          <code title={result.path}>{result.path}</code>
+          <code>{result.path}</code>
           <small>{result.file_name}</small>
-        </div>
+        </button>
       ))}
       {searching && (
         <div className="workspace-files-state compact">Refreshing search…</div>
