@@ -17,6 +17,8 @@ import {
   type FsReadDirectoryResponse,
   type FsReadFileParams,
   type FsReadFileResponse,
+  type FsWriteFileParams,
+  type FsWriteFileResponse,
   type FuzzyFileSearchParams,
   type FuzzyFileSearchResponse,
   type GitDiffToRemoteParams,
@@ -271,6 +273,10 @@ export class SyndridAppServerClient {
 
   async readFile(params: FsReadFileParams): Promise<FsReadFileResponse> {
     return this.request<FsReadFileResponse>(methods.fsReadFile, params);
+  }
+
+  async writeFile(params: FsWriteFileParams): Promise<FsWriteFileResponse> {
+    return this.request<FsWriteFileResponse>(methods.fsWriteFile, params);
   }
 
   async fuzzyFileSearch(
