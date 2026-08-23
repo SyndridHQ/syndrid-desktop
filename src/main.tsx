@@ -8,6 +8,7 @@ import { GitDock } from "./components/GitDock";
 import { HooksDock } from "./components/HooksDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
+import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { ProviderDock } from "./components/ProviderDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
@@ -22,6 +23,7 @@ const bootStartedAt = performance.now();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App bootStartedAt={bootStartedAt} />
+    <PrimaryNavigationBridge />
     <CommandPalette />
     <ApprovalDock />
     <RuntimeInputDock />
