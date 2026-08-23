@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
@@ -12,15 +12,31 @@ import "./styles.css";
 
 const bootStartedAt = performance.now();
 
+interface SelectedWorkspace {
+  threadId: string;
+  cwd: string;
+}
+
+function DesktopRoot() {
+  const [workspace, setWorkspace] = useState<SelectedWorkspace | null>(null);
+  const workspacePath = workspace?.cwd ?? null;
+
+  return (
+    <>
+      <App bootStartedAt={bootStartedAt} onWorkspaceChange={setWorkspace} />
+      <ApprovalDock />
+      <RuntimeInputDock />
+      <McpElicitationDock />
+      <McpServerDock />
+      <WorkspaceFilesDock workspacePath={workspacePath} />
+      <SkillsDock workspacePath={workspacePath} />
+      <RuntimeActivityDock />
+    </>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App bootStartedAt={bootStartedAt} />
-    <ApprovalDock />
-    <RuntimeInputDock />
-    <McpElicitationDock />
-    <McpServerDock />
-    <WorkspaceFilesDock />
-    <SkillsDock />
-    <RuntimeActivityDock />
+    <DesktopRoot />
   </StrictMode>,
 );
