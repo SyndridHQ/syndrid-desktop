@@ -53,6 +53,13 @@ const commands: Command[] = [
     run: () => clickElement(".terminal-toggle"),
   },
   {
+    id: "processes",
+    label: "Open background processes",
+    detail: "Inspect and terminate Syndrid-owned background terminals",
+    keywords: "processes background terminals pid cpu memory rss long running",
+    run: () => clickElement(".background-processes-toggle"),
+  },
+  {
     id: "git",
     label: "Open source control",
     detail: "Inspect Git metadata reported by the selected Syndrid session",
