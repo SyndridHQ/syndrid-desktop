@@ -134,6 +134,8 @@ export interface FsGetMetadataParams { path: string; }
 export interface FsGetMetadataResponse { isDirectory: boolean; isFile: boolean; isSymlink: boolean; sizeBytes?: number; createdAtMs: number; modifiedAtMs: number; }
 export interface FsReadFileParams { path: string; }
 export interface FsReadFileResponse { dataBase64: string; }
+export interface FsWriteFileParams { path: string; dataBase64: string; }
+export type FsWriteFileResponse = Record<string, never>;
 
 export interface FuzzyFileSearchParams { query: string; roots: string[]; cancellationToken: string | null; }
 export interface FuzzyFileSearchResult { root: string; path: string; match_type: unknown; file_name: string; score: number; indices: number[] | null; }
@@ -192,6 +194,7 @@ export const methods = {
   fsReadDirectory: "fs/readDirectory",
   fsGetMetadata: "fs/getMetadata",
   fsReadFile: "fs/readFile",
+  fsWriteFile: "fs/writeFile",
   fuzzyFileSearch: "fuzzyFileSearch",
   skillsList: "skills/list",
   hooksList: "hooks/list",
