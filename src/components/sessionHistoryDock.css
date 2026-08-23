@@ -49,9 +49,27 @@
 .session-history-panel button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
 .session-history-panel button:disabled { opacity: .45; cursor: not-allowed; }
 
+.session-history-kind {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 8px 8px 0;
+}
+
+.session-history-kind button {
+  min-height: 25px;
+  background: var(--panel-2, #11151a);
+}
+
+.session-history-kind button.selected {
+  border-color: rgba(127,149,255,.42);
+  background: rgba(127,149,255,.09);
+  color: var(--text, #e8edf2);
+}
+
 .session-history-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 6px;
   padding: 8px 8px 5px;
 }
@@ -109,4 +127,6 @@
 
 @media (max-width: 720px) {
   .session-history-dock { left: 8px; bottom: 234px; width: calc(100vw - 16px); }
+  .session-history-search { grid-template-columns: minmax(0, 1fr) auto; }
+  .session-history-search button:first-of-type { display: none; }
 }
