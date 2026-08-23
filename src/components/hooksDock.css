@@ -1,0 +1,62 @@
+.hooks-dock {
+  position: fixed;
+  right: 20px;
+  bottom: 76px;
+  z-index: 43;
+  width: min(390px, calc(100vw - 24px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.hooks-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(13, 16, 20, 0.96);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.hooks-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
+.hooks-toggle > span:last-child { color: var(--faint, #5d6670); font-size: 9px; }
+
+.hooks-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 11px;
+  background: rgba(13, 16, 20, 0.985);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+.hooks-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border, #20262d); padding: 10px 11px; }
+.hooks-panel > header > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.hooks-panel > header strong { font-size: 10px; }
+.hooks-panel > header small { color: var(--faint, #5d6670); font-size: 8px; }
+.hooks-panel button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
+.hooks-panel button:disabled { opacity: .4; cursor: not-allowed; }
+.hooks-list { max-height: min(480px, 60vh); overflow: auto; padding: 7px; }
+.hooks-empty { padding: 22px 10px; color: var(--faint, #5d6670); text-align: center; }
+.hook-card { border: 1px solid var(--border, #20262d); border-radius: 7px; padding: 7px 8px; background: var(--panel-2, #11151a); }
+.hook-card + .hook-card { margin-top: 6px; }
+.hook-card-head { display: flex; justify-content: space-between; gap: 8px; }
+.hook-card-head strong { font-size: 9px; }
+.hook-card-head em { color: var(--muted, #87919c); font-size: 8px; font-style: normal; }
+.hook-running .hook-card-head em { color: var(--accent, #7f95ff); }
+.hook-failed .hook-card-head em, .hook-blocked .hook-card-head em { color: #e6a6a6; }
+.hook-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.hook-meta span { border-radius: 4px; padding: 1px 4px; background: rgba(127,149,255,.07); color: var(--faint, #5d6670); font-size: 7px; }
+.hook-card code { display: block; overflow: hidden; margin-top: 5px; color: var(--muted, #87919c); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.hook-card p { margin: 5px 0 0; color: var(--muted, #87919c); font-size: 8px; white-space: pre-wrap; word-break: break-word; }
+.hook-card p.hook-entry { max-height: 54px; overflow: hidden; }
+.hook-card p.hook-entry b { color: var(--faint, #5d6670); font-weight: 600; }
+.hook-card > footer { display: flex; gap: 8px; margin-top: 6px; color: var(--faint, #5d6670); font-size: 7px; }
+.hooks-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
+
+@media (max-width: 720px) {
+  .hooks-dock { right: 8px; bottom: 152px; width: calc(100vw - 16px); }
+}
