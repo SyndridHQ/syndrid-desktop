@@ -65,22 +65,32 @@ export function SessionHistoryDock() {
     setError(null);
     if (open) void load(false);
     // `load` intentionally stays out of this dependency list: workspace/scope
-    // changes invalidate and issue exactly one fresh explicit panel read.
+    // changes invalidate and issue exactly one fresh panel read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, scopeWorkspace, workspace?.threadId, workspace?.cwd]);
 
-  const visibleThreads = useMemo(
-    () => dedupeThreads(threads),
-    [threads],
-  );
-
-  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (!open) return;
     generation.current += 1;
     setThreads([]);
     setCursor(null);
-    setSubmittedQuery(query.trim());
-    queueMicrotask(() => void load(false));
+    setError(null);
+    void load(false);
+    // The submitted query is the trigger; the callback from this render carries
+    // that exact query and avoids issuing requests for each input keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submittedQuery]);
+
+  const visibleThreads = useMemo(() => dedupeThreads(threads), [threads]);
+
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = query.trim();
+    if (normalized === submittedQuery) {
+      void load(false);
+      return;
+    }
+    setSubmittedQuery(normalized);
   };
 
   return (
