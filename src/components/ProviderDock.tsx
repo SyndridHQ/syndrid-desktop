@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type {
+  ConfigReadResponse,
   ModelProviderCapabilities,
   ModelSummary,
 } from "../runtime/protocol";
@@ -15,6 +16,7 @@ export function ProviderDock() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
+  const [config, setConfig] = useState<ConfigReadResponse | null>(null);
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [capabilities, setCapabilities] =
     useState<ModelProviderCapabilities | null>(null);
@@ -30,9 +32,13 @@ export function ProviderDock() {
     setLoading(true);
     setError(null);
     try {
-      const [catalog, providerCapabilities, thread] = await Promise.all([
+      const configParams = workspace?.cwd
+        ? { cwd: workspace.cwd, includeLayers: false }
+        : { includeLayers: false };
+      const [catalog, providerCapabilities, effectiveConfig, thread] = await Promise.all([
         appServerClient.listModels({ limit: MAX_VISIBLE_MODELS, includeHidden: false }),
         appServerClient.readModelProviderCapabilities(),
+        appServerClient.readConfig(configParams),
         workspace?.threadId
           ? appServerClient.readThread({
               threadId: workspace.threadId,
@@ -43,6 +49,7 @@ export function ProviderDock() {
 
       setModels(catalog.data);
       setCapabilities(providerCapabilities);
+      setConfig(effectiveConfig);
       setProvider(thread?.thread.modelProvider?.trim() || null);
       setLoaded(true);
     } catch (cause) {
@@ -50,12 +57,13 @@ export function ProviderDock() {
     } finally {
       setLoading(false);
     }
-  }, [workspace?.threadId]);
+  }, [workspace?.cwd, workspace?.threadId]);
 
   useEffect(() => {
     if (!open) return;
     setLoaded(false);
     setProvider(null);
+    setConfig(null);
     setError(null);
     void load();
   }, [load, open]);
@@ -79,6 +87,10 @@ export function ProviderDock() {
       )
       .slice(0, MAX_VISIBLE_MODELS);
   }, [models, query]);
+
+  const effectiveProvider = config?.config.model_provider?.trim() || null;
+  const effectiveModel = config?.config.model?.trim() || null;
+  const serviceTier = config?.config.service_tier?.trim() || null;
 
   return (
     <aside className="provider-dock" aria-label="Provider manager">
@@ -107,6 +119,27 @@ export function ProviderDock() {
               {loading ? "Loading…" : "Refresh"}
             </button>
           </header>
+
+          {config && (
+            <dl className="provider-effective">
+              <div>
+                <dt>Session provider</dt>
+                <dd>{provider ?? "Runtime default"}</dd>
+              </div>
+              <div>
+                <dt>Workspace default</dt>
+                <dd>{effectiveProvider ?? "Runtime default"}</dd>
+              </div>
+              <div>
+                <dt>Default model</dt>
+                <dd>{effectiveModel ?? "Runtime-selected"}</dd>
+              </div>
+              <div>
+                <dt>Service tier</dt>
+                <dd>{serviceTier ?? "Default"}</dd>
+              </div>
+            </dl>
+          )}
 
           {capabilities && (
             <div className="provider-capabilities" aria-label="Provider capabilities">
@@ -139,7 +172,7 @@ export function ProviderDock() {
           {error ? (
             <div className="provider-state error">{error}</div>
           ) : loading && !loaded ? (
-            <div className="provider-state">Discovering runtime models…</div>
+            <div className="provider-state">Discovering runtime providers and models…</div>
           ) : models.length === 0 ? (
             <div className="provider-state">No runtime models reported.</div>
           ) : visibleModels.length === 0 ? (
@@ -169,7 +202,7 @@ export function ProviderDock() {
           )}
 
           <footer>
-            Runtime-discovered · read-only · no hardcoded model inventory · no polling
+            Runtime-discovered · effective config · read-only · no hardcoded model inventory
           </footer>
         </section>
       )}
