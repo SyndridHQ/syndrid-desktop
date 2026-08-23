@@ -3,6 +3,7 @@ import { appServerClient } from "../runtime/appServerClient";
 import {
   notifications,
   type CommandExecOutputDeltaNotification,
+  type CommandExecTerminalSize,
 } from "../runtime/protocol";
 import "./terminalDock.css";
 
@@ -10,6 +11,12 @@ const LOCAL_ENVIRONMENT_ID = "local";
 const MAX_TRANSCRIPT_CHARS = 200_000;
 const OUTPUT_CAP_BYTES = 2 * 1024 * 1024;
 const INPUT_MAX_CHARS = 4_096;
+const DEFAULT_TERMINAL_SIZE: CommandExecTerminalSize = { rows: 26, cols: 100 };
+const RESIZE_DEBOUNCE_MS = 120;
+const MIN_TERMINAL_ROWS = 4;
+const MAX_TERMINAL_ROWS = 200;
+const MIN_TERMINAL_COLS = 20;
+const MAX_TERMINAL_COLS = 400;
 
 export function TerminalDock() {
   const [open, setOpen] = useState(false);
@@ -24,6 +31,7 @@ export function TerminalDock() {
   const processIdRef = useRef<string | null>(null);
   const decoderRef = useRef(new TextDecoder("utf-8", { fatal: false }));
   const outputRef = useRef<HTMLPreElement>(null);
+  const lastTerminalSizeRef = useRef<CommandExecTerminalSize | null>(null);
 
   const appendTranscript = useCallback((text: string) => {
     if (!text) return;
@@ -57,6 +65,43 @@ export function TerminalDock() {
     if (!open) return;
     outputRef.current?.scrollTo({ top: outputRef.current.scrollHeight });
   }, [open, transcript]);
+
+  useEffect(() => {
+    const element = outputRef.current;
+    if (!open || !running || !element || !processIdRef.current) return;
+
+    let resizeTimer: number | null = null;
+    let disposed = false;
+
+    const syncSize = () => {
+      const processId = processIdRef.current;
+      if (!processId || disposed) return;
+      const size = measureTerminalSize(element);
+      const previous = lastTerminalSizeRef.current;
+      if (previous?.rows === size.rows && previous.cols === size.cols) return;
+      lastTerminalSizeRef.current = size;
+      if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        resizeTimer = null;
+        if (disposed || processIdRef.current !== processId) return;
+        void appServerClient.resizeCommand({ processId, size }).catch((cause) => {
+          if (!disposed && processIdRef.current === processId) {
+            setError(cause instanceof Error ? cause.message : String(cause));
+          }
+        });
+      }, RESIZE_DEBOUNCE_MS);
+    };
+
+    const observer = new ResizeObserver(syncSize);
+    observer.observe(element);
+    syncSize();
+
+    return () => {
+      disposed = true;
+      observer.disconnect();
+      if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+    };
+  }, [open, running]);
 
   const stop = useCallback(async () => {
     const processId = processIdRef.current;
@@ -93,7 +138,11 @@ export function TerminalDock() {
       const workspace = appServerClient.getWorkspaceSnapshot();
       const terminalCwd = workspace?.cwd ?? null;
       const processId = `desktop-terminal-${crypto.randomUUID()}`;
+      const initialSize = outputRef.current
+        ? measureTerminalSize(outputRef.current)
+        : DEFAULT_TERMINAL_SIZE;
       processIdRef.current = processId;
+      lastTerminalSizeRef.current = initialSize;
       decoderRef.current = new TextDecoder("utf-8", { fatal: false });
       setShellLabel(`${environment.shell.name} · ${shellPath}`);
       setCwd(terminalCwd ?? environment.cwd);
@@ -110,7 +159,7 @@ export function TerminalDock() {
           outputBytesCap: OUTPUT_CAP_BYTES,
           disableTimeout: true,
           cwd: terminalCwd,
-          size: { rows: 26, cols: 100 },
+          size: initialSize,
         })
         .then((result) => {
           if (processIdRef.current !== processId) return;
@@ -120,18 +169,21 @@ export function TerminalDock() {
           if (result.stderr) appendTranscript(result.stderr);
           appendTranscript(`\n[process exited ${result.exitCode}]\n`);
           processIdRef.current = null;
+          lastTerminalSizeRef.current = null;
           setRunning(false);
           setStopping(false);
         })
         .catch((cause) => {
           if (processIdRef.current !== processId) return;
           processIdRef.current = null;
+          lastTerminalSizeRef.current = null;
           setRunning(false);
           setStopping(false);
           setError(cause instanceof Error ? cause.message : String(cause));
         });
     } catch (cause) {
       processIdRef.current = null;
+      lastTerminalSizeRef.current = null;
       setRunning(false);
       setError(
         cause instanceof Error
@@ -232,7 +284,7 @@ export function TerminalDock() {
 
           {error && <div className="terminal-error">{error}</div>}
           <footer>
-            Runtime-owned PTY · selected-workspace cwd · bounded output · no hidden process after close
+            Runtime-owned PTY · selected-workspace cwd · bounded output · panel-sized terminal · no hidden process after close
           </footer>
         </section>
       )}
@@ -249,6 +301,49 @@ function isCommandExecOutputDelta(value: unknown): value is CommandExecOutputDel
     typeof record.deltaBase64 === "string" &&
     typeof record.capReached === "boolean"
   );
+}
+
+function measureTerminalSize(element: HTMLElement): CommandExecTerminalSize {
+  const style = window.getComputedStyle(element);
+  const fontSize = parseCssPixels(style.fontSize, 12);
+  const lineHeight = parseCssPixels(style.lineHeight, fontSize * 1.4);
+  const horizontalPadding =
+    parseCssPixels(style.paddingLeft, 0) + parseCssPixels(style.paddingRight, 0);
+  const verticalPadding =
+    parseCssPixels(style.paddingTop, 0) + parseCssPixels(style.paddingBottom, 0);
+  const availableWidth = Math.max(0, element.clientWidth - horizontalPadding);
+  const availableHeight = Math.max(0, element.clientHeight - verticalPadding);
+  const cellWidth = measureMonospaceCellWidth(style.font, fontSize);
+  return {
+    rows: clampInteger(
+      Math.floor(availableHeight / Math.max(lineHeight, 1)),
+      MIN_TERMINAL_ROWS,
+      MAX_TERMINAL_ROWS,
+    ),
+    cols: clampInteger(
+      Math.floor(availableWidth / Math.max(cellWidth, 1)),
+      MIN_TERMINAL_COLS,
+      MAX_TERMINAL_COLS,
+    ),
+  };
+}
+
+function measureMonospaceCellWidth(font: string, fallbackFontSize: number): number {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return fallbackFontSize * 0.62;
+  context.font = font;
+  const width = context.measureText("M").width;
+  return Number.isFinite(width) && width > 0 ? width : fallbackFontSize * 0.62;
+}
+
+function parseCssPixels(value: string, fallback: number): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Number.isFinite(value) ? Math.floor(value) : min));
 }
 
 function decodeBase64(value: string): Uint8Array {
