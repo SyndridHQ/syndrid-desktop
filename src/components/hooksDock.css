@@ -3,7 +3,7 @@
   right: 20px;
   bottom: 76px;
   z-index: 43;
-  width: min(390px, calc(100vw - 24px));
+  width: min(410px, calc(100vw - 24px));
   font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text, #e8edf2);
 }
@@ -36,11 +36,18 @@
 .hooks-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border, #20262d); padding: 10px 11px; }
 .hooks-panel > header > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .hooks-panel > header strong { font-size: 10px; }
-.hooks-panel > header small { color: var(--faint, #5d6670); font-size: 8px; }
+.hooks-panel > header small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .hooks-panel button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
 .hooks-panel button:disabled { opacity: .4; cursor: not-allowed; }
+
+.hooks-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; border-bottom: 1px solid var(--border, #20262d); padding: 6px 7px; }
+.hooks-tabs button { min-height: 27px; }
+.hooks-tabs button.active { border-color: rgba(127,149,255,.4); background: rgba(127,149,255,.09); color: var(--text, #e8edf2); }
+
 .hooks-list { max-height: min(480px, 60vh); overflow: auto; padding: 7px; }
 .hooks-empty { padding: 22px 10px; color: var(--faint, #5d6670); text-align: center; }
+.hooks-empty.compact { padding: 8px 10px; font-size: 8px; }
+.hooks-empty.hooks-error { color: #e6a6a6; }
 .hook-card { border: 1px solid var(--border, #20262d); border-radius: 7px; padding: 7px 8px; background: var(--panel-2, #11151a); }
 .hook-card + .hook-card { margin-top: 6px; }
 .hook-card-head { display: flex; justify-content: space-between; gap: 8px; }
@@ -53,9 +60,14 @@
 .hook-card code { display: block; overflow: hidden; margin-top: 5px; color: var(--muted, #87919c); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .hook-card p { margin: 5px 0 0; color: var(--muted, #87919c); font-size: 8px; white-space: pre-wrap; word-break: break-word; }
 .hook-card p.hook-entry { max-height: 54px; overflow: hidden; }
-.hook-card p.hook-entry b { color: var(--faint, #5d6670); font-weight: 600; }
+.hook-card p.hook-entry b, .hook-card p.hook-command b { color: var(--faint, #5d6670); font-weight: 600; }
+.hook-card p.hook-command { max-height: 44px; overflow: hidden; }
 .hook-card > footer { display: flex; gap: 8px; margin-top: 6px; color: var(--faint, #5d6670); font-size: 7px; }
-.hooks-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
+.hook-disabled { opacity: .64; }
+.hook-trust-managed, .hook-trust-trusted { color: #9fc8a8 !important; }
+.hook-trust-untrusted, .hook-trust-modified { color: #e2b982 !important; }
+.hooks-panel > footer { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
+.hooks-panel > footer em { color: #e2b982; font-style: normal; }
 
 @media (max-width: 720px) {
   .hooks-dock { right: 8px; bottom: 152px; width: calc(100vw - 16px); }
