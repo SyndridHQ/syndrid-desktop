@@ -136,6 +136,7 @@
 .git-diff-files button:hover { background: rgba(127,149,255,.07); }
 .git-diff-files button.selected { background: rgba(127,149,255,.12); color: var(--text, #e8edf2); }
 .git-diff-files button > span { overflow: hidden; font: 8px/1.35 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.git-diff-files button > span b { display: inline-block; min-width: 11px; margin-right: 4px; color: var(--faint, #6f7984); font-weight: 700; text-align: center; }
 .git-diff-files button > small { color: var(--faint, #5d6670); font: 7px/1.3 "SFMono-Regular", Consolas, monospace; }
 .git-diff-file-limit { padding: 8px 7px; color: var(--faint, #5d6670); font-size: 7px; text-align: center; }
 
