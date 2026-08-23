@@ -144,6 +144,29 @@ export interface SkillMetadata { name: string; description: string; shortDescrip
 export interface SkillsListEntry { cwd: string; skills: SkillMetadata[]; errors: unknown[]; }
 export interface SkillsListResponse { data: SkillsListEntry[]; }
 
+export type HookEventName = "preToolUse" | "permissionRequest" | "postToolUse" | "preCompact" | "postCompact" | "sessionStart" | "userPromptSubmit" | "subagentStart" | "subagentStop" | "stop";
+export type HookTrustStatus = "managed" | "untrusted" | "trusted" | "modified";
+export interface HooksListParams { cwds?: string[]; }
+export interface HookMetadata {
+  key: string;
+  eventName: HookEventName;
+  handlerType: string;
+  matcher: string | null;
+  command: string | null;
+  timeoutSec: number;
+  statusMessage: string | null;
+  sourcePath: string;
+  source: string;
+  pluginId: string | null;
+  displayOrder: number;
+  enabled: boolean;
+  isManaged: boolean;
+  currentHash: string;
+  trustStatus: HookTrustStatus;
+}
+export interface HooksListEntry { cwd: string; hooks: HookMetadata[]; warnings: string[]; errors: unknown[]; }
+export interface HooksListResponse { data: HooksListEntry[]; }
+
 export interface AgentMessageDeltaNotification { threadId: string; turnId: string; itemId: string; delta: string; }
 export interface TurnLifecycleNotification { threadId: string; turn: TurnSummary; }
 
@@ -171,6 +194,7 @@ export const methods = {
   fsReadFile: "fs/readFile",
   fuzzyFileSearch: "fuzzyFileSearch",
   skillsList: "skills/list",
+  hooksList: "hooks/list",
 } as const;
 
 export const notifications = {
