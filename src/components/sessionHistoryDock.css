@@ -116,6 +116,7 @@
 .session-history-row > div:first-child { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .session-history-row strong { overflow: hidden; flex: 1; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .session-history-row > div:first-child span { border: 1px solid rgba(127,149,255,.28); border-radius: 999px; padding: 1px 4px; color: var(--muted, #87919c); font-size: 7px; }
+.session-history-row .session-history-row-action { flex: 0 0 auto; padding: 2px 5px; font-size: 7px; }
 .session-history-row > small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .session-history-meta { display: flex; gap: 8px; min-width: 0; color: var(--faint, #5d6670); font-size: 7px; }
 .session-history-meta code { font: inherit; }
