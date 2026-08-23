@@ -38,6 +38,7 @@ export interface TurnStartParams { threadId: string; clientUserMessageId?: strin
 export interface TurnStartResponse { turn: TurnSummary; }
 export interface TurnInterruptParams { threadId: string; turnId: string; }
 export type TurnInterruptResponse = Record<string, never>;
+export interface TurnDiffUpdatedNotification { threadId: string; turnId: string; diff: string; }
 
 export interface ModelListParams { cursor?: string | null; limit?: number | null; includeHidden?: boolean | null; }
 export interface ModelSummary { id: string; model: string; upgrade: string | null; upgradeInfo: unknown | null; availabilityNux: unknown | null; displayName: string; description: string; hidden: boolean; supportedReasoningEfforts: unknown[]; defaultReasoningEffort: unknown; inputModalities: unknown[]; supportsPersonality: boolean; additionalSpeedTiers: string[]; serviceTiers: unknown[]; defaultServiceTier: string | null; isDefault: boolean; }
@@ -203,6 +204,7 @@ export const methods = {
 export const notifications = {
   turnStarted: "turn/started",
   turnCompleted: "turn/completed",
+  turnDiffUpdated: "turn/diff/updated",
   agentMessageDelta: "item/agentMessage/delta",
   commandExecOutputDelta: "command/exec/outputDelta",
   serverRequestResolved: "serverRequest/resolved",
