@@ -22,7 +22,6 @@ export function ProviderDock() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (loading) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before loading providers.");
       return;
@@ -51,7 +50,7 @@ export function ProviderDock() {
     } finally {
       setLoading(false);
     }
-  }, [loading, workspace?.threadId]);
+  }, [workspace?.threadId]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +58,7 @@ export function ProviderDock() {
     setProvider(null);
     setError(null);
     void load();
-  }, [open, workspace?.threadId]);
+  }, [load, open]);
 
   const visibleModels = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -158,7 +157,10 @@ export function ProviderDock() {
                     {model.isDefault && <em>Default</em>}
                     {model.supportsPersonality && <small>Personality</small>}
                     {model.inputModalities.length > 0 && (
-                      <small>{model.inputModalities.length} input mode{model.inputModalities.length === 1 ? "" : "s"}</small>
+                      <small>
+                        {model.inputModalities.length} input mode
+                        {model.inputModalities.length === 1 ? "" : "s"}
+                      </small>
                     )}
                   </span>
                 </article>
