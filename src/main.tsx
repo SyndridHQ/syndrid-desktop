@@ -12,6 +12,7 @@ import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { ProviderDock } from "./components/ProviderDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
+import { SessionHistoryDock } from "./components/SessionHistoryDock";
 import { SettingsDock } from "./components/SettingsDock";
 import { SkillsDock } from "./components/SkillsDock";
 import { TerminalDock } from "./components/TerminalDock";
@@ -34,6 +35,7 @@ createRoot(document.getElementById("root")!).render(
     <ProviderDock />
     <GitDock />
     <TerminalDock />
+    <SessionHistoryDock />
     <ContextDock />
     <HooksDock />
     <SettingsDock />
