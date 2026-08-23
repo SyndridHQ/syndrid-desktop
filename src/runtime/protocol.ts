@@ -103,7 +103,20 @@ export interface CommandExecOutputDeltaNotification {
 
 /** Legacy app-server read retained by SyndridCLI for remote-relative working-tree diffs. */
 export interface GitDiffToRemoteParams { cwd: string; }
-export interface GitDiffToRemoteResponse { sha: string; diff: string; }
+export type GitDiffChangeKind = "modified" | "added" | "deleted" | "renamed";
+export interface GitDiffChange {
+  path: string;
+  previousPath: string | null;
+  kind: GitDiffChangeKind;
+  addedLines: number;
+  removedLines: number;
+}
+export interface GitDiffToRemoteResponse {
+  sha: string;
+  diff: string;
+  /** Additive typed metadata from SyndridCLI PR #115; absent on older runtimes. */
+  changes?: GitDiffChange[];
+}
 
 export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
 export type McpAuthStatus = "unsupported" | "notLoggedIn" | "bearerToken" | "oAuth";
