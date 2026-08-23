@@ -5,6 +5,7 @@ import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
+import { ProviderDock } from "./components/ProviderDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { SkillsDock } from "./components/SkillsDock";
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")!).render(
     <McpServerDock />
     <WorkspaceFilesDock />
     <SkillsDock />
+    <ProviderDock />
     <TerminalDock />
     <RuntimeActivityDock />
   </StrictMode>,
