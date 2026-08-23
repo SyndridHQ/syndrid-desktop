@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type {
   FsReadDirectoryEntry,
@@ -16,12 +16,16 @@ interface FilePreview {
   name: string;
   status: "loading" | "ready" | "unavailable" | "oversized" | "binary" | "error";
   sizeBytes?: number;
+  modifiedAtMs?: number;
+  isSymlink?: boolean;
+  workspaceThreadId?: string;
   text?: string;
   message?: string;
 }
 
 export function WorkspaceFilesDock() {
   const workspace = useRuntimeWorkspace();
+  const previewRequestRef = useRef(0);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -38,6 +42,11 @@ export function WorkspaceFilesDock() {
   const currentPath = pathStack.at(-1) ?? rootPath;
   const supportsResolvedPaths = entries.some((entry) => Boolean(entry.path));
 
+  const clearPreview = useCallback(() => {
+    previewRequestRef.current += 1;
+    setPreview(null);
+  }, []);
+
   const loadRoot = useCallback(async () => {
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before browsing workspace files.");
@@ -51,7 +60,7 @@ export function WorkspaceFilesDock() {
       setEntries([]);
       setSearchResults([]);
       setSearchAttempted(false);
-      setPreview(null);
+      clearPreview();
       setLoaded(true);
       setLoading(false);
       return;
@@ -59,7 +68,7 @@ export function WorkspaceFilesDock() {
 
     setLoading(true);
     setError(null);
-    setPreview(null);
+    clearPreview();
     try {
       const result = await appServerClient.readDirectory({ path: root });
       setRootPath(root);
@@ -74,7 +83,7 @@ export function WorkspaceFilesDock() {
     } finally {
       setLoading(false);
     }
-  }, [workspace?.cwd]);
+  }, [clearPreview, workspace?.cwd]);
 
   useEffect(() => {
     setLoaded(false);
@@ -84,17 +93,17 @@ export function WorkspaceFilesDock() {
     setQuery("");
     setSearchResults([]);
     setSearchAttempted(false);
-    setPreview(null);
+    clearPreview();
     setError(null);
     if (open) void loadRoot();
-  }, [loadRoot, open, workspace?.threadId]);
+  }, [clearPreview, loadRoot, open, workspace?.threadId]);
 
   const navigateTo = useCallback(
     async (path: string, stack: string[]) => {
       if (loading) return;
       setLoading(true);
       setError(null);
-      setPreview(null);
+      clearPreview();
       try {
         const result = await appServerClient.readDirectory({ path });
         setPathStack(stack);
@@ -108,7 +117,7 @@ export function WorkspaceFilesDock() {
         setLoading(false);
       }
     },
-    [loading],
+    [clearPreview, loading],
   );
 
   const openDirectory = useCallback(
@@ -120,14 +129,24 @@ export function WorkspaceFilesDock() {
   );
 
   const previewPath = useCallback(async (path: string, name: string) => {
-    setPreview({ path, name, status: "loading" });
+    const requestGeneration = ++previewRequestRef.current;
+    const requestedThreadId = workspace?.threadId;
+    if (!requestedThreadId) return;
+
+    setPreview({ path, name, status: "loading", workspaceThreadId: requestedThreadId });
+    const isCurrentRequest = () =>
+      previewRequestRef.current === requestGeneration &&
+      appServerClient.getWorkspaceSnapshot()?.threadId === requestedThreadId;
+
     try {
       const metadata = await appServerClient.getMetadata({ path });
+      if (!isCurrentRequest()) return;
       if (!metadata.isFile) {
         setPreview({
           path,
           name,
           status: "unavailable",
+          workspaceThreadId: requestedThreadId,
           message: "The selected path is no longer a regular file.",
         });
         return;
@@ -138,6 +157,7 @@ export function WorkspaceFilesDock() {
           path,
           name,
           status: "unavailable",
+          workspaceThreadId: requestedThreadId,
           message: "This runtime cannot size-gate file previews yet.",
         });
         return;
@@ -149,12 +169,14 @@ export function WorkspaceFilesDock() {
           name,
           status: "oversized",
           sizeBytes: metadata.sizeBytes,
+          workspaceThreadId: requestedThreadId,
           message: `Preview skipped because the file exceeds ${formatBytes(MAX_PREVIEW_BYTES)}.`,
         });
         return;
       }
 
       const result = await appServerClient.readFile({ path });
+      if (!isCurrentRequest()) return;
       const bytes = decodeBase64(result.dataBase64);
       if (bytes.byteLength > MAX_PREVIEW_BYTES) {
         setPreview({
@@ -162,6 +184,7 @@ export function WorkspaceFilesDock() {
           name,
           status: "oversized",
           sizeBytes: bytes.byteLength,
+          workspaceThreadId: requestedThreadId,
           message: "Preview stopped because the returned content exceeded the preview limit.",
         });
         return;
@@ -173,6 +196,7 @@ export function WorkspaceFilesDock() {
           name,
           status: "binary",
           sizeBytes: bytes.byteLength,
+          workspaceThreadId: requestedThreadId,
           message: "Binary content is not rendered as text.",
         });
         return;
@@ -187,6 +211,7 @@ export function WorkspaceFilesDock() {
           name,
           status: "binary",
           sizeBytes: bytes.byteLength,
+          workspaceThreadId: requestedThreadId,
           message: "The file is not valid UTF-8 text, so the desktop did not render it.",
         });
         return;
@@ -197,17 +222,22 @@ export function WorkspaceFilesDock() {
         name,
         status: "ready",
         sizeBytes: bytes.byteLength,
+        modifiedAtMs: metadata.modifiedAtMs,
+        isSymlink: metadata.isSymlink,
+        workspaceThreadId: requestedThreadId,
         text,
       });
     } catch (cause) {
+      if (!isCurrentRequest()) return;
       setPreview({
         path,
         name,
         status: "error",
+        workspaceThreadId: requestedThreadId,
         message: cause instanceof Error ? cause.message : String(cause),
       });
     }
-  }, []);
+  }, [workspace?.threadId]);
 
   const previewFile = useCallback(
     (entry: FsReadDirectoryEntry) => {
@@ -369,11 +399,21 @@ export function WorkspaceFilesDock() {
           )}
 
           {preview && (
-            <FilePreviewPanel preview={preview} onClose={() => setPreview(null)} />
+            <FilePreviewPanel
+              onClose={clearPreview}
+              onSaved={(text, sizeBytes, modifiedAtMs) => {
+                setPreview((current) =>
+                  current && current.path === preview.path
+                    ? { ...current, text, sizeBytes, modifiedAtMs, message: undefined }
+                    : current,
+                );
+              }}
+              preview={preview}
+            />
           )}
 
           <footer>
-            Runtime-backed · selected session · explicit reads only · {supportsResolvedPaths ? "lazy navigation + bounded preview" : "root-only on this runtime"} · no polling
+            Runtime-backed · selected session · explicit reads/writes only · {supportsResolvedPaths ? "lazy navigation + bounded editor" : "root-only on this runtime"} · no polling
           </footer>
         </section>
       )}
@@ -384,27 +424,161 @@ export function WorkspaceFilesDock() {
 function FilePreviewPanel({
   preview,
   onClose,
+  onSaved,
 }: {
   preview: FilePreview;
   onClose: () => void;
+  onSaved: (text: string, sizeBytes: number, modifiedAtMs: number) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(preview.text ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditing(false);
+    setDraft(preview.text ?? "");
+    setSaving(false);
+    setSaveMessage(null);
+    setSaveError(null);
+  }, [preview.modifiedAtMs, preview.path, preview.text]);
+
+  const editable =
+    preview.status === "ready" &&
+    preview.isSymlink === false &&
+    typeof preview.modifiedAtMs === "number" &&
+    preview.modifiedAtMs > 0 &&
+    typeof preview.sizeBytes === "number" &&
+    typeof preview.text === "string" &&
+    typeof preview.workspaceThreadId === "string";
+  const dirty = editing && draft !== (preview.text ?? "");
+
+  const save = async () => {
+    if (!editable || !dirty || saving || !preview.workspaceThreadId) return;
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      const currentWorkspace = appServerClient.getWorkspaceSnapshot();
+      if (currentWorkspace?.threadId !== preview.workspaceThreadId) {
+        throw new Error("The selected session changed. Reopen the file before saving.");
+      }
+
+      const encoded = new TextEncoder().encode(draft);
+      if (encoded.byteLength > MAX_PREVIEW_BYTES) {
+        throw new Error(`Save blocked because the edited file exceeds ${formatBytes(MAX_PREVIEW_BYTES)}.`);
+      }
+
+      const metadata = await appServerClient.getMetadata({ path: preview.path });
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== preview.workspaceThreadId) {
+        throw new Error("The selected session changed. Reopen the file before saving.");
+      }
+      if (!metadata.isFile || metadata.isSymlink) {
+        throw new Error("Save blocked because the path is no longer the same regular file.");
+      }
+      if (
+        metadata.modifiedAtMs !== preview.modifiedAtMs ||
+        metadata.sizeBytes !== preview.sizeBytes
+      ) {
+        throw new Error("The file changed on disk after it was opened. Reopen it before saving.");
+      }
+
+      const currentFile = await appServerClient.readFile({ path: preview.path });
+      const currentBytes = decodeBase64(currentFile.dataBase64);
+      if (currentBytes.byteLength > MAX_PREVIEW_BYTES || currentBytes.includes(0)) {
+        throw new Error("The file changed to unsupported content. Reopen it before saving.");
+      }
+      let currentText: string;
+      try {
+        currentText = new TextDecoder("utf-8", { fatal: true }).decode(currentBytes);
+      } catch {
+        throw new Error("The file is no longer valid UTF-8 text. Reopen it before saving.");
+      }
+      if (currentText !== preview.text) {
+        throw new Error("The file contents changed after it was opened. Reopen it before saving.");
+      }
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== preview.workspaceThreadId) {
+        throw new Error("The selected session changed. Reopen the file before saving.");
+      }
+
+      await appServerClient.writeFile({
+        path: preview.path,
+        dataBase64: encodeBase64(encoded),
+      });
+      const after = await appServerClient.getMetadata({ path: preview.path });
+      const nextModifiedAtMs = after.modifiedAtMs > 0 ? after.modifiedAtMs : Date.now();
+      const nextSizeBytes = typeof after.sizeBytes === "number" ? after.sizeBytes : encoded.byteLength;
+      onSaved(draft, nextSizeBytes, nextModifiedAtMs);
+      setEditing(false);
+      setSaveMessage("Saved through Syndrid runtime.");
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <section className="workspace-file-preview" aria-live="polite">
       <header>
         <span>
-          <strong>{preview.name}</strong>
+          <strong>{preview.name}{dirty ? " · unsaved" : ""}</strong>
           <small title={preview.path}>{preview.path}</small>
         </span>
-        <button onClick={onClose} type="button">Close</button>
+        <div className="workspace-file-preview-actions">
+          {preview.status === "ready" && !editing && (
+            <button disabled={!editable} onClick={() => setEditing(true)} type="button">
+              Edit
+            </button>
+          )}
+          {editing && (
+            <>
+              <button
+                disabled={saving}
+                onClick={() => {
+                  setDraft(preview.text ?? "");
+                  setEditing(false);
+                  setSaveError(null);
+                  setSaveMessage(null);
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button disabled={!dirty || saving} onClick={() => void save()} type="button">
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </>
+          )}
+          <button disabled={saving} onClick={onClose} type="button">Close</button>
+        </div>
       </header>
       {preview.status === "loading" ? (
         <div className="workspace-files-state compact">Checking metadata…</div>
       ) : preview.status === "ready" ? (
         <>
           <div className="workspace-file-preview-meta">
-            UTF-8 · {formatBytes(preview.sizeBytes ?? 0)} · read after metadata gate
+            UTF-8 · {formatBytes(preview.sizeBytes ?? 0)} · {editing ? "local draft; explicit save" : "read after metadata gate"}
+            {preview.isSymlink && " · symlink editing disabled"}
+            {!preview.isSymlink && (preview.modifiedAtMs ?? 0) <= 0 && " · edit conflict checks unavailable"}
           </div>
-          <pre>{preview.text}</pre>
+          {editing ? (
+            <textarea
+              aria-label={`Edit ${preview.name}`}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setSaveError(null);
+                setSaveMessage(null);
+              }}
+              spellCheck={false}
+              value={draft}
+            />
+          ) : (
+            <pre>{preview.text}</pre>
+          )}
+          {saveError && <div className="workspace-file-save-message error">{saveError}</div>}
+          {saveMessage && <div className="workspace-file-save-message success">{saveMessage}</div>}
         </>
       ) : (
         <div className={`workspace-files-state compact ${preview.status === "error" ? "error" : ""}`}>
@@ -460,6 +634,16 @@ function decodeBase64(value: string): Uint8Array {
     bytes[index] = decoded.charCodeAt(index);
   }
   return bytes;
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return window.btoa(binary);
 }
 
 function formatBytes(bytes: number): string {
