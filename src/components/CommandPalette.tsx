@@ -53,6 +53,13 @@ const commands: Command[] = [
     run: () => clickElement(".terminal-toggle"),
   },
   {
+    id: "git",
+    label: "Open source control",
+    detail: "Inspect Git metadata reported by the selected Syndrid session",
+    keywords: "git source control branch commit origin repository",
+    run: () => clickElement(".git-toggle"),
+  },
+  {
     id: "providers",
     label: "Open providers",
     detail: "Inspect the selected session provider and runtime model catalog",
