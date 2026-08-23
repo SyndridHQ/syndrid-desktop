@@ -1,0 +1,99 @@
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: min(16vh, 140px) 16px 16px;
+  background: rgba(5, 7, 9, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.command-palette {
+  width: min(620px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 12px;
+  background: rgba(13, 16, 20, 0.985);
+  color: var(--text, #e8edf2);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  font: 12px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.command-palette-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 12px 14px;
+}
+
+.command-palette-search > span {
+  color: var(--muted, #87919c);
+  font-size: 16px;
+}
+
+.command-palette-search input {
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.command-palette-search input::placeholder { color: var(--faint, #5d6670); }
+.command-palette kbd {
+  border: 1px solid var(--border, #20262d);
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: var(--panel-2, #11151a);
+  color: var(--faint, #5d6670);
+  font: 9px/1.5 "SFMono-Regular", Consolas, monospace;
+}
+
+.command-palette-results {
+  max-height: min(420px, 54vh);
+  overflow: auto;
+  padding: 6px;
+}
+
+.command-palette-results button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.command-palette-results button:hover,
+.command-palette-results button.active {
+  background: rgba(127, 149, 255, 0.09);
+}
+
+.command-palette-results button > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.command-palette-results strong { font-size: 11px; font-weight: 600; }
+.command-palette-results small { color: var(--faint, #5d6670); font-size: 9px; }
+.command-palette-empty { padding: 28px 12px; color: var(--faint, #5d6670); text-align: center; }
+.command-palette > footer {
+  border-top: 1px solid var(--border, #20262d);
+  padding: 7px 10px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
