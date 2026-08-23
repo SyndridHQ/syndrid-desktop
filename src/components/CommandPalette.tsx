@@ -53,6 +53,13 @@ const commands: Command[] = [
     run: () => clickElement(".terminal-toggle"),
   },
   {
+    id: "providers",
+    label: "Open providers",
+    detail: "Inspect the selected session provider and runtime model catalog",
+    keywords: "providers models catalog capabilities routing",
+    run: () => clickElement(".provider-toggle"),
+  },
+  {
     id: "skills",
     label: "Open skills",
     detail: "Open the selected-workspace skills inventory",
