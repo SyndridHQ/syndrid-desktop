@@ -1,0 +1,76 @@
+.git-dock {
+  position: fixed;
+  right: 116px;
+  bottom: 34px;
+  z-index: 42;
+  width: min(360px, calc(100vw - 24px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.git-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(13, 16, 20, 0.96);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.git-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
+.git-toggle > span:last-child { max-width: 100px; overflow: hidden; color: var(--faint, #5d6670); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.git-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 11px;
+  background: rgba(13, 16, 20, 0.985);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+}
+
+.git-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 10px 11px;
+}
+
+.git-panel > header > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.git-panel > header strong { font-size: 10px; }
+.git-panel > header small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.git-panel button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; }
+.git-panel button:disabled { opacity: .45; cursor: not-allowed; }
+
+.git-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--border, #20262d);
+}
+
+.git-summary > div {
+  min-width: 0;
+  padding: 9px 10px;
+  background: var(--panel-2, #11151a);
+}
+
+.git-summary .git-summary-wide { grid-column: 1 / -1; }
+.git-summary dt { color: var(--faint, #5d6670); font-size: 7px; letter-spacing: .06em; text-transform: uppercase; }
+.git-summary dd { overflow: hidden; margin: 3px 0 0; color: var(--text, #e8edf2); font: 9px/1.35 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.git-state { padding: 22px 12px; color: var(--faint, #5d6670); text-align: center; }
+.git-state.error { color: #e6a6a6; }
+.git-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
+
+@media (max-width: 900px) {
+  .git-dock { right: 8px; bottom: 114px; width: calc(100vw - 16px); }
+}
