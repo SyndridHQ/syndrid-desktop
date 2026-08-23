@@ -21,6 +21,8 @@ import {
   type FuzzyFileSearchResponse,
   type GitDiffToRemoteParams,
   type GitDiffToRemoteResponse,
+  type HooksListParams,
+  type HooksListResponse,
   type InitializeParams,
   type InitializeResponse,
   type JsonRpcFailure,
@@ -279,6 +281,10 @@ export class SyndridAppServerClient {
 
   async listSkills(params: SkillsListParams = {}): Promise<SkillsListResponse> {
     return this.request<SkillsListResponse>(methods.skillsList, params);
+  }
+
+  async listHooks(params: HooksListParams = {}): Promise<HooksListResponse> {
+    return this.request<HooksListResponse>(methods.hooksList, params);
   }
 
   onNotification(handler: RuntimeNotificationHandler): () => void {
