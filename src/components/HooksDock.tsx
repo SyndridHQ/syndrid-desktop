@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type { HookMetadata, HooksListEntry } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
@@ -33,6 +33,7 @@ type HooksView = "inventory" | "activity";
 
 export function HooksDock() {
   const workspace = useRuntimeWorkspace();
+  const inventoryRequestRef = useRef(0);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<HooksView>("inventory");
   const [runs, setRuns] = useState<HookRun[]>([]);
@@ -50,8 +51,9 @@ export function HooksDock() {
     }), []);
 
   const loadInventory = useCallback(async () => {
-    if (inventoryLoading) return;
+    const requestGeneration = ++inventoryRequestRef.current;
     if (appServerClient.getSnapshot().phase !== "ready") {
+      setInventoryLoading(false);
       setInventoryError("Connect the Syndrid runtime before loading hooks.");
       return;
     }
@@ -60,6 +62,7 @@ export function HooksDock() {
     if (!cwd) {
       setInventory([]);
       setInventoryLoaded(true);
+      setInventoryLoading(false);
       setInventoryError(null);
       return;
     }
@@ -69,23 +72,32 @@ export function HooksDock() {
     setInventoryError(null);
     try {
       const result = await appServerClient.listHooks({ cwds: [cwd] });
+      if (inventoryRequestRef.current !== requestGeneration) return;
       const current = appServerClient.getWorkspaceSnapshot();
       if (current?.threadId !== requestedThreadId || current.cwd !== cwd) return;
       setInventory(result.data);
       setInventoryLoaded(true);
     } catch (cause) {
+      if (inventoryRequestRef.current !== requestGeneration) return;
       setInventoryError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setInventoryLoading(false);
+      if (inventoryRequestRef.current === requestGeneration) {
+        setInventoryLoading(false);
+      }
     }
-  }, [inventoryLoading, workspace?.cwd, workspace?.threadId]);
+  }, [workspace?.cwd, workspace?.threadId]);
 
   useEffect(() => {
     setInventory([]);
     setInventoryLoaded(false);
     setInventoryError(null);
-    if (open && view === "inventory") void loadInventory();
-  }, [open, view, workspace?.threadId, workspace?.cwd]);
+    if (open && view === "inventory") {
+      void loadInventory();
+    } else {
+      inventoryRequestRef.current += 1;
+      setInventoryLoading(false);
+    }
+  }, [loadInventory, open, view, workspace?.cwd, workspace?.threadId]);
 
   const runningCount = useMemo(
     () => runs.filter((run) => run.status === "running").length,
