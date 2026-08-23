@@ -46,6 +46,13 @@ const commands: Command[] = [
     run: () => clickElement(".workspace-files-toggle"),
   },
   {
+    id: "terminal",
+    label: "Open terminal",
+    detail: "Open the runtime-backed native PTY console",
+    keywords: "terminal shell pty command powershell zsh bash",
+    run: () => clickElement(".terminal-toggle"),
+  },
+  {
     id: "skills",
     label: "Open skills",
     detail: "Open the selected-workspace skills inventory",
