@@ -4,6 +4,15 @@ import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./gitDock.css";
 
 const MAX_DIFF_CHARS = 250_000;
+const MAX_DIFF_FILES = 200;
+
+interface DiffSection {
+  key: string;
+  path: string;
+  text: string;
+  added: number;
+  removed: number;
+}
 
 export function GitDock() {
   const workspace = useRuntimeWorkspace();
@@ -13,6 +22,7 @@ export function GitDock() {
   const [baseSha, setBaseSha] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
   const [diffTruncated, setDiffTruncated] = useState(false);
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const gitInfo = workspace?.git ?? null;
 
@@ -22,6 +32,7 @@ export function GitDock() {
     setBaseSha(null);
     setDiff("");
     setDiffTruncated(false);
+    setSelectedSectionKey(null);
     setError(null);
   }, [workspace?.threadId, workspace?.cwd]);
 
@@ -40,9 +51,11 @@ export function GitDock() {
       if (appServerClient.getWorkspaceSnapshot()?.cwd !== cwd) return;
 
       const isTruncated = result.diff.length > MAX_DIFF_CHARS;
+      const retainedDiff = isTruncated ? result.diff.slice(0, MAX_DIFF_CHARS) : result.diff;
       setBaseSha(result.sha);
-      setDiff(isTruncated ? result.diff.slice(0, MAX_DIFF_CHARS) : result.diff);
+      setDiff(retainedDiff);
       setDiffTruncated(isTruncated);
+      setSelectedSectionKey(firstDiffSectionKey(retainedDiff));
       setDiffLoaded(true);
     } catch (cause) {
       if (appServerClient.getWorkspaceSnapshot()?.cwd === cwd) {
@@ -56,6 +69,18 @@ export function GitDock() {
   }, [loadingDiff, workspace?.cwd]);
 
   const diffStats = useMemo(() => summarizeDiff(diff), [diff]);
+  const allDiffSections = useMemo(() => splitUnifiedDiff(diff), [diff]);
+  const diffSections = useMemo(
+    () => allDiffSections.slice(0, MAX_DIFF_FILES),
+    [allDiffSections],
+  );
+  const selectedSection = useMemo(
+    () =>
+      diffSections.find((section) => section.key === selectedSectionKey) ??
+      diffSections[0] ??
+      null,
+    [diffSections, selectedSectionKey],
+  );
 
   return (
     <aside className="git-dock" aria-label="Git overview">
@@ -119,13 +144,44 @@ export function GitDock() {
                     </span>
                     {diff && (
                       <em>
+                        {allDiffSections.length > 0 && `${allDiffSections.length} files · `}
                         +{diffStats.added} −{diffStats.removed}
                       </em>
                     )}
                   </div>
                   {diff ? (
                     <>
-                      <pre>{diff}</pre>
+                      {diffSections.length > 0 ? (
+                        <div className="git-diff-layout">
+                          <nav className="git-diff-files" aria-label="Changed files">
+                            {diffSections.map((section) => (
+                              <button
+                                className={section.key === selectedSection?.key ? "selected" : ""}
+                                key={section.key}
+                                onClick={() => setSelectedSectionKey(section.key)}
+                                title={section.path}
+                                type="button"
+                              >
+                                <span>{section.path}</span>
+                                <small>+{section.added} −{section.removed}</small>
+                              </button>
+                            ))}
+                            {allDiffSections.length > MAX_DIFF_FILES && (
+                              <div className="git-diff-file-limit">
+                                Showing {MAX_DIFF_FILES} of {allDiffSections.length} files.
+                              </div>
+                            )}
+                          </nav>
+                          <div className="git-diff-file-view">
+                            <div className="git-diff-file-title" title={selectedSection?.path}>
+                              {selectedSection?.path ?? "Diff"}
+                            </div>
+                            <pre>{selectedSection?.text ?? diff}</pre>
+                          </div>
+                        </div>
+                      ) : (
+                        <pre>{diff}</pre>
+                      )}
                       {diffTruncated && (
                         <div className="git-state compact">
                           Display limited to {MAX_DIFF_CHARS.toLocaleString()} characters.
@@ -151,6 +207,60 @@ export function GitDock() {
       )}
     </aside>
   );
+}
+
+function firstDiffSectionKey(diff: string): string | null {
+  return splitUnifiedDiff(diff)[0]?.key ?? null;
+}
+
+function splitUnifiedDiff(diff: string): DiffSection[] {
+  if (!diff) return [];
+
+  const lines = diff.split("\n");
+  const sections: DiffSection[] = [];
+  let start = -1;
+
+  const pushSection = (end: number) => {
+    if (start < 0 || end <= start) return;
+    const sectionLines = lines.slice(start, end);
+    const text = sectionLines.join("\n");
+    const path = inferDiffPath(sectionLines, sections.length);
+    const stats = summarizeDiff(text);
+    sections.push({
+      key: `${sections.length}:${path}`,
+      path,
+      text,
+      added: stats.added,
+      removed: stats.removed,
+    });
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!lines[index]?.startsWith("diff --git ")) continue;
+    if (start >= 0) pushSection(index);
+    start = index;
+  }
+  if (start >= 0) pushSection(lines.length);
+
+  return sections;
+}
+
+function inferDiffPath(lines: string[], fallbackIndex: number): string {
+  const addedPath = lines.find((line) => line.startsWith("+++ "))?.slice(4).trim();
+  if (addedPath && addedPath !== "/dev/null") return cleanDiffPath(addedPath);
+
+  const renameTo = lines.find((line) => line.startsWith("rename to "))?.slice(10).trim();
+  if (renameTo) return cleanDiffPath(renameTo);
+
+  const removedPath = lines.find((line) => line.startsWith("--- "))?.slice(4).trim();
+  if (removedPath && removedPath !== "/dev/null") return cleanDiffPath(removedPath);
+
+  return `Changed file ${fallbackIndex + 1}`;
+}
+
+function cleanDiffPath(path: string): string {
+  const unquoted = path.startsWith('"') && path.endsWith('"') ? path.slice(1, -1) : path;
+  return unquoted.replace(/^[ab]\//, "");
 }
 
 function summarizeDiff(diff: string): { added: number; removed: number } {
