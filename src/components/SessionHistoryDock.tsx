@@ -12,6 +12,7 @@ export function SessionHistoryDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mutatingThreadId, setMutatingThreadId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -85,6 +86,35 @@ export function SessionHistoryDock() {
   const visibleThreads = useMemo(() => dedupeThreads(threads), [threads]);
   const normalizedQuery = query.trim();
 
+  const mutateThread = useCallback(
+    async (thread: ThreadSummary) => {
+      if (mutatingThreadId) return;
+      if (historyKind === "active" && thread.id === workspace?.threadId) {
+        setError("The currently selected session cannot be archived from History.");
+        return;
+      }
+
+      const requestGeneration = generation.current;
+      setMutatingThreadId(thread.id);
+      setError(null);
+      try {
+        if (historyKind === "archived") {
+          await appServerClient.unarchiveThread({ threadId: thread.id });
+        } else {
+          await appServerClient.archiveThread({ threadId: thread.id });
+        }
+        if (requestGeneration !== generation.current) return;
+        setThreads((current) => current.filter((item) => item.id !== thread.id));
+      } catch (cause) {
+        if (requestGeneration !== generation.current) return;
+        setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        if (requestGeneration === generation.current) setMutatingThreadId(null);
+      }
+    },
+    [historyKind, mutatingThreadId, workspace?.threadId],
+  );
+
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalized = query.trim();
@@ -132,7 +162,7 @@ export function SessionHistoryDock() {
             <button
               aria-pressed={historyKind === "active"}
               className={historyKind === "active" ? "selected" : ""}
-              disabled={loading}
+              disabled={loading || Boolean(mutatingThreadId)}
               onClick={() => setHistoryKind("active")}
               type="button"
             >
@@ -141,7 +171,7 @@ export function SessionHistoryDock() {
             <button
               aria-pressed={historyKind === "archived"}
               className={historyKind === "archived" ? "selected" : ""}
-              disabled={loading}
+              disabled={loading || Boolean(mutatingThreadId)}
               onClick={() => setHistoryKind("archived")}
               type="button"
             >
@@ -159,13 +189,13 @@ export function SessionHistoryDock() {
             {normalizedQuery && (
               <button onClick={clearSearch} type="button">Clear</button>
             )}
-            <button disabled={loading} type="submit">Search</button>
+            <button disabled={loading || Boolean(mutatingThreadId)} type="submit">Search</button>
           </form>
 
           <label className="session-history-scope">
             <input
               checked={scopeWorkspace}
-              disabled={!workspace?.cwd}
+              disabled={!workspace?.cwd || Boolean(mutatingThreadId)}
               onChange={(event) => setScopeWorkspace(event.target.checked)}
               type="checkbox"
             />
@@ -184,15 +214,22 @@ export function SessionHistoryDock() {
             <div className="session-history-list">
               {visibleThreads.map((thread) => (
                 <ThreadRow
+                  action={historyKind === "archived" ? "Restore" : "Archive"}
+                  actionDisabled={
+                    Boolean(mutatingThreadId) ||
+                    (historyKind === "active" && thread.id === workspace?.threadId)
+                  }
+                  actionPending={mutatingThreadId === thread.id}
                   current={historyKind === "active" && thread.id === workspace?.threadId}
                   key={thread.id}
+                  onAction={() => void mutateThread(thread)}
                   thread={thread}
                 />
               ))}
               {cursor && threads.length < MAX_RETAINED_THREADS && (
                 <button
                   className="session-history-more"
-                  disabled={loading}
+                  disabled={loading || Boolean(mutatingThreadId)}
                   onClick={() => void load(true)}
                   type="button"
                 >
@@ -212,10 +249,18 @@ export function SessionHistoryDock() {
 }
 
 function ThreadRow({
+  action,
+  actionDisabled,
+  actionPending,
   current,
+  onAction,
   thread,
 }: {
+  action: "Archive" | "Restore";
+  actionDisabled: boolean;
+  actionPending: boolean;
   current: boolean;
+  onAction: () => void;
   thread: ThreadSummary;
 }) {
   const title = thread.name?.trim() || thread.preview?.trim() || "Untitled session";
@@ -224,6 +269,15 @@ function ThreadRow({
       <div>
         <strong title={title}>{title}</strong>
         {current && <span>Current</span>}
+        <button
+          className="session-history-row-action"
+          disabled={actionDisabled}
+          onClick={onAction}
+          title={current ? "Current session cannot be archived here" : `${action} session`}
+          type="button"
+        >
+          {actionPending ? "…" : action}
+        </button>
       </div>
       <small title={thread.cwd}>{thread.cwd || "No workspace"}</small>
       <div className="session-history-meta">
