@@ -1,4 +1,12 @@
 import {
+  type CommandExecParams,
+  type CommandExecResponse,
+  type CommandExecTerminateParams,
+  type CommandExecTerminateResponse,
+  type CommandExecWriteParams,
+  type CommandExecWriteResponse,
+  type EnvironmentInfoParams,
+  type EnvironmentInfoResponse,
   type FsGetMetadataParams,
   type FsGetMetadataResponse,
   type FsReadDirectoryParams,
@@ -64,7 +72,7 @@ export type RuntimeServerRequestHandler = (request: RuntimeServerRequest) => boo
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
-  timeout: number;
+  timeout: number | null;
 }
 
 export interface RuntimeConnectionSnapshot {
@@ -147,7 +155,7 @@ export class SyndridAppServerClient {
 
   async disconnect(): Promise<void> {
     for (const pending of this.pending.values()) {
-      window.clearTimeout(pending.timeout);
+      if (pending.timeout !== null) window.clearTimeout(pending.timeout);
       pending.reject(new Error("Syndrid app-server disconnected."));
     }
     this.pending.clear();
@@ -192,6 +200,24 @@ export class SyndridAppServerClient {
 
   async readModelProviderCapabilities(): Promise<ModelProviderCapabilities> {
     return this.request<ModelProviderCapabilities>(methods.modelProviderCapabilitiesRead, {});
+  }
+
+  async readEnvironmentInfo(params: EnvironmentInfoParams): Promise<EnvironmentInfoResponse> {
+    return this.request<EnvironmentInfoResponse>(methods.environmentInfo, params);
+  }
+
+  async execCommand(params: CommandExecParams): Promise<CommandExecResponse> {
+    return this.request<CommandExecResponse>(methods.commandExec, params, null);
+  }
+
+  async writeCommand(params: CommandExecWriteParams): Promise<CommandExecWriteResponse> {
+    return this.request<CommandExecWriteResponse>(methods.commandExecWrite, params);
+  }
+
+  async terminateCommand(
+    params: CommandExecTerminateParams,
+  ): Promise<CommandExecTerminateResponse> {
+    return this.request<CommandExecTerminateResponse>(methods.commandExecTerminate, params);
   }
 
   async listMcpServerStatus(
@@ -298,16 +324,19 @@ export class SyndridAppServerClient {
   private async request<TResult>(
     method: string,
     params: unknown,
-    timeoutMs = REQUEST_TIMEOUT_MS,
+    timeoutMs: number | null = REQUEST_TIMEOUT_MS,
   ): Promise<TResult> {
     const id = this.nextId++;
     const payload = { method, id, params };
 
     const response = new Promise<TResult>((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`${method} timed out after ${timeoutMs}ms.`));
-      }, timeoutMs);
+      const timeout =
+        timeoutMs === null
+          ? null
+          : window.setTimeout(() => {
+              this.pending.delete(id);
+              reject(new Error(`${method} timed out after ${timeoutMs}ms.`));
+            }, timeoutMs);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as TResult),
@@ -321,7 +350,7 @@ export class SyndridAppServerClient {
     } catch (error) {
       const pending = this.pending.get(id);
       if (pending) {
-        window.clearTimeout(pending.timeout);
+        if (pending.timeout !== null) window.clearTimeout(pending.timeout);
         this.pending.delete(id);
       }
       throw error;
@@ -374,7 +403,7 @@ export class SyndridAppServerClient {
         return;
       }
 
-      window.clearTimeout(pending.timeout);
+      if (pending.timeout !== null) window.clearTimeout(pending.timeout);
       this.pending.delete(message.id);
 
       const response = message as unknown as JsonRpcResponse;
