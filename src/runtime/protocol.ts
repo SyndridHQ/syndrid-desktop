@@ -101,6 +101,10 @@ export interface CommandExecOutputDeltaNotification {
   capReached: boolean;
 }
 
+/** Legacy app-server read retained by SyndridCLI for remote-relative working-tree diffs. */
+export interface GitDiffToRemoteParams { cwd: string; }
+export interface GitDiffToRemoteResponse { sha: string; diff: string; }
+
 export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
 export type McpAuthStatus = "unsupported" | "notLoggedIn" | "bearerToken" | "oAuth";
 export interface McpServerStatusListParams { cursor?: string | null; limit?: number | null; detail?: McpServerStatusDetail | null; threadId?: string | null; }
@@ -146,6 +150,7 @@ export const methods = {
   commandExecWrite: "command/exec/write",
   commandExecResize: "command/exec/resize",
   commandExecTerminate: "command/exec/terminate",
+  gitDiffToRemote: "gitDiffToRemote",
   mcpServerStatusList: "mcpServerStatus/list",
   mcpServerOauthLogin: "mcpServer/oauth/login",
   fsReadDirectory: "fs/readDirectory",
