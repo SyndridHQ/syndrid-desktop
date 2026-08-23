@@ -83,6 +83,30 @@
   font-size: 8px;
 }
 
+.background-processes-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 7px 8px;
+}
+
+.background-processes-filter input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--border, #20262d);
+  border-radius: 6px;
+  padding: 5px 7px;
+  outline: none;
+  background: var(--panel-2, #11151a);
+  color: var(--text, #e8edf2);
+  font: 9px/1.4 "SFMono-Regular", Consolas, monospace;
+}
+
+.background-processes-filter input:focus { border-color: rgba(127, 149, 255, .55); }
+.background-processes-filter input::placeholder { color: var(--faint, #5d6670); }
+.background-processes-filter small { flex: 0 0 auto; color: var(--faint, #5d6670); font-size: 8px; }
+
 .background-processes-list {
   max-height: min(470px, 58vh);
   overflow: auto;
