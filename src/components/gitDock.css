@@ -150,18 +150,52 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.git-diff pre {
+
+.git-diff-text {
   max-height: min(430px, 52vh);
-  margin: 0;
   overflow: auto;
-  padding: 10px;
   background: #0b0e11;
   color: var(--muted, #aab3bd);
   font: 9px/1.45 "SFMono-Regular", Consolas, monospace;
   tab-size: 2;
+}
+.git-diff-file-view .git-diff-text { max-height: calc(min(470px, 56vh) - 29px); }
+.git-diff-line {
+  display: grid;
+  grid-template-columns: 38px 38px minmax(max-content, 1fr);
+  min-width: max-content;
   white-space: pre;
 }
-.git-diff-file-view pre { max-height: calc(min(470px, 56vh) - 29px); }
+.git-diff-line > * { padding-top: 1px; padding-bottom: 1px; }
+.git-diff-line-number {
+  border-right: 1px solid rgba(255,255,255,.035);
+  padding-right: 6px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+  text-align: right;
+  user-select: none;
+}
+.git-diff-line code {
+  padding-right: 10px;
+  padding-left: 9px;
+  color: inherit;
+  font: inherit;
+}
+.git-diff-line.metadata { color: var(--faint, #6f7984); }
+.git-diff-line.hunk { background: rgba(127,149,255,.08); color: #aeb9ef; }
+.git-diff-line.added { background: rgba(81,160,108,.105); color: #b9dbbf; }
+.git-diff-line.removed { background: rgba(190,91,91,.11); color: #dfb5b5; }
+.git-diff-line.context { color: var(--muted, #aab3bd); }
+.git-diff-line-limit {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid var(--border, #20262d);
+  padding: 8px 10px;
+  background: rgba(13,16,20,.97);
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+  text-align: center;
+}
 
 .git-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
 
