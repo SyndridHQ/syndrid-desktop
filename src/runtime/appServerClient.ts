@@ -40,6 +40,12 @@ import {
   type RequestId,
   type SkillsListParams,
   type SkillsListResponse,
+  type ThreadBackgroundTerminalsCleanParams,
+  type ThreadBackgroundTerminalsCleanResponse,
+  type ThreadBackgroundTerminalsListParams,
+  type ThreadBackgroundTerminalsListResponse,
+  type ThreadBackgroundTerminalsTerminateParams,
+  type ThreadBackgroundTerminalsTerminateResponse,
   type ThreadListParams,
   type ThreadListResponse,
   type ThreadReadParams,
@@ -201,6 +207,33 @@ export class SyndridAppServerClient {
     const result = await this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
     this.setWorkspaceFromThread(result.thread);
     return result;
+  }
+
+  async listBackgroundTerminals(
+    params: ThreadBackgroundTerminalsListParams,
+  ): Promise<ThreadBackgroundTerminalsListResponse> {
+    return this.request<ThreadBackgroundTerminalsListResponse>(
+      methods.threadBackgroundTerminalsList,
+      params,
+    );
+  }
+
+  async terminateBackgroundTerminal(
+    params: ThreadBackgroundTerminalsTerminateParams,
+  ): Promise<ThreadBackgroundTerminalsTerminateResponse> {
+    return this.request<ThreadBackgroundTerminalsTerminateResponse>(
+      methods.threadBackgroundTerminalsTerminate,
+      params,
+    );
+  }
+
+  async cleanBackgroundTerminals(
+    params: ThreadBackgroundTerminalsCleanParams,
+  ): Promise<ThreadBackgroundTerminalsCleanResponse> {
+    return this.request<ThreadBackgroundTerminalsCleanResponse>(
+      methods.threadBackgroundTerminalsClean,
+      params,
+    );
   }
 
   async startTurn(params: TurnStartParams): Promise<TurnStartResponse> {
