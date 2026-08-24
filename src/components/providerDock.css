@@ -99,6 +99,29 @@
 .provider-capabilities .enabled { color: #9bd3ad; }
 .provider-capabilities .disabled { color: var(--faint, #5d6670); opacity: .7; }
 
+.provider-limits {
+  max-height: 230px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 7px 9px;
+}
+.provider-limits > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.provider-limits > header strong { font-size: 8px; }
+.provider-limits > header small { color: var(--faint, #5d6670); font-size: 7px; }
+.provider-limit-list { display: grid; gap: 6px; }
+.provider-limit-card { display: grid; gap: 6px; border: 1px solid var(--border, #20262d); border-radius: 7px; padding: 7px; background: rgba(127,149,255,.025); }
+.provider-limit-title { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
+.provider-limit-title strong { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-limit-title em { flex: 0 0 auto; color: #e6a6a6; font-size: 7px; font-style: normal; }
+.provider-limit-meter-row { display: grid; gap: 3px; }
+.provider-limit-meter-row > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.provider-limit-meter-row > div:first-child > span { color: var(--muted, #87919c); font-size: 7px; }
+.provider-limit-meter-row small { color: var(--faint, #5d6670); font-size: 7px; }
+.provider-limit-meter { height: 4px; overflow: hidden; border-radius: 999px; background: var(--border, #20262d); }
+.provider-limit-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--accent, #7f95ff); transition: width 120ms ease-out; }
+.provider-limit-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; color: var(--faint, #5d6670); font-size: 7px; }
+.provider-limit-state { padding: 7px 2px 5px; color: var(--faint, #5d6670); font-size: 8px; }
+
 .provider-reroutes {
   max-height: 150px;
   overflow: auto;
