@@ -34,8 +34,9 @@ export function PlanDock() {
     return appServerClient.onNotification((notification) => {
       if (notification.method !== "turn/plan/updated") return;
       const params = toRecord(notification.params);
-      const threadId = params?.threadId;
-      const turnId = params?.turnId;
+      if (!params) return;
+      const threadId = params.threadId;
+      const turnId = params.turnId;
       if (
         typeof threadId !== "string" ||
         typeof turnId !== "string" ||
