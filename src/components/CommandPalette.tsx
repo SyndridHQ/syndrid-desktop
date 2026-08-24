@@ -151,6 +151,13 @@ const commands: Command[] = [
     run: () => clickElement(".settings-toggle"),
   },
   {
+    id: "shortcuts",
+    label: "Show keyboard shortcuts",
+    detail: "View native workbench shortcuts for Windows and macOS",
+    keywords: "keyboard shortcuts hotkeys keybindings windows macos command control",
+    run: () => window.dispatchEvent(new Event("syndrid:open-shortcuts")),
+  },
+  {
     id: "diagnostics",
     label: "Open runtime diagnostics",
     detail: "Inspect the on-demand app-server, platform, shell, workspace, and protocol snapshot",
