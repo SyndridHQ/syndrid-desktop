@@ -13,6 +13,8 @@ export function SessionHistoryDock() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mutatingThreadId, setMutatingThreadId] = useState<string | null>(null);
+  const [inspectingThreadId, setInspectingThreadId] = useState<string | null>(null);
+  const [inspectedThread, setInspectedThread] = useState<ThreadSummary | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -21,6 +23,7 @@ export function SessionHistoryDock() {
   const [historyKind, setHistoryKind] = useState<HistoryKind>("active");
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
+  const inspectionGeneration = useRef(0);
 
   const load = useCallback(
     async (append = false) => {
@@ -62,9 +65,12 @@ export function SessionHistoryDock() {
 
   useEffect(() => {
     generation.current += 1;
+    inspectionGeneration.current += 1;
     setThreads([]);
     setCursor(null);
     setError(null);
+    setInspectedThread(null);
+    setInspectingThreadId(null);
     if (open) void load(false);
     // Workspace/scope/history-kind changes invalidate and issue exactly one
     // fresh panel read. The callback from this render carries those values.
@@ -74,9 +80,12 @@ export function SessionHistoryDock() {
   useEffect(() => {
     if (!open) return;
     generation.current += 1;
+    inspectionGeneration.current += 1;
     setThreads([]);
     setCursor(null);
     setError(null);
+    setInspectedThread(null);
+    setInspectingThreadId(null);
     void load(false);
     // The submitted query is the trigger; the callback from this render carries
     // that exact query and avoids issuing requests for each input keystroke.
@@ -85,6 +94,28 @@ export function SessionHistoryDock() {
 
   const visibleThreads = useMemo(() => dedupeThreads(threads), [threads]);
   const normalizedQuery = query.trim();
+
+  const inspectThread = useCallback(async (thread: ThreadSummary) => {
+    if (inspectingThreadId) return;
+    const requestGeneration = ++inspectionGeneration.current;
+    setInspectingThreadId(thread.id);
+    setError(null);
+    try {
+      const result = await appServerClient.inspectThread({
+        threadId: thread.id,
+        includeTurns: false,
+      });
+      if (requestGeneration !== inspectionGeneration.current) return;
+      setInspectedThread(result.thread);
+    } catch (cause) {
+      if (requestGeneration !== inspectionGeneration.current) return;
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (requestGeneration === inspectionGeneration.current) {
+        setInspectingThreadId(null);
+      }
+    }
+  }, [inspectingThreadId]);
 
   const mutateThread = useCallback(
     async (thread: ThreadSummary) => {
@@ -105,6 +136,7 @@ export function SessionHistoryDock() {
         }
         if (requestGeneration !== generation.current) return;
         setThreads((current) => current.filter((item) => item.id !== thread.id));
+        if (inspectedThread?.id === thread.id) setInspectedThread(null);
       } catch (cause) {
         if (requestGeneration !== generation.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -112,7 +144,7 @@ export function SessionHistoryDock() {
         if (requestGeneration === generation.current) setMutatingThreadId(null);
       }
     },
-    [historyKind, mutatingThreadId, workspace?.threadId],
+    [historyKind, inspectedThread?.id, mutatingThreadId, workspace?.threadId],
   );
 
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
@@ -221,8 +253,10 @@ export function SessionHistoryDock() {
                   }
                   actionPending={mutatingThreadId === thread.id}
                   current={historyKind === "active" && thread.id === workspace?.threadId}
+                  inspectPending={inspectingThreadId === thread.id}
                   key={thread.id}
                   onAction={() => void mutateThread(thread)}
+                  onInspect={() => void inspectThread(thread)}
                   thread={thread}
                 />
               ))}
@@ -239,6 +273,24 @@ export function SessionHistoryDock() {
             </div>
           )}
 
+          {inspectedThread && (
+            <section className="session-history-inspector" aria-label="Inspected session">
+              <header>
+                <span>
+                  <strong>{inspectedThread.name?.trim() || inspectedThread.preview?.trim() || "Untitled session"}</strong>
+                  <small>Runtime thread/read metadata · turns not hydrated</small>
+                </span>
+                <button onClick={() => setInspectedThread(null)} type="button">Close</button>
+              </header>
+              <dl>
+                <div><dt>Thread</dt><dd title={inspectedThread.id}>{inspectedThread.id}</dd></div>
+                <div><dt>Workspace</dt><dd title={inspectedThread.cwd}>{inspectedThread.cwd || "None"}</dd></div>
+                <div><dt>Provider</dt><dd>{inspectedThread.modelProvider || "Unknown"}</dd></div>
+                <div><dt>Updated</dt><dd>{formatRelativeTime(inspectedThread.updatedAt)}</dd></div>
+              </dl>
+            </section>
+          )}
+
           <footer>
             Runtime-backed · {historyKind} · explicit pagination · retains at most {MAX_RETAINED_THREADS} sessions
           </footer>
@@ -253,14 +305,18 @@ function ThreadRow({
   actionDisabled,
   actionPending,
   current,
+  inspectPending,
   onAction,
+  onInspect,
   thread,
 }: {
   action: "Archive" | "Restore";
   actionDisabled: boolean;
   actionPending: boolean;
   current: boolean;
+  inspectPending: boolean;
   onAction: () => void;
+  onInspect: () => void;
   thread: ThreadSummary;
 }) {
   const title = thread.name?.trim() || thread.preview?.trim() || "Untitled session";
@@ -269,6 +325,15 @@ function ThreadRow({
       <div>
         <strong title={title}>{title}</strong>
         {current && <span>Current</span>}
+        <button
+          className="session-history-row-action"
+          disabled={inspectPending}
+          onClick={onInspect}
+          title="Inspect runtime session metadata without changing foreground selection"
+          type="button"
+        >
+          {inspectPending ? "…" : "Inspect"}
+        </button>
         <button
           className="session-history-row-action"
           disabled={actionDisabled}
