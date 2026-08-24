@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type { McpServerStatus } from "../runtime/protocol";
 import "./mcpServerDock.css";
@@ -8,77 +8,125 @@ interface PendingOauth {
   authorizationUrl: string;
 }
 
+const PAGE_SIZE = 50;
+const MAX_RETAINED_SERVERS = 200;
+
 export function McpServerDock() {
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<McpServerStatus[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [oauthStarting, setOauthStarting] = useState<string | null>(null);
   const [pendingOauth, setPendingOauth] = useState<PendingOauth | null>(null);
+  const generation = useRef(0);
 
-  const load = useCallback(async () => {
-    if (loading) return;
-    if (appServerClient.getSnapshot().phase !== "ready") {
-      setError("Connect the Syndrid runtime before loading MCP servers.");
-      return;
-    }
+  const load = useCallback(
+    async (append = false) => {
+      if (loading) return;
+      if (appServerClient.getSnapshot().phase !== "ready") {
+        setError("Connect the Syndrid runtime before loading MCP servers.");
+        return;
+      }
 
-    setLoading(true);
-    setError(null);
-    try {
-      const all: McpServerStatus[] = [];
-      let cursor: string | null | undefined = null;
-      do {
+      const requestGeneration = ++generation.current;
+      setLoading(true);
+      setError(null);
+      try {
         const page = await appServerClient.listMcpServerStatus({
-          cursor,
-          limit: 50,
+          cursor: append ? cursor : null,
+          limit: PAGE_SIZE,
           detail: "toolsAndAuthOnly",
         });
-        all.push(...page.data);
-        cursor = page.nextCursor;
-      } while (cursor && all.length < 500);
-      setServers(all);
-      setLoaded(true);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setLoading(false);
-    }
-  }, [loading]);
+        if (requestGeneration !== generation.current) return;
 
-  const startOauth = useCallback(async (serverName: string) => {
-    if (oauthStarting) return;
-    if (appServerClient.getSnapshot().phase !== "ready") {
-      setError("Connect the Syndrid runtime before signing in to an MCP server.");
-      return;
-    }
+        setServers((current) =>
+          dedupeServers(append ? [...current, ...page.data] : page.data).slice(
+            0,
+            MAX_RETAINED_SERVERS,
+          ),
+        );
+        setCursor(page.nextCursor);
+        setLoaded(true);
+        setStale(false);
+      } catch (cause) {
+        if (requestGeneration !== generation.current) return;
+        setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        if (requestGeneration === generation.current) setLoading(false);
+      }
+    },
+    [cursor, loading],
+  );
 
-    setOauthStarting(serverName);
-    setPendingOauth(null);
+  const startOauth = useCallback(
+    async (serverName: string) => {
+      if (oauthStarting) return;
+      if (appServerClient.getSnapshot().phase !== "ready") {
+        setError("Connect the Syndrid runtime before signing in to an MCP server.");
+        return;
+      }
+
+      setOauthStarting(serverName);
+      setPendingOauth(null);
+      setError(null);
+      try {
+        const result = await appServerClient.startMcpServerOauthLogin({
+          name: serverName,
+        });
+        const authorizationUrl = safeAuthorizationUrl(result.authorizationUrl);
+        setPendingOauth({ serverName, authorizationUrl });
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setOauthStarting(null);
+      }
+    },
+    [oauthStarting],
+  );
+
+  useEffect(() => {
+    generation.current += 1;
+    setServers([]);
+    setCursor(null);
+    setLoaded(false);
+    setStale(false);
+    setLoading(false);
     setError(null);
-    try {
-      const result = await appServerClient.startMcpServerOauthLogin({
-        name: serverName,
-      });
-      const authorizationUrl = safeAuthorizationUrl(result.authorizationUrl);
-      setPendingOauth({ serverName, authorizationUrl });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setOauthStarting(null);
-    }
-  }, [oauthStarting]);
+    setPendingOauth(null);
+    setOauthStarting(null);
+    if (open) void load(false);
+    // Opening the panel is the only automatic inventory read. No polling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    if (next && !loaded && !loading) void load();
-  };
+  useEffect(() => {
+    if (!open) return;
+
+    return appServerClient.onNotification((notification) => {
+      if (notification.method === "mcpServer/startupStatus/updated") {
+        setStale(true);
+        return;
+      }
+      if (notification.method !== "mcpServer/oauthLogin/completed") return;
+
+      const completed = parseOauthCompletion(notification.params);
+      if (!completed) return;
+      setStale(true);
+      setPendingOauth((current) =>
+        current?.serverName === completed.name ? null : current,
+      );
+      if (!completed.success) {
+        setError(completed.error || `OAuth sign-in failed for ${completed.name}.`);
+      }
+    });
+  }, [open]);
 
   return (
     <aside className="mcp-server-dock" aria-label="MCP server manager">
-      <button className="mcp-server-toggle" onClick={toggle} type="button">
+      <button className="mcp-server-toggle" onClick={() => setOpen((value) => !value)} type="button">
         <span className="mcp-server-dot" />
         MCP
         {loaded && <span className="mcp-server-count">{servers.length}</span>}
@@ -90,8 +138,8 @@ export function McpServerDock() {
               <strong>MCP servers</strong>
               <small>Runtime inventory · tools + auth only</small>
             </div>
-            <button disabled={loading} onClick={() => void load()} type="button">
-              {loading ? "Loading…" : "Refresh"}
+            <button disabled={loading} onClick={() => void load(false)} type="button">
+              {loading ? "Loading…" : stale ? "Refresh · updated" : "Refresh"}
             </button>
           </header>
           {pendingOauth && (
@@ -111,12 +159,17 @@ export function McpServerDock() {
                 disabled={loading}
                 onClick={() => {
                   setPendingOauth(null);
-                  void load();
+                  void load(false);
                 }}
                 type="button"
               >
                 Check status
               </button>
+            </div>
+          )}
+          {stale && loaded && (
+            <div className="mcp-server-updated">
+              Runtime MCP state changed. The retained inventory remains visible until Refresh.
             </div>
           )}
           {error ? (
@@ -159,12 +212,42 @@ export function McpServerDock() {
                   </article>
                 );
               })}
+              {cursor && servers.length < MAX_RETAINED_SERVERS && (
+                <button
+                  className="mcp-server-more"
+                  disabled={loading}
+                  onClick={() => void load(true)}
+                  type="button"
+                >
+                  {loading ? "Loading…" : "Load more"}
+                </button>
+              )}
             </div>
           )}
+          <footer>
+            Runtime-owned · explicit pagination · retains at most {MAX_RETAINED_SERVERS} servers · no polling
+          </footer>
         </section>
       )}
     </aside>
   );
+}
+
+function dedupeServers(servers: McpServerStatus[]): McpServerStatus[] {
+  const byName = new Map<string, McpServerStatus>();
+  for (const server of servers) byName.set(server.name, server);
+  return [...byName.values()];
+}
+
+function parseOauthCompletion(value: unknown): { name: string; success: boolean; error: string | null } | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.name !== "string" || typeof record.success !== "boolean") return null;
+  return {
+    name: record.name,
+    success: record.success,
+    error: typeof record.error === "string" ? record.error : null,
+  };
 }
 
 function safeAuthorizationUrl(raw: string): string {
