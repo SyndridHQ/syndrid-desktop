@@ -63,6 +63,7 @@ import {
   type TurnStartResponse,
   methods,
 } from "./protocol";
+import type { AccountRateLimitsReadResponse } from "./accountRateLimitsProtocol";
 import type {
   FsUnwatchParams,
   FsUnwatchResponse,
@@ -310,6 +311,10 @@ export class SyndridAppServerClient {
 
   async readConfig(params: ConfigReadParams = {}): Promise<ConfigReadResponse> {
     return this.request<ConfigReadResponse>(methods.configRead, params);
+  }
+
+  async readAccountRateLimits(): Promise<AccountRateLimitsReadResponse> {
+    return this.request<AccountRateLimitsReadResponse>("account/rateLimits/read", {});
   }
 
   async listPermissionProfiles(
