@@ -63,6 +63,10 @@ export function ModelCatalogDock() {
     if (!open) {
       generation.current += 1;
       setLoading(false);
+      setModels([]);
+      setCursor(null);
+      setQuery("");
+      setError(null);
       return;
     }
     setModels([]);
@@ -73,6 +77,7 @@ export function ModelCatalogDock() {
     requestAnimationFrame(() => inputRef.current?.focus());
     // Opening the explorer is the only automatic inventory read. Additional
     // catalog pages remain explicit and there is no background model polling.
+    // Closed explorers release retained catalog state immediately.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -192,7 +197,7 @@ export function ModelCatalogDock() {
         </div>
 
         <footer>
-          Runtime-discovered · 80 models/page · retains 400 · mounts 160 · explicit pagination · no polling
+          Runtime-discovered · 80 models/page · retains 400 while open · releases on close · mounts 160 · explicit pagination · no polling
         </footer>
       </section>
     </div>
