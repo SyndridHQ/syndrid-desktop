@@ -16,6 +16,8 @@ export function RuntimeActivityDock() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
+
     return appServerClient.onNotification((notification) => {
       if (
         notification.method !== ITEM_STARTED &&
@@ -33,7 +35,7 @@ export function RuntimeActivityDock() {
 
       setActivities((current) => upsertRuntimeActivity(current, activity));
     });
-  }, []);
+  }, [open]);
 
   const runningCount = useMemo(
     () => activities.filter((activity) => activity.phase === "running").length,
@@ -41,12 +43,17 @@ export function RuntimeActivityDock() {
   );
   const recent = useMemo(() => activities.slice(-12).reverse(), [activities]);
 
+  const toggleOpen = () => {
+    if (open) setActivities([]);
+    setOpen((current) => !current);
+  };
+
   return (
     <section className={`runtime-activity-dock ${open ? "open" : ""}`}>
       <button
         aria-expanded={open}
         className="runtime-activity-toggle"
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleOpen}
         type="button"
       >
         <span className={`runtime-activity-dot ${runningCount > 0 ? "busy" : ""}`} />
