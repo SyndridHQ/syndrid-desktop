@@ -9,6 +9,14 @@ import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./providerDock.css";
 
 const MAX_VISIBLE_MODELS = 120;
+const MAX_RETAINED_REROUTES = 12;
+
+interface RuntimeReroute {
+  turnId: string;
+  fromModel: string;
+  toModel: string;
+  reason: string;
+}
 
 export function ProviderDock() {
   const workspace = useRuntimeWorkspace();
@@ -20,6 +28,7 @@ export function ProviderDock() {
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [capabilities, setCapabilities] =
     useState<ModelProviderCapabilities | null>(null);
+  const [reroutes, setReroutes] = useState<RuntimeReroute[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -64,9 +73,32 @@ export function ProviderDock() {
     setLoaded(false);
     setProvider(null);
     setConfig(null);
+    setReroutes([]);
     setError(null);
     void load();
   }, [load, open]);
+
+  useEffect(() => {
+    const threadId = workspace?.threadId;
+    if (!open || !threadId) return;
+
+    return appServerClient.onNotification((notification) => {
+      if (notification.method !== "model/rerouted") return;
+      const reroute = parseReroute(notification.params);
+      if (!reroute || reroute.threadId !== threadId) return;
+      setReroutes((current) =>
+        [
+          {
+            turnId: reroute.turnId,
+            fromModel: reroute.fromModel,
+            toModel: reroute.toModel,
+            reason: reroute.reason,
+          },
+          ...current.filter((entry) => entry.turnId !== reroute.turnId),
+        ].slice(0, MAX_RETAINED_REROUTES),
+      );
+    });
+  }, [open, workspace?.threadId]);
 
   const visibleModels = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -155,6 +187,27 @@ export function ProviderDock() {
             </div>
           )}
 
+          {reroutes.length > 0 && (
+            <section className="provider-reroutes" aria-label="Runtime model reroutes">
+              <header>
+                <strong>Runtime reroutes</strong>
+                <small>{reroutes.length} observed while open</small>
+              </header>
+              {reroutes.map((reroute) => (
+                <article key={reroute.turnId}>
+                  <div>
+                    <code title={reroute.fromModel}>{reroute.fromModel}</code>
+                    <span aria-hidden="true">→</span>
+                    <code title={reroute.toModel}>{reroute.toModel}</code>
+                  </div>
+                  <small>
+                    {formatRerouteReason(reroute.reason)} · turn {shortId(reroute.turnId)}
+                  </small>
+                </article>
+              ))}
+            </section>
+          )}
+
           <div className="provider-search">
             <input
               aria-label="Filter models"
@@ -202,10 +255,40 @@ export function ProviderDock() {
           )}
 
           <footer>
-            Runtime-discovered · effective config · read-only · no hardcoded model inventory
+            Runtime-discovered · reroute-aware · read-only · no hardcoded model inventory
           </footer>
         </section>
       )}
     </aside>
   );
+}
+
+function parseReroute(value: unknown): (RuntimeReroute & { threadId: string }) | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.threadId !== "string" ||
+    typeof record.turnId !== "string" ||
+    typeof record.fromModel !== "string" ||
+    typeof record.toModel !== "string" ||
+    typeof record.reason !== "string"
+  ) {
+    return null;
+  }
+  return {
+    threadId: record.threadId,
+    turnId: record.turnId,
+    fromModel: record.fromModel,
+    toModel: record.toModel,
+    reason: record.reason,
+  };
+}
+
+function formatRerouteReason(reason: string): string {
+  if (reason === "highRiskCyberActivity") return "Runtime safety reroute";
+  return reason.replace(/([a-z])([A-Z])/g, "$1 $2").toLocaleLowerCase();
+}
+
+function shortId(id: string): string {
+  return id.length > 10 ? `${id.slice(0, 8)}…` : id;
 }
