@@ -54,6 +54,23 @@ export function ReviewDock() {
         return;
       }
 
+      if (notification.method === "turn/completed") {
+        const turn = toRecord(params.turn);
+        if (!turn || typeof turn.id !== "string") return;
+        setReviews((current) => {
+          if (!current.some((review) => review.threadId === params.threadId && review.turnId === turn.id)) {
+            return current;
+          }
+          return current.map((review) =>
+            review.threadId === params.threadId && review.turnId === turn.id
+              ? { ...review, status: turn.status }
+              : review,
+          );
+        });
+        setStoppingReviews((current) => removeSetValue(current, params.threadId as string));
+        return;
+      }
+
       if (notification.method !== "item/agentMessage/delta" || typeof params.delta !== "string") {
         return;
       }
