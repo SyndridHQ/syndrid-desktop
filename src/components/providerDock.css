@@ -99,6 +99,22 @@
 .provider-capabilities .enabled { color: #9bd3ad; }
 .provider-capabilities .disabled { color: var(--faint, #5d6670); opacity: .7; }
 
+.provider-reroutes {
+  max-height: 150px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 7px 9px;
+}
+.provider-reroutes > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.provider-reroutes > header strong { font-size: 8px; }
+.provider-reroutes > header small { color: var(--faint, #5d6670); font-size: 7px; }
+.provider-reroutes article { display: grid; gap: 2px; border-radius: 5px; padding: 5px 4px; }
+.provider-reroutes article:hover { background: rgba(127,149,255,.05); }
+.provider-reroutes article > div { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 5px; }
+.provider-reroutes code { overflow: hidden; color: var(--muted, #87919c); font: 8px/1.35 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.provider-reroutes article > div > span { color: var(--faint, #5d6670); font-size: 8px; }
+.provider-reroutes article > small { color: var(--faint, #5d6670); font-size: 7px; }
+
 .provider-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
