@@ -13,10 +13,12 @@ export function SubagentsDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [forking, setForking] = useState(false);
   const [subagents, setSubagents] = useState<ThreadSummary[]>([]);
   const [forks, setForks] = useState<ThreadSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [scannedThreads, setScannedThreads] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
 
@@ -85,12 +87,39 @@ export function SubagentsDock() {
     [cursor, loading, workspace?.threadId],
   );
 
+  const forkSelected = useCallback(async () => {
+    if (forking || appServerClient.getSnapshot().phase !== "ready") return;
+    const selectedThreadId = workspace?.threadId;
+    if (!selectedThreadId) {
+      setError("Select a loaded Syndrid session before creating a fork.");
+      return;
+    }
+
+    setForking(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const result = await appServerClient.forkThread({ threadId: selectedThreadId });
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId) return;
+      setForks((current) =>
+        dedupeThreads([result.thread, ...current]).slice(0, MAX_RETAINED_FORKS),
+      );
+      setNotice(`Fork created · ${shortId(result.thread.id)} · selection unchanged`);
+    } catch (cause) {
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId) return;
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setForking(false);
+    }
+  }, [forking, workspace?.threadId]);
+
   useEffect(() => {
     generation.current += 1;
     setSubagents([]);
     setForks([]);
     setCursor(null);
     setScannedThreads(0);
+    setNotice(null);
     setError(null);
     if (open) void load(false);
     // The selected runtime thread is the only selection invalidation trigger. No polling.
@@ -168,9 +197,14 @@ export function SubagentsDock() {
               <strong>Runtime thread graph</strong>
               <small title={workspace?.cwd}>{workspace?.cwd || "Selected session"}</small>
             </span>
-            <button disabled={loading} onClick={() => void load(false)} type="button">
-              {loading ? "Loading…" : "Refresh"}
-            </button>
+            <div className="subagents-actions">
+              <button disabled={forking || !workspace?.threadId} onClick={() => void forkSelected()} type="button">
+                {forking ? "Forking…" : "Fork session"}
+              </button>
+              <button disabled={loading} onClick={() => void load(false)} type="button">
+                {loading ? "Loading…" : "Refresh"}
+              </button>
+            </div>
           </header>
 
           <div className="subagents-summary">
@@ -179,6 +213,8 @@ export function SubagentsDock() {
             <span>{scannedThreads} thread{scannedThreads === 1 ? "" : "s"} scanned</span>
             <strong>live lifecycle</strong>
           </div>
+
+          {notice && <div className="subagents-notice">{notice}</div>}
 
           {error ? (
             <div className="subagents-state error">{error}</div>
@@ -225,7 +261,7 @@ export function SubagentsDock() {
             )}
 
           <footer>
-            Runtime relationships · streamed lifecycle · explicit historical pagination · no polling
+            Runtime relationships · explicit fork · streamed lifecycle · no polling
           </footer>
         </section>
       )}
