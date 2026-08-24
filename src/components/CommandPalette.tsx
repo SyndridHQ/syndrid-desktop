@@ -123,6 +123,13 @@ const commands: Command[] = [
     run: () => clickElement(".diagnostics-toggle"),
   },
   {
+    id: "warnings",
+    label: "Open runtime warnings",
+    detail: "Inspect bounded runtime errors, safety warnings, config notices, and deprecations",
+    keywords: "warnings errors guardian safety config deprecation diagnostics runtime",
+    run: () => clickElement(".warnings-toggle"),
+  },
+  {
     id: "activity",
     label: "Open runtime activity",
     detail: "Inspect streamed commands, tools, changes, and subagents",
