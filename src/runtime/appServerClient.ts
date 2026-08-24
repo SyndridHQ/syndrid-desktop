@@ -63,6 +63,7 @@ import {
   type TurnStartResponse,
   methods,
 } from "./protocol";
+import type { ThreadForkParams, ThreadForkResponse } from "./threadForkProtocol";
 import {
   onNativeAppServerMessage,
   onNativeAppServerStderr,
@@ -193,6 +194,12 @@ export class SyndridAppServerClient {
 
   async listThreads(params: ThreadListParams = {}): Promise<ThreadListResponse> {
     return this.request<ThreadListResponse>(methods.threadList, params);
+  }
+
+  async forkThread(params: ThreadForkParams): Promise<ThreadForkResponse> {
+    // Forking is additive and deliberately does not change Desktop's selected
+    // workspace projection. Selection remains an explicit user action.
+    return this.request<ThreadForkResponse>("thread/fork", params);
   }
 
   async startThread(params: ThreadStartParams = {}): Promise<ThreadStartResponse> {
