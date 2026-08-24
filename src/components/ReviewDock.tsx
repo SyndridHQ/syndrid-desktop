@@ -5,6 +5,7 @@ import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./reviewDock.css";
 
 const MAX_RETAINED_REVIEWS = 8;
+const MAX_REVIEW_OUTPUT_CHARS = 40_000;
 type ReviewTargetKind = ReviewTarget["type"];
 
 type ReviewLaunch = {
@@ -13,6 +14,8 @@ type ReviewLaunch = {
   status: unknown;
   createdAt: number;
   targetLabel: string;
+  output: string;
+  outputTruncated: boolean;
 };
 
 export function ReviewDock() {
@@ -34,15 +37,37 @@ export function ReviewDock() {
     if (!open || reviews.length === 0) return;
     const reviewThreadIds = new Set(reviews.map((review) => review.threadId));
     return appServerClient.onNotification((notification) => {
-      if (notification.method !== "thread/status/changed") return;
       const params = toRecord(notification.params);
       if (!params || typeof params.threadId !== "string" || !reviewThreadIds.has(params.threadId)) {
         return;
       }
+
+      if (notification.method === "thread/status/changed") {
+        setReviews((current) =>
+          current.map((review) =>
+            review.threadId === params.threadId ? { ...review, status: params.status } : review,
+          ),
+        );
+        return;
+      }
+
+      if (notification.method !== "item/agentMessage/delta" || typeof params.delta !== "string") {
+        return;
+      }
+
       setReviews((current) =>
-        current.map((review) =>
-          review.threadId === params.threadId ? { ...review, status: params.status } : review,
-        ),
+        current.map((review) => {
+          if (review.threadId !== params.threadId || review.outputTruncated) return review;
+          const nextOutput = review.output + params.delta;
+          if (nextOutput.length <= MAX_REVIEW_OUTPUT_CHARS) {
+            return { ...review, output: nextOutput };
+          }
+          return {
+            ...review,
+            output: nextOutput.slice(0, MAX_REVIEW_OUTPUT_CHARS),
+            outputTruncated: true,
+          };
+        }),
       );
     });
   }, [open, reviews]);
@@ -77,6 +102,8 @@ export function ReviewDock() {
           status: result.turn.status,
           createdAt: Date.now(),
           targetLabel: formatTarget(reviewTarget),
+          output: "",
+          outputTruncated: false,
         },
         ...current.filter((review) => review.threadId !== result.reviewThreadId),
       ].slice(0, MAX_RETAINED_REVIEWS));
@@ -192,12 +219,20 @@ export function ReviewDock() {
                   <span className="review-target-label" title={review.targetLabel}>{review.targetLabel}</span>
                   <code title={review.threadId}>thread {shortId(review.threadId)}</code>
                   <code title={review.turnId}>turn {shortId(review.turnId)}</code>
+                  {review.output && (
+                    <pre className="review-output">
+                      {review.output}
+                      {review.outputTruncated ? "\n\n[output truncated by Desktop retention limit]" : ""}
+                    </pre>
+                  )}
                 </article>
               ))}
             </div>
           )}
 
-          <footer>Runtime-owned review · detached thread · streamed lifecycle · no polling</footer>
+          <footer>
+            Runtime-owned review · streamed output · max {MAX_REVIEW_OUTPUT_CHARS.toLocaleString()} chars/review · no polling
+          </footer>
         </section>
       )}
     </aside>
