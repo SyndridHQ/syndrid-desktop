@@ -75,6 +75,10 @@ import type {
   PermissionProfileListResponse,
 } from "./permissionProfileProtocol";
 import type { ReviewStartParams, ReviewStartResponse } from "./reviewProtocol";
+import type {
+  ThreadCompactStartParams,
+  ThreadCompactStartResponse,
+} from "./threadCompactProtocol";
 import type { ThreadForkParams, ThreadForkResponse } from "./threadForkProtocol";
 import type {
   ThreadGoalClearParams,
@@ -305,6 +309,10 @@ export class SyndridAppServerClient {
 
   async interruptTurn(params: TurnInterruptParams): Promise<TurnInterruptResponse> {
     return this.request<TurnInterruptResponse>(methods.turnInterrupt, params);
+  }
+
+  async compactThread(params: ThreadCompactStartParams): Promise<ThreadCompactStartResponse> {
+    return this.request<ThreadCompactStartResponse>("thread/compact/start", params);
   }
 
   async listModels(params: ModelListParams = {}): Promise<ModelListResponse> {
