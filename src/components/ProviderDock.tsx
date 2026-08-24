@@ -445,7 +445,7 @@ function parseRateLimitSnapshot(value: Record<string, unknown>): RateLimitSnapsh
 }
 
 function parseRateLimitWindow(value: Record<string, unknown>): RateLimitWindow | null {
-  const usedPercent = finiteNumber(value.usedPercent);
+  const usedPercent = finiteSignedNumber(value.usedPercent);
   const windowDurationMins = nullableNumber(value.windowDurationMins);
   const resetsAt = nullableNumber(value.resetsAt);
   if (usedPercent === null || windowDurationMins === undefined || resetsAt === undefined) return null;
@@ -461,7 +461,7 @@ function parseCredits(value: Record<string, unknown>): RateLimitSnapshot["credit
 
 function parseIndividualLimit(value: Record<string, unknown>): RateLimitSnapshot["individualLimit"] {
   if (typeof value.limit !== "string" || typeof value.used !== "string") return null;
-  const remainingPercent = finiteNumber(value.remainingPercent);
+  const remainingPercent = finiteSignedNumber(value.remainingPercent);
   const resetsAt = finiteNumber(value.resetsAt);
   if (remainingPercent === null || resetsAt === null) return null;
   return { limit: value.limit, used: value.used, remainingPercent, resetsAt };
@@ -479,10 +479,12 @@ function mergeRateLimitUpdate(
     : current.rateLimits;
 
   let nextById = current.rateLimitsByLimitId;
-  if (patch.limitId && nextById?.[patch.limitId]) {
+  const patchId = patch.limitId;
+  const existingById = patchId ? nextById?.[patchId] : undefined;
+  if (patchId && existingById) {
     nextById = {
       ...nextById,
-      [patch.limitId]: mergeRateLimitSnapshot(nextById[patch.limitId], patch),
+      [patchId]: mergeRateLimitSnapshot(existingById, patch),
     };
   }
   return { ...current, rateLimits: nextPrimary, rateLimitsByLimitId: nextById };
@@ -540,6 +542,10 @@ function nullableNumber(value: unknown): number | null | undefined {
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function finiteSignedNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
