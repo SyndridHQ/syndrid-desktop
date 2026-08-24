@@ -10,6 +10,7 @@ import { GitDock } from "./components/GitDock";
 import { HooksDock } from "./components/HooksDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
+import { PlanDock } from "./components/PlanDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { ProviderDock } from "./components/ProviderDock";
 import { ReviewDock } from "./components/ReviewDock";
@@ -45,6 +46,7 @@ createRoot(document.getElementById("root")!).render(
     <SubagentsDock />
     <SessionHistoryDock />
     <ContextDock />
+    <PlanDock />
     <HooksDock />
     <SettingsDock />
     <DiagnosticsDock />
