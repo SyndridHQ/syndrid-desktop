@@ -124,9 +124,14 @@ export function ModelCatalogDock() {
               {models.length} retained{cursor ? " · more available" : " · end of catalog"}
             </small>
           </span>
-          <button onClick={() => setOpen(false)} type="button">
-            Close
-          </button>
+          <div className="model-catalog-header-actions">
+            <button disabled={loading} onClick={() => void load(false)} type="button">
+              {loading ? "Loading…" : "Refresh"}
+            </button>
+            <button onClick={() => setOpen(false)} type="button">
+              Close
+            </button>
+          </div>
         </header>
 
         <div className="model-catalog-search">
