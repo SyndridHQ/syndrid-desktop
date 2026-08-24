@@ -63,6 +63,7 @@ import {
   type TurnStartResponse,
   methods,
 } from "./protocol";
+import type { ReviewStartParams, ReviewStartResponse } from "./reviewProtocol";
 import type { ThreadForkParams, ThreadForkResponse } from "./threadForkProtocol";
 import {
   onNativeAppServerMessage,
@@ -200,6 +201,12 @@ export class SyndridAppServerClient {
     // Forking is additive and deliberately does not change Desktop's selected
     // workspace projection. Selection remains an explicit user action.
     return this.request<ThreadForkResponse>("thread/fork", params);
+  }
+
+  async startReview(params: ReviewStartParams): Promise<ReviewStartResponse> {
+    // Detached review execution is runtime-owned and must not implicitly change
+    // the selected Desktop workspace/thread projection.
+    return this.request<ReviewStartResponse>("review/start", params);
   }
 
   async startThread(params: ThreadStartParams = {}): Promise<ThreadStartResponse> {
