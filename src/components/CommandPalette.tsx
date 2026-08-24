@@ -6,6 +6,7 @@ type Command = {
   label: string;
   detail: string;
   keywords: string;
+  shortcut?: string;
   run: () => void;
 };
 
@@ -43,6 +44,7 @@ const commands: Command[] = [
     label: "Open workspace files",
     detail: "Open the lazy runtime-backed file browser",
     keywords: "files workspace browser search preview",
+    shortcut: "⇧E",
     run: () => clickElement(".workspace-files-toggle"),
   },
   {
@@ -50,6 +52,7 @@ const commands: Command[] = [
     label: "Open terminal",
     detail: "Open the runtime-backed native PTY console",
     keywords: "terminal shell pty command powershell zsh bash",
+    shortcut: "`",
     run: () => clickElement(".terminal-toggle"),
   },
   {
@@ -92,6 +95,7 @@ const commands: Command[] = [
     label: "Open source control",
     detail: "Inspect Git metadata reported by the selected Syndrid session",
     keywords: "git source control branch commit origin repository",
+    shortcut: "⇧G",
     run: () => clickElement(".git-toggle"),
   },
   {
@@ -148,6 +152,7 @@ const commands: Command[] = [
     label: "Open desktop settings",
     detail: "Configure native Syndrid runtime supervision preferences",
     keywords: "settings preferences runtime binary path executable supervision",
+    shortcut: ",",
     run: () => clickElement(".settings-toggle"),
   },
   {
@@ -155,6 +160,7 @@ const commands: Command[] = [
     label: "Show keyboard shortcuts",
     detail: "View native workbench shortcuts for Windows and macOS",
     keywords: "keyboard shortcuts hotkeys keybindings windows macos command control",
+    shortcut: "/",
     run: () => window.dispatchEvent(new Event("syndrid:open-shortcuts")),
   },
   {
@@ -185,6 +191,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const modLabel = useMemo(() => (isApplePlatform() ? "⌘" : "Ctrl"), []);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -297,12 +304,15 @@ export function CommandPalette() {
                   <strong>{command.label}</strong>
                   <small>{command.detail}</small>
                 </span>
-                {index === activeIndex && <kbd>↵</kbd>}
+                <span className="command-palette-result-keys">
+                  {command.shortcut && <kbd>{modLabel}{command.shortcut}</kbd>}
+                  {index === activeIndex && <kbd>↵</kbd>}
+                </span>
               </button>
             ))
           )}
         </div>
-        <footer>↑↓ navigate · ↵ run · Ctrl/⌘ K toggle</footer>
+        <footer>↑↓ navigate · ↵ run · {modLabel}K toggle</footer>
       </section>
     </div>
   );
@@ -316,4 +326,8 @@ function clickElement(selector: string): void {
 function focusElement<T extends HTMLElement>(selector: string): void {
   const element = document.querySelector<T>(selector);
   if (element && !element.hasAttribute("disabled")) element.focus();
+}
+
+function isApplePlatform(): boolean {
+  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
 }
