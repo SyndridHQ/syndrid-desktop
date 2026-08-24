@@ -12,11 +12,14 @@ export function BackgroundProcessesDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [confirmClean, setConfirmClean] = useState(false);
   const [processes, setProcesses] = useState<ThreadBackgroundTerminal[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ProcessSort>("runtime");
   const [terminating, setTerminating] = useState<Set<string>>(() => new Set());
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
 
@@ -37,6 +40,7 @@ export function BackgroundProcessesDock() {
       const requestGeneration = ++generation.current;
       const threadId = workspace.threadId;
       setLoading(true);
+      setNotice(null);
       setError(null);
       try {
         const result = await appServerClient.listBackgroundTerminals({
@@ -74,6 +78,9 @@ export function BackgroundProcessesDock() {
     setQuery("");
     setSort("runtime");
     setTerminating(new Set());
+    setCleaning(false);
+    setConfirmClean(false);
+    setNotice(null);
     setError(null);
     if (open) void load(false);
     // Workspace selection is the invalidation trigger; the fresh callback from
@@ -95,9 +102,10 @@ export function BackgroundProcessesDock() {
   const terminate = useCallback(
     async (process: ThreadBackgroundTerminal) => {
       const threadId = workspace?.threadId;
-      if (!threadId || terminating.has(process.processId)) return;
+      if (!threadId || cleaning || terminating.has(process.processId)) return;
 
       setTerminating((current) => new Set(current).add(process.processId));
+      setNotice(null);
       setError(null);
       try {
         const result = await appServerClient.terminateBackgroundTerminal({
@@ -123,8 +131,35 @@ export function BackgroundProcessesDock() {
         });
       }
     },
-    [terminating, workspace?.threadId],
+    [cleaning, terminating, workspace?.threadId],
   );
+
+  const cleanAll = useCallback(async () => {
+    const threadId = workspace?.threadId;
+    if (!threadId || cleaning || processes.length === 0) return;
+
+    if (!confirmClean) {
+      setConfirmClean(true);
+      setNotice("Stop all will terminate every running background terminal for this session. Confirm to continue.");
+      setError(null);
+      return;
+    }
+
+    setCleaning(true);
+    setNotice(null);
+    setError(null);
+    try {
+      await appServerClient.cleanBackgroundTerminals({ threadId });
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      setConfirmClean(false);
+      setNotice("Runtime accepted the stop-all request. Refresh to reconcile process exits.");
+    } catch (cause) {
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setCleaning(false);
+    }
+  }, [cleaning, confirmClean, processes.length, workspace?.threadId]);
 
   return (
     <aside className="background-processes-dock" aria-label="Background processes">
@@ -147,9 +182,21 @@ export function BackgroundProcessesDock() {
                 {workspace?.cwd || "Selected session runtime"}
               </small>
             </span>
-            <button disabled={loading} onClick={() => void load(false)} type="button">
-              {loading ? "Loading…" : "Refresh"}
-            </button>
+            <div className="background-processes-header-actions">
+              {processes.length > 0 && (
+                <button
+                  className={confirmClean ? "danger" : ""}
+                  disabled={cleaning || loading || terminating.size > 0}
+                  onClick={() => void cleanAll()}
+                  type="button"
+                >
+                  {cleaning ? "Stopping all…" : confirmClean ? "Confirm stop all" : "Stop all"}
+                </button>
+              )}
+              <button disabled={loading || cleaning} onClick={() => void load(false)} type="button">
+                {loading ? "Loading…" : "Refresh"}
+              </button>
+            </div>
           </header>
 
           <div className="background-processes-summary">
@@ -157,6 +204,8 @@ export function BackgroundProcessesDock() {
             <span>{formatCpu(totals.cpuPercent)} CPU</span>
             <span>{formatMemory(totals.rssKb)} RSS</span>
           </div>
+
+          {notice && <div className="background-processes-notice">{notice}</div>}
 
           {processes.length > 0 && (
             <div className="background-processes-filter">
@@ -205,14 +254,14 @@ export function BackgroundProcessesDock() {
                 <ProcessRow
                   key={process.processId}
                   process={process}
-                  stopping={terminating.has(process.processId)}
+                  stopping={cleaning || terminating.has(process.processId)}
                   terminate={terminate}
                 />
               ))}
               {cursor && processes.length < MAX_RETAINED_PROCESSES && (
                 <button
                   className="background-processes-more"
-                  disabled={loading}
+                  disabled={loading || cleaning}
                   onClick={() => void load(true)}
                   type="button"
                 >
@@ -223,7 +272,7 @@ export function BackgroundProcessesDock() {
           )}
 
           <footer>
-            Runtime-owned · explicit refresh · retains at most {MAX_RETAINED_PROCESSES} processes
+            Runtime-owned · explicit refresh/termination · retains at most {MAX_RETAINED_PROCESSES} processes
           </footer>
         </section>
       )}
