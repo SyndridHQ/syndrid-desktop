@@ -8,6 +8,7 @@ const PAGE_SIZE = 80;
 const MAX_RETAINED_SUBAGENTS = 120;
 const MAX_RETAINED_FORKS = 60;
 const REMOVAL_METHODS = new Set(["thread/archived", "thread/deleted", "thread/closed"]);
+type RelationshipView = "all" | "agents" | "forks";
 
 export function SubagentsDock() {
   const workspace = useRuntimeWorkspace();
@@ -18,6 +19,8 @@ export function SubagentsDock() {
   const [forks, setForks] = useState<ThreadSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [scannedThreads, setScannedThreads] = useState(0);
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<RelationshipView>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -119,6 +122,8 @@ export function SubagentsDock() {
     setForks([]);
     setCursor(null);
     setScannedThreads(0);
+    setQuery("");
+    setView("all");
     setNotice(null);
     setError(null);
     if (open) void load(false);
@@ -180,7 +185,17 @@ export function SubagentsDock() {
     () => [...forks].sort((a, b) => b.updatedAt - a.updatedAt),
     [forks],
   );
+  const filteredSubagents = useMemo(
+    () => (view === "forks" ? [] : filterThreads(sortedSubagents, query)),
+    [query, sortedSubagents, view],
+  );
+  const filteredForks = useMemo(
+    () => (view === "agents" ? [] : filterThreads(sortedForks, query)),
+    [query, sortedForks, view],
+  );
   const hasRelationships = subagents.length > 0 || forks.length > 0;
+  const visibleCount = filteredSubagents.length + filteredForks.length;
+  const normalizedQuery = query.trim();
 
   return (
     <aside className="subagents-dock" aria-label="Session graph">
@@ -216,6 +231,34 @@ export function SubagentsDock() {
 
           {notice && <div className="subagents-notice">{notice}</div>}
 
+          {hasRelationships && (
+            <div className="thread-graph-filter">
+              <input
+                aria-label="Filter thread graph"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Filter name, role, preview, provider, or ID…"
+                value={query}
+              />
+              <select
+                aria-label="Thread relationship type"
+                onChange={(event) => setView(event.target.value as RelationshipView)}
+                value={view}
+              >
+                <option value="all">All relationships</option>
+                <option value="agents">Subagents</option>
+                <option value="forks">Forks</option>
+              </select>
+              {normalizedQuery && (
+                <button onClick={() => setQuery("")} type="button">
+                  Clear
+                </button>
+              )}
+              {(normalizedQuery || view !== "all") && (
+                <small>{visibleCount} of {subagents.length + forks.length}</small>
+              )}
+            </div>
+          )}
+
           {error ? (
             <div className="subagents-state error">{error}</div>
           ) : loading && !hasRelationships ? (
@@ -227,20 +270,22 @@ export function SubagentsDock() {
               No direct subagents or forks found in the retained thread page.
               {cursor ? " Load more to continue the runtime scan." : ""}
             </div>
+          ) : visibleCount === 0 ? (
+            <div className="subagents-state">No retained relationships match this filter.</div>
           ) : (
             <div className="subagents-list">
-              {sortedSubagents.length > 0 && (
+              {filteredSubagents.length > 0 && (
                 <section className="thread-graph-group" aria-label="Direct subagents">
                   <h3>Subagents</h3>
-                  {sortedSubagents.map((thread) => (
+                  {filteredSubagents.map((thread) => (
                     <ThreadGraphRow key={thread.id} kind="agent" thread={thread} />
                   ))}
                 </section>
               )}
-              {sortedForks.length > 0 && (
+              {filteredForks.length > 0 && (
                 <section className="thread-graph-group" aria-label="Direct forks">
                   <h3>Forks</h3>
-                  {sortedForks.map((thread) => (
+                  {filteredForks.map((thread) => (
                     <ThreadGraphRow key={thread.id} kind="fork" thread={thread} />
                   ))}
                 </section>
@@ -261,7 +306,7 @@ export function SubagentsDock() {
             )}
 
           <footer>
-            Runtime relationships · explicit fork · streamed lifecycle · no polling
+            Runtime relationships · explicit fork · streamed lifecycle · in-memory filtering · no polling
           </footer>
         </section>
       )}
@@ -300,6 +345,23 @@ function dedupeThreads(threads: ThreadSummary[]): ThreadSummary[] {
   const byId = new Map<string, ThreadSummary>();
   for (const thread of threads) byId.set(thread.id, thread);
   return [...byId.values()];
+}
+
+function filterThreads(threads: ThreadSummary[], query: string): ThreadSummary[] {
+  const normalized = query.trim().toLocaleLowerCase();
+  if (!normalized) return threads;
+  return threads.filter((thread) => {
+    const fields = [
+      thread.id,
+      thread.name ?? "",
+      thread.preview,
+      thread.agentNickname ?? "",
+      thread.agentRole ?? "",
+      thread.modelProvider,
+      formatStatus(thread.status),
+    ];
+    return fields.some((field) => field.toLocaleLowerCase().includes(normalized));
+  });
 }
 
 function shortId(id: string): string {
