@@ -60,7 +60,6 @@ export function PermissionsDock() {
 
   const loadProfiles = useCallback(
     async (append = false) => {
-      if (profileLoading) return;
       if (appServerClient.getSnapshot().phase !== "ready") {
         setProfileError("Connect the Syndrid runtime before listing permission profiles.");
         return;
@@ -96,7 +95,7 @@ export function PermissionsDock() {
         if (requestGeneration === profileGeneration.current) setProfileLoading(false);
       }
     },
-    [profileCursor, profileLoading, workspace?.cwd],
+    [profileCursor, workspace?.cwd],
   );
 
   useEffect(() => {
