@@ -71,6 +71,14 @@ import type {
 } from "./fsWatchProtocol";
 import type { ReviewStartParams, ReviewStartResponse } from "./reviewProtocol";
 import type { ThreadForkParams, ThreadForkResponse } from "./threadForkProtocol";
+import type {
+  ThreadGoalClearParams,
+  ThreadGoalClearResponse,
+  ThreadGoalGetParams,
+  ThreadGoalGetResponse,
+  ThreadGoalSetParams,
+  ThreadGoalSetResponse,
+} from "./threadGoalProtocol";
 import {
   onNativeAppServerMessage,
   onNativeAppServerStderr,
@@ -239,6 +247,18 @@ export class SyndridAppServerClient {
 
   async unarchiveThread(params: ThreadUnarchiveParams): Promise<ThreadUnarchiveResponse> {
     return this.request<ThreadUnarchiveResponse>(methods.threadUnarchive, params);
+  }
+
+  async getThreadGoal(params: ThreadGoalGetParams): Promise<ThreadGoalGetResponse> {
+    return this.request<ThreadGoalGetResponse>("thread/goal/get", params);
+  }
+
+  async setThreadGoal(params: ThreadGoalSetParams): Promise<ThreadGoalSetResponse> {
+    return this.request<ThreadGoalSetResponse>("thread/goal/set", params);
+  }
+
+  async clearThreadGoal(params: ThreadGoalClearParams): Promise<ThreadGoalClearResponse> {
+    return this.request<ThreadGoalClearResponse>("thread/goal/clear", params);
   }
 
   async listBackgroundTerminals(
