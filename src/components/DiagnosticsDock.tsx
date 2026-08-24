@@ -104,7 +104,7 @@ export function DiagnosticsDock() {
   );
 }
 
-function Diagnostic({ label, value, title }: { label: string; value: string; title?: string }) {
+function Diagnostic({ label, value, title }: { label: string; value: string; title?: string | undefined }) {
   return (
     <div>
       <dt>{label}</dt>
