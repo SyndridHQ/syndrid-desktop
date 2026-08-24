@@ -16,12 +16,14 @@ export function DiagnosticsDock() {
   const [loading, setLoading] = useState(false);
   const [snapshot, setSnapshot] = useState<DiagnosticsSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
     if (loading) return;
     const connection = appServerClient.getSnapshot();
     setLoading(true);
     setError(null);
+    setCopied(false);
     try {
       const environment = connection.phase === "ready"
         ? await appServerClient.readEnvironmentInfo({ environmentId: "local" })
@@ -42,6 +44,19 @@ export function DiagnosticsDock() {
       setLoading(false);
     }
   }, [loading]);
+
+  const copySnapshot = useCallback(async () => {
+    if (!snapshot || loading) return;
+    setError(null);
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard access is unavailable in this environment.");
+      await navigator.clipboard.writeText(formatSnapshotForClipboard(snapshot, workspace));
+      setCopied(true);
+    } catch (cause) {
+      setCopied(false);
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, [loading, snapshot, workspace]);
 
   useEffect(() => {
     if (open) void refresh();
@@ -73,9 +88,14 @@ export function DiagnosticsDock() {
               <strong>Runtime diagnostics</strong>
               <small>On-demand snapshot · protocol {PROTOCOL_SOURCE_SHORT_SHA}</small>
             </span>
-            <button disabled={loading} onClick={() => void refresh()} type="button">
-              {loading ? "Reading…" : "Refresh"}
-            </button>
+            <div>
+              <button disabled={!snapshot || loading} onClick={() => void copySnapshot()} type="button">
+                {copied ? "Copied" : "Copy snapshot"}
+              </button>{" "}
+              <button disabled={loading} onClick={() => void refresh()} type="button">
+                {loading ? "Reading…" : "Refresh"}
+              </button>
+            </div>
           </header>
 
           {error && <div className="diagnostics-error">{error}</div>}
@@ -96,7 +116,7 @@ export function DiagnosticsDock() {
           </dl>
 
           <footer>
-            Explicit environment read only · no CPU sampling · no process polling · SyndridCLI remains authoritative
+            Explicit environment read only · no CPU sampling · no process polling · copied snapshots omit Git remote URLs
           </footer>
         </section>
       )}
@@ -118,6 +138,59 @@ function formatNative(native: RuntimeConnectionSnapshot["native"]): string {
   if (native.state === "running") return native.binary;
   if (native.state === "exited") return `Exited${native.code === null ? "" : ` · ${native.code}`}`;
   return "Stopped";
+}
+
+function formatSnapshotForClipboard(
+  snapshot: DiagnosticsSnapshot,
+  workspace: ReturnType<typeof useRuntimeWorkspace>,
+): string {
+  const { connection, environment, capturedAt } = snapshot;
+  const native = connection.native;
+  const server = connection.server;
+  return JSON.stringify(
+    {
+      capturedAt: new Date(capturedAt).toISOString(),
+      protocolSource: PROTOCOL_SOURCE_SHORT_SHA,
+      connection: {
+        phase: connection.phase,
+        error: connection.error,
+      },
+      runtime: server
+        ? {
+            userAgent: server.userAgent,
+            platformFamily: server.platformFamily,
+            platformOs: server.platformOs,
+            codexHome: server.codexHome,
+          }
+        : null,
+      native: native?.state === "running"
+        ? { state: native.state, binary: native.binary, pid: native.pid }
+        : native,
+      environment: environment
+        ? {
+            cwd: environment.cwd,
+            shell: {
+              name: environment.shell.name,
+              path: environment.shell.path,
+            },
+          }
+        : null,
+      workspace: workspace
+        ? {
+            threadId: workspace.threadId,
+            cwd: workspace.cwd,
+            git: workspace.git
+              ? {
+                  branch: workspace.git.branch,
+                  sha: workspace.git.sha,
+                }
+              : null,
+          }
+        : null,
+    },
+    null,
+    2,
+  );
 }
 
 function shortId(id: string): string {
