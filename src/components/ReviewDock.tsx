@@ -34,20 +34,18 @@ export function ReviewDock() {
   }, [workspace?.threadId]);
 
   useEffect(() => {
-    if (!open || reviews.length === 0) return;
-    const reviewThreadIds = new Set(reviews.map((review) => review.threadId));
+    if (!open) return;
     return appServerClient.onNotification((notification) => {
       const params = toRecord(notification.params);
-      if (!params || typeof params.threadId !== "string" || !reviewThreadIds.has(params.threadId)) {
-        return;
-      }
+      if (!params || typeof params.threadId !== "string") return;
 
       if (notification.method === "thread/status/changed") {
-        setReviews((current) =>
-          current.map((review) =>
+        setReviews((current) => {
+          if (!current.some((review) => review.threadId === params.threadId)) return current;
+          return current.map((review) =>
             review.threadId === params.threadId ? { ...review, status: params.status } : review,
-          ),
-        );
+          );
+        });
         return;
       }
 
@@ -55,8 +53,9 @@ export function ReviewDock() {
         return;
       }
 
-      setReviews((current) =>
-        current.map((review) => {
+      setReviews((current) => {
+        if (!current.some((review) => review.threadId === params.threadId)) return current;
+        return current.map((review) => {
           if (review.threadId !== params.threadId || review.outputTruncated) return review;
           const nextOutput = review.output + params.delta;
           if (nextOutput.length <= MAX_REVIEW_OUTPUT_CHARS) {
@@ -67,10 +66,10 @@ export function ReviewDock() {
             output: nextOutput.slice(0, MAX_REVIEW_OUTPUT_CHARS),
             outputTruncated: true,
           };
-        }),
-      );
+        });
+      });
     });
-  }, [open, reviews]);
+  }, [open]);
 
   const reviewTarget = useMemo(() => buildReviewTarget(targetKind, targetValue), [targetKind, targetValue]);
 
