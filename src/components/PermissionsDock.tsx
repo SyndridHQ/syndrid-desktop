@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
+import type { PermissionProfileSummary } from "../runtime/permissionProfileProtocol";
 import type { ConfigReadResponse } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./permissionsDock.css";
+
+const PROFILE_PAGE_SIZE = 40;
+const MAX_RETAINED_PROFILES = 120;
 
 type RuntimeThreadSettings = {
   approvalPolicy: unknown;
@@ -18,7 +22,12 @@ export function PermissionsDock() {
   const [config, setConfig] = useState<ConfigReadResponse | null>(null);
   const [sessionSettings, setSessionSettings] = useState<RuntimeThreadSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profiles, setProfiles] = useState<PermissionProfileSummary[]>([]);
+  const [profileCursor, setProfileCursor] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const generation = useRef(0);
+  const profileGeneration = useRef(0);
 
   const load = useCallback(async () => {
     if (appServerClient.getSnapshot().phase !== "ready") {
@@ -49,12 +58,62 @@ export function PermissionsDock() {
     }
   }, [workspace?.cwd]);
 
+  const loadProfiles = useCallback(
+    async (append = false) => {
+      if (profileLoading) return;
+      if (appServerClient.getSnapshot().phase !== "ready") {
+        setProfileError("Connect the Syndrid runtime before listing permission profiles.");
+        return;
+      }
+
+      const requestGeneration = ++profileGeneration.current;
+      const cwd = workspace?.cwd ?? null;
+      setProfileLoading(true);
+      setProfileError(null);
+      try {
+        const result = await appServerClient.listPermissionProfiles({
+          cursor: append ? profileCursor : null,
+          limit: PROFILE_PAGE_SIZE,
+          cwd,
+        });
+        if (
+          requestGeneration !== profileGeneration.current ||
+          (appServerClient.getWorkspaceSnapshot()?.cwd ?? null) !== cwd
+        ) {
+          return;
+        }
+        setProfiles((current) =>
+          dedupeProfiles(append ? [...current, ...result.data] : result.data).slice(
+            0,
+            MAX_RETAINED_PROFILES,
+          ),
+        );
+        setProfileCursor(result.nextCursor);
+      } catch (cause) {
+        if (requestGeneration !== profileGeneration.current) return;
+        setProfileError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        if (requestGeneration === profileGeneration.current) setProfileLoading(false);
+      }
+    },
+    [profileCursor, profileLoading, workspace?.cwd],
+  );
+
   useEffect(() => {
     generation.current += 1;
+    profileGeneration.current += 1;
     setConfig(null);
     setSessionSettings(null);
     setError(null);
-    if (open) void load();
+    setProfiles([]);
+    setProfileCursor(null);
+    setProfileError(null);
+    setLoading(false);
+    setProfileLoading(false);
+    if (open) {
+      void load();
+      void loadProfiles(false);
+    }
     // Workspace selection is the authoritative invalidation trigger. No polling.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspace?.threadId, workspace?.cwd]);
@@ -76,11 +135,16 @@ export function PermissionsDock() {
   const liveApproval = sessionSettings?.approvalPolicy;
   const liveSandbox = sessionSettings?.sandboxPolicy;
   const liveProfile = sessionSettings?.activePermissionProfile;
+  const liveProfileId = extractPermissionProfileId(liveProfile);
 
   const writableRootCount = extractWritableRoots(liveSandbox).length;
   const writableRoots = useMemo(
     () => extractWritableRoots(liveSandbox).slice(0, 8),
     [liveSandbox],
+  );
+  const allowedProfileCount = useMemo(
+    () => profiles.reduce((count, profile) => count + (profile.allowed ? 1 : 0), 0),
+    [profiles],
   );
 
   return (
@@ -161,11 +225,68 @@ export function PermissionsDock() {
                   </div>
                 )}
               </section>
+
+              <section className="permissions-section">
+                <header className="permissions-section-header-row">
+                  <span>
+                    <strong>Runtime permission profiles</strong>
+                    <small>
+                      {profiles.length > 0
+                        ? `${allowedProfileCount} of ${profiles.length} retained profiles allowed by effective requirements`
+                        : "Runtime-defined profiles for the selected workspace"}
+                    </small>
+                  </span>
+                  <button
+                    disabled={profileLoading}
+                    onClick={() => void loadProfiles(false)}
+                    type="button"
+                  >
+                    {profileLoading && profiles.length === 0 ? "Loading…" : "Refresh profiles"}
+                  </button>
+                </header>
+
+                {profileError ? (
+                  <div className="permissions-state compact error">{profileError}</div>
+                ) : profileLoading && profiles.length === 0 ? (
+                  <div className="permissions-state compact">Reading runtime permission profiles…</div>
+                ) : profiles.length === 0 ? (
+                  <div className="permissions-state compact">No runtime permission profiles were returned.</div>
+                ) : (
+                  <div className="permission-profile-list">
+                    {profiles.map((profile) => (
+                      <article
+                        className={profile.id === liveProfileId ? "permission-profile-row current" : "permission-profile-row"}
+                        key={profile.id}
+                      >
+                        <div>
+                          <strong>{profile.id}</strong>
+                          {profile.description && <small>{profile.description}</small>}
+                        </div>
+                        <span className={profile.allowed ? "allowed" : "blocked"}>
+                          {profile.id === liveProfileId ? "active · " : ""}
+                          {profile.allowed ? "allowed" : "blocked"}
+                        </span>
+                      </article>
+                    ))}
+                  </div>
+                )}
+
+                {profileCursor && profiles.length < MAX_RETAINED_PROFILES && (
+                  <button
+                    className="permission-profile-more"
+                    disabled={profileLoading}
+                    onClick={() => void loadProfiles(true)}
+                    type="button"
+                  >
+                    {profileLoading ? "Loading…" : "Load more profiles"}
+                  </button>
+                )}
+              </section>
             </>
           )}
 
           <footer>
-            Runtime-owned · read-only · event-aware · no permission inference or polling
+            Runtime-owned · read-only · profiles paged {PROFILE_PAGE_SIZE} at a time · retains at most {MAX_RETAINED_PROFILES} · no polling
           </footer>
         </section>
       )}
@@ -200,6 +321,12 @@ function parseThreadSettingsUpdated(value: unknown): {
   };
 }
 
+function dedupeProfiles(profiles: PermissionProfileSummary[]): PermissionProfileSummary[] {
+  const byId = new Map<string, PermissionProfileSummary>();
+  for (const profile of profiles) byId.set(profile.id, profile);
+  return [...byId.values()];
+}
+
 function formatPolicy(value: unknown): string {
   if (value === null || value === undefined) return "Runtime default";
   if (typeof value === "string") return humanize(value);
@@ -226,14 +353,18 @@ function formatSandbox(value: unknown): string {
 }
 
 function formatPermissionProfile(value: unknown): string {
-  if (value === null || value === undefined) return "None reported";
+  return extractPermissionProfileId(value) ?? "None reported";
+}
+
+function extractPermissionProfileId(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
   if (typeof value === "string") return value;
   const record = toRecord(value);
-  if (!record) return "Runtime-defined";
+  if (!record) return null;
   for (const key of ["name", "id", "profileName", "source"]) {
     if (typeof record[key] === "string" && record[key]) return String(record[key]);
   }
-  return summarizeObject(record);
+  return null;
 }
 
 function extractWritableRoots(value: unknown): string[] {
