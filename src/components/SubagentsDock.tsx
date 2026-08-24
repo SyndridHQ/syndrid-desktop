@@ -10,13 +10,13 @@ const MAX_RETAINED_FORKS = 60;
 const REMOVAL_METHODS = new Set(["thread/archived", "thread/deleted", "thread/closed"]);
 type RelationshipView = "all" | "agents" | "forks";
 type ThreadDetail = ThreadReadResponse["thread"];
-
 type InspectionState = {
   threadId: string;
   loading: boolean;
   thread: ThreadDetail | null;
   error: string | null;
 };
+type InspectedGitInfo = { branch: string | null; sha: string | null };
 
 export function SubagentsDock() {
   const workspace = useRuntimeWorkspace();
@@ -35,110 +35,90 @@ export function SubagentsDock() {
   const generation = useRef(0);
   const inspectionGeneration = useRef(0);
 
-  const load = useCallback(
-    async (append = false) => {
-      if (loading) return;
-      if (appServerClient.getSnapshot().phase !== "ready") {
-        setError("Connect the Syndrid runtime before inspecting the thread graph.");
-        return;
-      }
-      const selectedThreadId = workspace?.threadId;
-      if (!selectedThreadId) {
-        setSubagents([]);
-        setForks([]);
-        setCursor(null);
-        setScannedThreads(0);
-        setError("Select a loaded Syndrid session first.");
-        return;
-      }
+  const load = useCallback(async (append = false) => {
+    if (loading) return;
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setError("Connect the Syndrid runtime before inspecting the thread graph.");
+      return;
+    }
+    const selectedThreadId = workspace?.threadId;
+    if (!selectedThreadId) {
+      setSubagents([]);
+      setForks([]);
+      setCursor(null);
+      setScannedThreads(0);
+      setError("Select a loaded Syndrid session first.");
+      return;
+    }
 
-      const requestGeneration = ++generation.current;
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await appServerClient.listThreads({
-          cursor: append ? cursor : null,
-          limit: PAGE_SIZE,
-          archived: false,
-          sortKey: "updated_at",
-          sortDirection: "desc",
-        });
-        if (
-          requestGeneration !== generation.current ||
-          appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
-        ) {
-          return;
-        }
+    const requestGeneration = ++generation.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await appServerClient.listThreads({
+        cursor: append ? cursor : null,
+        limit: PAGE_SIZE,
+        archived: false,
+        sortKey: "updated_at",
+        sortDirection: "desc",
+      });
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
+      ) return;
 
-        const directChildren = result.data.filter(
-          (thread) => thread.parentThreadId === selectedThreadId,
-        );
-        const directForks = result.data.filter(
-          (thread) => thread.forkedFromId === selectedThreadId,
-        );
-        setSubagents((current) =>
-          dedupeThreads(append ? [...current, ...directChildren] : directChildren).slice(
-            0,
-            MAX_RETAINED_SUBAGENTS,
-          ),
-        );
-        setForks((current) =>
-          dedupeThreads(append ? [...current, ...directForks] : directForks).slice(
-            0,
-            MAX_RETAINED_FORKS,
-          ),
-        );
-        setScannedThreads((current) => (append ? current + result.data.length : result.data.length));
-        setCursor(result.nextCursor);
-      } catch (cause) {
-        if (requestGeneration !== generation.current) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
-      } finally {
-        if (requestGeneration === generation.current) setLoading(false);
-      }
-    },
-    [cursor, loading, workspace?.threadId],
-  );
+      const directChildren = result.data.filter((thread) => thread.parentThreadId === selectedThreadId);
+      const directForks = result.data.filter((thread) => thread.forkedFromId === selectedThreadId);
+      setSubagents((current) =>
+        dedupeThreads(append ? [...current, ...directChildren] : directChildren).slice(0, MAX_RETAINED_SUBAGENTS),
+      );
+      setForks((current) =>
+        dedupeThreads(append ? [...current, ...directForks] : directForks).slice(0, MAX_RETAINED_FORKS),
+      );
+      setScannedThreads((current) => (append ? current + result.data.length : result.data.length));
+      setCursor(result.nextCursor);
+    } catch (cause) {
+      if (requestGeneration !== generation.current) return;
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (requestGeneration === generation.current) setLoading(false);
+    }
+  }, [cursor, loading, workspace?.threadId]);
 
-  const inspectThread = useCallback(
-    async (thread: ThreadSummary) => {
-      if (appServerClient.getSnapshot().phase !== "ready") {
-        setInspection({
-          threadId: thread.id,
-          loading: false,
-          thread: null,
-          error: "Connect the Syndrid runtime before inspecting this thread.",
-        });
-        return;
-      }
-      const selectedThreadId = workspace?.threadId;
-      if (!selectedThreadId) return;
+  const inspectThread = useCallback(async (thread: ThreadSummary) => {
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setInspection({
+        threadId: thread.id,
+        loading: false,
+        thread: null,
+        error: "Connect the Syndrid runtime before inspecting this thread.",
+      });
+      return;
+    }
+    const selectedThreadId = workspace?.threadId;
+    if (!selectedThreadId) return;
 
-      const requestGeneration = ++inspectionGeneration.current;
-      setInspection({ threadId: thread.id, loading: true, thread: null, error: null });
-      try {
-        // Metadata-only reads deliberately omit rollout turns/items. The thread graph
-        // is an inspector, not a second conversation store.
-        const result = await appServerClient.inspectThread({ threadId: thread.id });
-        if (
-          requestGeneration !== inspectionGeneration.current ||
-          appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
-        ) {
-          return;
-        }
-        setInspection({ threadId: thread.id, loading: false, thread: result.thread, error: null });
-      } catch (cause) {
-        if (requestGeneration !== inspectionGeneration.current) return;
-        setInspection({
-          threadId: thread.id,
-          loading: false,
-          thread: null,
-          error: cause instanceof Error ? cause.message : String(cause),
-        });
-      }
-    },
-    [workspace?.threadId],
-  );
+    const requestGeneration = ++inspectionGeneration.current;
+    setInspection({ threadId: thread.id, loading: true, thread: null, error: null });
+    try {
+      // Metadata-only read: omit rollout turns/items so inspection does not become
+      // a second conversation store or hydrate potentially unbounded history.
+      const result = await appServerClient.inspectThread({ threadId: thread.id });
+      if (
+        requestGeneration !== inspectionGeneration.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
+      ) return;
+      setInspection({ threadId: thread.id, loading: false, thread: result.thread, error: null });
+    } catch (cause) {
+      if (requestGeneration !== inspectionGeneration.current) return;
+      setInspection({
+        threadId: thread.id,
+        loading: false,
+        thread: null,
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+  }, [workspace?.threadId]);
 
   const forkSelected = useCallback(async () => {
     if (forking || appServerClient.getSnapshot().phase !== "ready") return;
@@ -154,9 +134,7 @@ export function SubagentsDock() {
     try {
       const result = await appServerClient.forkThread({ threadId: selectedThreadId });
       if (appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId) return;
-      setForks((current) =>
-        dedupeThreads([result.thread, ...current]).slice(0, MAX_RETAINED_FORKS),
-      );
+      setForks((current) => dedupeThreads([result.thread, ...current]).slice(0, MAX_RETAINED_FORKS));
       setNotice(`Fork created · ${shortId(result.thread.id)} · selection unchanged`);
     } catch (cause) {
       if (appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId) return;
@@ -195,14 +173,10 @@ export function SubagentsDock() {
         const thread = toThreadSummary(params.thread);
         if (!thread) return;
         if (thread.parentThreadId === selectedThreadId) {
-          setSubagents((current) =>
-            dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_SUBAGENTS),
-          );
+          setSubagents((current) => dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_SUBAGENTS));
         }
         if (thread.forkedFromId === selectedThreadId) {
-          setForks((current) =>
-            dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_FORKS),
-          );
+          setForks((current) => dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_FORKS));
         }
         return;
       }
@@ -212,22 +186,19 @@ export function SubagentsDock() {
 
       if (notification.method === "thread/status/changed") {
         const updateStatus = (current: ThreadSummary[]) =>
-          current.map((thread) =>
-            thread.id === threadId ? { ...thread, status: params.status } : thread,
-          );
+          current.map((thread) => thread.id === threadId ? { ...thread, status: params.status } : thread);
         setSubagents(updateStatus);
         setForks(updateStatus);
         setInspection((current) =>
           current?.thread?.id === threadId
-            ? { ...current, thread: { ...current.thread, status: params.status as ThreadDetail["status"] } }
+            ? { ...current, thread: { ...current.thread, status: params.status } }
             : current,
         );
         return;
       }
 
       if (REMOVAL_METHODS.has(notification.method)) {
-        const removeThread = (current: ThreadSummary[]) =>
-          current.filter((thread) => thread.id !== threadId);
+        const removeThread = (current: ThreadSummary[]) => current.filter((thread) => thread.id !== threadId);
         setSubagents(removeThread);
         setForks(removeThread);
         setInspection((current) => (current?.threadId === threadId ? null : current));
@@ -235,14 +206,8 @@ export function SubagentsDock() {
     });
   }, [open, workspace?.threadId]);
 
-  const sortedSubagents = useMemo(
-    () => [...subagents].sort((a, b) => b.updatedAt - a.updatedAt),
-    [subagents],
-  );
-  const sortedForks = useMemo(
-    () => [...forks].sort((a, b) => b.updatedAt - a.updatedAt),
-    [forks],
-  );
+  const sortedSubagents = useMemo(() => [...subagents].sort((a, b) => b.updatedAt - a.updatedAt), [subagents]);
+  const sortedForks = useMemo(() => [...forks].sort((a, b) => b.updatedAt - a.updatedAt), [forks]);
   const filteredSubagents = useMemo(
     () => (view === "forks" ? [] : filterThreads(sortedSubagents, query)),
     [query, sortedSubagents, view],
@@ -288,7 +253,6 @@ export function SubagentsDock() {
           </div>
 
           {notice && <div className="subagents-notice">{notice}</div>}
-
           {inspection && (
             <ThreadInspector
               inspection={inspection}
@@ -316,14 +280,8 @@ export function SubagentsDock() {
                 <option value="agents">Subagents</option>
                 <option value="forks">Forks</option>
               </select>
-              {normalizedQuery && (
-                <button onClick={() => setQuery("")} type="button">
-                  Clear
-                </button>
-              )}
-              {(normalizedQuery || view !== "all") && (
-                <small>{visibleCount} of {subagents.length + forks.length}</small>
-              )}
+              {normalizedQuery && <button onClick={() => setQuery("")} type="button">Clear</button>}
+              {(normalizedQuery || view !== "all") && <small>{visibleCount} of {subagents.length + forks.length}</small>}
             </div>
           )}
 
@@ -375,21 +333,13 @@ export function SubagentsDock() {
             </div>
           )}
 
-          {cursor &&
-            (subagents.length < MAX_RETAINED_SUBAGENTS || forks.length < MAX_RETAINED_FORKS) && (
-              <button
-                className="subagents-more"
-                disabled={loading}
-                onClick={() => void load(true)}
-                type="button"
-              >
-                {loading ? "Loading…" : "Load more runtime threads"}
-              </button>
-            )}
+          {cursor && (subagents.length < MAX_RETAINED_SUBAGENTS || forks.length < MAX_RETAINED_FORKS) && (
+            <button className="subagents-more" disabled={loading} onClick={() => void load(true)} type="button">
+              {loading ? "Loading…" : "Load more runtime threads"}
+            </button>
+          )}
 
-          <footer>
-            Runtime relationships · metadata-only inspection · streamed lifecycle · no polling
-          </footer>
+          <footer>Runtime relationships · metadata-only inspection · streamed lifecycle · no polling</footer>
         </section>
       )}
     </aside>
@@ -432,14 +382,9 @@ function ThreadGraphRow({
   );
 }
 
-function ThreadInspector({
-  inspection,
-  close,
-}: {
-  inspection: InspectionState;
-  close: () => void;
-}) {
+function ThreadInspector({ inspection, close }: { inspection: InspectionState; close: () => void }) {
   const thread = inspection.thread;
+  const gitInfo = parseGitInfo(thread?.gitInfo);
   return (
     <section className="thread-inspector" aria-label="Thread details">
       <header>
@@ -460,16 +405,10 @@ function ThreadInspector({
           <ThreadDetailRow label="Workspace" title={thread.cwd} value={thread.cwd || "—"} />
           <ThreadDetailRow label="Source" value={formatStructuredValue(thread.source)} />
           <ThreadDetailRow label="Thread source" value={formatStructuredValue(thread.threadSource)} />
-          {thread.parentThreadId && (
-            <ThreadDetailRow label="Parent" title={thread.parentThreadId} value={shortId(thread.parentThreadId)} />
-          )}
-          {thread.forkedFromId && (
-            <ThreadDetailRow label="Forked from" title={thread.forkedFromId} value={shortId(thread.forkedFromId)} />
-          )}
-          {thread.gitInfo?.branch && <ThreadDetailRow label="Branch" value={thread.gitInfo.branch} />}
-          {thread.gitInfo?.sha && (
-            <ThreadDetailRow label="Commit" title={thread.gitInfo.sha} value={shortId(thread.gitInfo.sha)} />
-          )}
+          {thread.parentThreadId && <ThreadDetailRow label="Parent" title={thread.parentThreadId} value={shortId(thread.parentThreadId)} />}
+          {thread.forkedFromId && <ThreadDetailRow label="Forked from" title={thread.forkedFromId} value={shortId(thread.forkedFromId)} />}
+          {gitInfo?.branch && <ThreadDetailRow label="Branch" value={gitInfo.branch} />}
+          {gitInfo?.sha && <ThreadDetailRow label="Commit" title={gitInfo.sha} value={shortId(gitInfo.sha)} />}
         </dl>
       ) : null}
       <footer>Metadata-only `thread/read` · foreground selection unchanged</footer>
@@ -478,12 +417,7 @@ function ThreadInspector({
 }
 
 function ThreadDetailRow({ label, value, title }: { label: string; value: string; title?: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd title={title}>{value}</dd>
-    </div>
-  );
+  return <div><dt>{label}</dt><dd title={title}>{value}</dd></div>;
 }
 
 function dedupeThreads(threads: ThreadSummary[]): ThreadSummary[] {
@@ -529,11 +463,24 @@ function formatStructuredValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    const key = Object.keys(record)[0];
+    const key = Object.keys(value as Record<string, unknown>)[0];
     return key ?? "runtime value";
   }
   return "runtime value";
+}
+
+function parseGitInfo(value: unknown): InspectedGitInfo | null {
+  const record = toRecord(value);
+  if (!record) return null;
+  const branch = nullableString(record.branch);
+  const sha = nullableString(record.sha);
+  if (branch === undefined || sha === undefined) return null;
+  return { branch, sha };
+}
+
+function nullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" ? value : undefined;
 }
 
 function formatRelativeTime(timestampSeconds: number): string {
@@ -545,9 +492,7 @@ function formatRelativeTime(timestampSeconds: number): string {
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
 function toThreadSummary(value: unknown): ThreadSummary | null {
@@ -558,8 +503,6 @@ function toThreadSummary(value: unknown): ThreadSummary | null {
     (thread.parentThreadId !== null && typeof thread.parentThreadId !== "string") ||
     (thread.forkedFromId !== null && typeof thread.forkedFromId !== "string") ||
     typeof thread.updatedAt !== "number"
-  ) {
-    return null;
-  }
+  ) return null;
   return value as ThreadSummary;
 }
