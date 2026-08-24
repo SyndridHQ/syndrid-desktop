@@ -11,6 +11,7 @@ import { GoalDock } from "./components/GoalDock";
 import { HooksDock } from "./components/HooksDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
+import { PermissionsDock } from "./components/PermissionsDock";
 import { PlanDock } from "./components/PlanDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { ProviderDock } from "./components/ProviderDock";
@@ -40,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
     <WorkspaceFilesDock />
     <SkillsDock />
     <ProviderDock />
+    <PermissionsDock />
     <GitDock />
     <ReviewDock />
     <TerminalDock />
