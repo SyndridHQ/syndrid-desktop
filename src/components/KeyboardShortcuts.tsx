@@ -15,28 +15,28 @@ const shortcutDefinitions: Omit<Shortcut, "keys">[] = [
     id: "files",
     label: "Workspace files",
     detail: "Toggle the runtime-backed workspace browser",
-    matches: (event) => isMod(event) && event.shiftKey && event.key.toLowerCase() === "e",
+    matches: (event) => isPrimaryMod(event) && event.shiftKey && event.key.toLowerCase() === "e",
     run: () => clickElement(".workspace-files-toggle"),
   },
   {
     id: "source-control",
     label: "Source control",
     detail: "Toggle the selected-session Git surface",
-    matches: (event) => isMod(event) && event.shiftKey && event.key.toLowerCase() === "g",
+    matches: (event) => isPrimaryMod(event) && event.shiftKey && event.key.toLowerCase() === "g",
     run: () => clickElement(".git-toggle"),
   },
   {
     id: "terminal",
     label: "Terminal",
     detail: "Toggle the Syndrid-owned native PTY console",
-    matches: (event) => isMod(event) && !event.shiftKey && event.key === "`",
+    matches: (event) => isPrimaryMod(event) && !event.shiftKey && event.key === "`",
     run: () => clickElement(".terminal-toggle"),
   },
   {
     id: "settings",
     label: "Desktop settings",
     detail: "Toggle native runtime supervision settings",
-    matches: (event) => isMod(event) && !event.shiftKey && event.key === ",",
+    matches: (event) => isPrimaryMod(event) && !event.shiftKey && event.key === ",",
     run: () => clickElement(".settings-toggle"),
   },
 ];
@@ -80,7 +80,17 @@ export function KeyboardShortcuts() {
         return;
       }
 
-      if (isMod(event) && !event.shiftKey && event.key === "/" && !isEditableTarget(event.target)) {
+      if (open && isPrimaryMod(event) && event.key.toLowerCase() === "k") {
+        setOpen(false);
+        return;
+      }
+
+      if (
+        isPrimaryMod(event) &&
+        !event.shiftKey &&
+        event.key === "/" &&
+        !isEditableTarget(event.target)
+      ) {
         event.preventDefault();
         setOpen((current) => !current);
         return;
@@ -165,8 +175,9 @@ function ShortcutRow({ detail, keys, label }: { detail: string; keys: string[]; 
   );
 }
 
-function isMod(event: KeyboardEvent): boolean {
-  return (event.metaKey || event.ctrlKey) && !event.altKey;
+function isPrimaryMod(event: KeyboardEvent): boolean {
+  if (event.altKey) return false;
+  return isApplePlatform() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
 }
 
 function isApplePlatform(): boolean {
