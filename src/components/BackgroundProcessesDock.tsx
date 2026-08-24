@@ -42,6 +42,7 @@ export function BackgroundProcessesDock() {
       const requestGeneration = ++generation.current;
       const threadId = workspace.threadId;
       setLoading(true);
+      if (!append) setConfirmClean(false);
       setNotice(null);
       setError(null);
       try {
@@ -177,6 +178,12 @@ export function BackgroundProcessesDock() {
     }
   }, [cleaning, confirmClean, processes.length, workspace?.threadId]);
 
+  const cancelClean = useCallback(() => {
+    if (cleaning) return;
+    setConfirmClean(false);
+    setNotice(null);
+  }, [cleaning]);
+
   return (
     <aside className="background-processes-dock" aria-label="Background processes">
       <button
@@ -207,6 +214,11 @@ export function BackgroundProcessesDock() {
                   type="button"
                 >
                   {cleaning ? "Stopping all…" : confirmClean ? "Confirm stop all" : "Stop all"}
+                </button>
+              )}
+              {confirmClean && (
+                <button disabled={cleaning} onClick={cancelClean} type="button">
+                  Cancel
                 </button>
               )}
               <button disabled={loading || cleaning} onClick={() => void load(false)} type="button">
