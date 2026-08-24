@@ -22,6 +22,7 @@ export function ReviewDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [stoppingReviews, setStoppingReviews] = useState<Set<string>>(() => new Set());
   const [targetKind, setTargetKind] = useState<ReviewTargetKind>("uncommittedChanges");
   const [targetValue, setTargetValue] = useState("");
   const [reviews, setReviews] = useState<ReviewLaunch[]>([]);
@@ -29,6 +30,7 @@ export function ReviewDock() {
 
   useEffect(() => {
     setReviews([]);
+    setStoppingReviews(new Set());
     setError(null);
     setStarting(false);
   }, [workspace?.threadId]);
@@ -46,6 +48,9 @@ export function ReviewDock() {
             review.threadId === params.threadId ? { ...review, status: params.status } : review,
           );
         });
+        if (!isRunningStatus(params.status)) {
+          setStoppingReviews((current) => removeSetValue(current, params.threadId as string));
+        }
         return;
       }
 
@@ -113,6 +118,34 @@ export function ReviewDock() {
       setStarting(false);
     }
   }, [reviewTarget, starting, targetKind, workspace?.threadId]);
+
+  const stopReview = useCallback(async (review: ReviewLaunch) => {
+    if (
+      stoppingReviews.has(review.threadId) ||
+      !isRunningStatus(review.status) ||
+      appServerClient.getSnapshot().phase !== "ready"
+    ) {
+      return;
+    }
+
+    const sourceThreadId = workspace?.threadId;
+    if (!sourceThreadId) return;
+
+    setStoppingReviews((current) => new Set(current).add(review.threadId));
+    setError(null);
+    try {
+      await appServerClient.interruptTurn({
+        threadId: review.threadId,
+        turnId: review.turnId,
+      });
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId) return;
+      // Runtime lifecycle notifications remain authoritative for the final state.
+    } catch (cause) {
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId) return;
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setStoppingReviews((current) => removeSetValue(current, review.threadId));
+    }
+  }, [stoppingReviews, workspace?.threadId]);
 
   const activeCount = useMemo(
     () => reviews.filter((review) => isRunningStatus(review.status)).length,
@@ -209,28 +242,42 @@ export function ReviewDock() {
             <div className="review-state">No detached reviews launched for this selection.</div>
           ) : (
             <div className="review-list">
-              {reviews.map((review) => (
-                <article key={review.threadId}>
-                  <div>
-                    <strong>{formatStatus(review.status)}</strong>
-                    <small>{formatAge(review.createdAt)}</small>
-                  </div>
-                  <span className="review-target-label" title={review.targetLabel}>{review.targetLabel}</span>
-                  <code title={review.threadId}>thread {shortId(review.threadId)}</code>
-                  <code title={review.turnId}>turn {shortId(review.turnId)}</code>
-                  {review.output && (
-                    <pre className="review-output">
-                      {review.output}
-                      {review.outputTruncated ? "\n\n[output truncated by Desktop retention limit]" : ""}
-                    </pre>
-                  )}
-                </article>
-              ))}
+              {reviews.map((review) => {
+                const stopping = stoppingReviews.has(review.threadId);
+                const running = isRunningStatus(review.status);
+                return (
+                  <article key={review.threadId}>
+                    <div>
+                      <strong>{formatStatus(review.status)}</strong>
+                      <small>{formatAge(review.createdAt)}</small>
+                    </div>
+                    {running && (
+                      <button
+                        className="review-stop"
+                        disabled={stopping}
+                        onClick={() => void stopReview(review)}
+                        type="button"
+                      >
+                        {stopping ? "Stopping…" : "Stop"}
+                      </button>
+                    )}
+                    <span className="review-target-label" title={review.targetLabel}>{review.targetLabel}</span>
+                    <code title={review.threadId}>thread {shortId(review.threadId)}</code>
+                    <code title={review.turnId}>turn {shortId(review.turnId)}</code>
+                    {review.output && (
+                      <pre className="review-output">
+                        {review.output}
+                        {review.outputTruncated ? "\n\n[output truncated by Desktop retention limit]" : ""}
+                      </pre>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
 
           <footer>
-            Runtime-owned review · streamed output · max {MAX_REVIEW_OUTPUT_CHARS.toLocaleString()} chars/review · no polling
+            Runtime-owned review · streamed output/interruption · max {MAX_REVIEW_OUTPUT_CHARS.toLocaleString()} chars/review · no polling
           </footer>
         </section>
       )}
@@ -286,6 +333,13 @@ function formatStatus(status: unknown): string {
 function isRunningStatus(status: unknown): boolean {
   const value = formatStatus(status).toLocaleLowerCase();
   return value.includes("running") || value.includes("active") || value.includes("progress");
+}
+
+function removeSetValue(current: Set<string>, value: string): Set<string> {
+  if (!current.has(value)) return current;
+  const next = new Set(current);
+  next.delete(value);
+  return next;
 }
 
 function shortId(id: string): string {
