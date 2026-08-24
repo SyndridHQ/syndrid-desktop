@@ -109,6 +109,13 @@ const commands: Command[] = [
     run: () => clickElement(".provider-toggle"),
   },
   {
+    id: "model-catalog",
+    label: "Browse runtime models",
+    detail: "Explore the runtime-discovered model catalog with explicit pagination",
+    keywords: "providers models catalog browse pagination dynamic runtime",
+    run: () => window.dispatchEvent(new Event("syndrid:open-model-catalog")),
+  },
+  {
     id: "permissions",
     label: "Open permissions",
     detail: "Inspect runtime approval and sandbox policy without changing execution semantics",
