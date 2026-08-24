@@ -314,7 +314,7 @@ export class SyndridAppServerClient {
   }
 
   async readAccountRateLimits(): Promise<AccountRateLimitsReadResponse> {
-    return this.request<AccountRateLimitsReadResponse>("account/rateLimits/read", {});
+    return this.request<AccountRateLimitsReadResponse>("account/rateLimits/read", undefined);
   }
 
   async listPermissionProfiles(
