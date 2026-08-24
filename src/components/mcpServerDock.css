@@ -66,6 +66,13 @@
 .mcp-oauth-banner strong { font-size: 9px; }
 .mcp-oauth-banner small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .mcp-oauth-banner a { color: var(--accent, #7f95ff); }
+.mcp-server-updated {
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 7px 10px;
+  background: rgba(223,179,111,.06);
+  color: #dfb36f;
+  font-size: 8px;
+}
 
 .mcp-server-list { display: flex; max-height: min(440px, 56vh); flex-direction: column; gap: 6px; overflow: auto; padding: 8px; }
 .mcp-server-state { padding: 18px 10px; color: var(--faint, #5d6670); text-align: center; }
@@ -80,6 +87,13 @@
 .auth-notLoggedIn { color: #dfb36f; background: rgba(223,179,111,.1); }
 .mcp-tool-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .mcp-tool-list code, .mcp-tool-list span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 5px; padding: 2px 5px; background: rgba(127,149,255,.08); color: var(--muted, #87919c); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; }
+.mcp-server-more { display: block; width: 100%; }
+.mcp-server-panel > footer {
+  border-top: 1px solid var(--border, #20262d);
+  padding: 7px 9px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
 
 @media (max-width: 900px) {
   .mcp-server-dock { right: 8px; bottom: 72px; width: calc(100vw - 16px); }
