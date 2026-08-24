@@ -116,6 +116,13 @@ const commands: Command[] = [
     run: () => clickElement(".settings-toggle"),
   },
   {
+    id: "diagnostics",
+    label: "Open runtime diagnostics",
+    detail: "Inspect the on-demand app-server, platform, shell, workspace, and protocol snapshot",
+    keywords: "diagnostics health runtime environment platform shell pid protocol troubleshooting",
+    run: () => clickElement(".diagnostics-toggle"),
+  },
+  {
     id: "activity",
     label: "Open runtime activity",
     detail: "Inspect streamed commands, tools, changes, and subagents",
@@ -243,7 +250,7 @@ export function CommandPalette() {
                 </span>
                 {index === activeIndex && <kbd>↵</kbd>}
               </button>
-            ))}
+            ))
           )}
         </div>
         <footer>↑↓ navigate · ↵ run · Ctrl/⌘ K toggle</footer>
