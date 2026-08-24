@@ -6,6 +6,7 @@ import "./subagentsDock.css";
 
 const PAGE_SIZE = 80;
 const MAX_RETAINED_SUBAGENTS = 120;
+const MAX_RETAINED_FORKS = 60;
 const REMOVAL_METHODS = new Set(["thread/archived", "thread/deleted", "thread/closed"]);
 
 export function SubagentsDock() {
@@ -13,6 +14,7 @@ export function SubagentsDock() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [subagents, setSubagents] = useState<ThreadSummary[]>([]);
+  const [forks, setForks] = useState<ThreadSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [scannedThreads, setScannedThreads] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -22,12 +24,13 @@ export function SubagentsDock() {
     async (append = false) => {
       if (loading) return;
       if (appServerClient.getSnapshot().phase !== "ready") {
-        setError("Connect the Syndrid runtime before inspecting subagents.");
+        setError("Connect the Syndrid runtime before inspecting the thread graph.");
         return;
       }
-      const parentThreadId = workspace?.threadId;
-      if (!parentThreadId) {
+      const selectedThreadId = workspace?.threadId;
+      if (!selectedThreadId) {
         setSubagents([]);
+        setForks([]);
         setCursor(null);
         setScannedThreads(0);
         setError("Select a loaded Syndrid session first.");
@@ -47,18 +50,27 @@ export function SubagentsDock() {
         });
         if (
           requestGeneration !== generation.current ||
-          appServerClient.getWorkspaceSnapshot()?.threadId !== parentThreadId
+          appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
         ) {
           return;
         }
 
         const directChildren = result.data.filter(
-          (thread) => thread.parentThreadId === parentThreadId,
+          (thread) => thread.parentThreadId === selectedThreadId,
+        );
+        const directForks = result.data.filter(
+          (thread) => thread.forkedFromId === selectedThreadId,
         );
         setSubagents((current) =>
           dedupeThreads(append ? [...current, ...directChildren] : directChildren).slice(
             0,
             MAX_RETAINED_SUBAGENTS,
+          ),
+        );
+        setForks((current) =>
+          dedupeThreads(append ? [...current, ...directForks] : directForks).slice(
+            0,
+            MAX_RETAINED_FORKS,
           ),
         );
         setScannedThreads((current) => (append ? current + result.data.length : result.data.length));
@@ -76,6 +88,7 @@ export function SubagentsDock() {
   useEffect(() => {
     generation.current += 1;
     setSubagents([]);
+    setForks([]);
     setCursor(null);
     setScannedThreads(0);
     setError(null);
@@ -85,8 +98,8 @@ export function SubagentsDock() {
   }, [open, workspace?.threadId]);
 
   useEffect(() => {
-    const parentThreadId = workspace?.threadId;
-    if (!open || !parentThreadId) return;
+    const selectedThreadId = workspace?.threadId;
+    if (!open || !selectedThreadId) return;
 
     return appServerClient.onNotification((notification) => {
       const params = toRecord(notification.params);
@@ -94,10 +107,17 @@ export function SubagentsDock() {
 
       if (notification.method === "thread/started") {
         const thread = toThreadSummary(params.thread);
-        if (thread?.parentThreadId !== parentThreadId) return;
-        setSubagents((current) =>
-          dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_SUBAGENTS),
-        );
+        if (!thread) return;
+        if (thread.parentThreadId === selectedThreadId) {
+          setSubagents((current) =>
+            dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_SUBAGENTS),
+          );
+        }
+        if (thread.forkedFromId === selectedThreadId) {
+          setForks((current) =>
+            dedupeThreads([thread, ...current]).slice(0, MAX_RETAINED_FORKS),
+          );
+        }
         return;
       }
 
@@ -105,16 +125,20 @@ export function SubagentsDock() {
       if (typeof threadId !== "string") return;
 
       if (notification.method === "thread/status/changed") {
-        setSubagents((current) =>
+        const updateStatus = (current: ThreadSummary[]) =>
           current.map((thread) =>
             thread.id === threadId ? { ...thread, status: params.status } : thread,
-          ),
-        );
+          );
+        setSubagents(updateStatus);
+        setForks(updateStatus);
         return;
       }
 
       if (REMOVAL_METHODS.has(notification.method)) {
-        setSubagents((current) => current.filter((thread) => thread.id !== threadId));
+        const removeThread = (current: ThreadSummary[]) =>
+          current.filter((thread) => thread.id !== threadId);
+        setSubagents(removeThread);
+        setForks(removeThread);
       }
     });
   }, [open, workspace?.threadId]);
@@ -123,20 +147,25 @@ export function SubagentsDock() {
     () => [...subagents].sort((a, b) => b.updatedAt - a.updatedAt),
     [subagents],
   );
+  const sortedForks = useMemo(
+    () => [...forks].sort((a, b) => b.updatedAt - a.updatedAt),
+    [forks],
+  );
+  const hasRelationships = subagents.length > 0 || forks.length > 0;
 
   return (
-    <aside className="subagents-dock" aria-label="Subagents">
+    <aside className="subagents-dock" aria-label="Session graph">
       <button className="subagents-toggle" onClick={() => setOpen((value) => !value)} type="button">
         <span aria-hidden="true">⌁</span>
-        Subagents
-        {subagents.length > 0 && <span>{subagents.length}</span>}
+        Agents
+        {hasRelationships && <span>{subagents.length + forks.length}</span>}
       </button>
 
       {open && (
         <section className="subagents-panel">
           <header>
             <span>
-              <strong>Direct subagents</strong>
+              <strong>Runtime thread graph</strong>
               <small title={workspace?.cwd}>{workspace?.cwd || "Selected session"}</small>
             </span>
             <button disabled={loading} onClick={() => void load(false)} type="button">
@@ -145,43 +174,58 @@ export function SubagentsDock() {
           </header>
 
           <div className="subagents-summary">
-            <span>{subagents.length} direct child{subagents.length === 1 ? "" : "ren"}</span>
-            <span>{scannedThreads} runtime thread{scannedThreads === 1 ? "" : "s"} scanned</span>
+            <span>{subagents.length} direct subagent{subagents.length === 1 ? "" : "s"}</span>
+            <span>{forks.length} direct fork{forks.length === 1 ? "" : "s"}</span>
+            <span>{scannedThreads} thread{scannedThreads === 1 ? "" : "s"} scanned</span>
             <strong>live lifecycle</strong>
           </div>
 
           {error ? (
             <div className="subagents-state error">{error}</div>
-          ) : loading && subagents.length === 0 ? (
+          ) : loading && !hasRelationships ? (
             <div className="subagents-state">Reading runtime thread graph…</div>
           ) : !workspace?.threadId ? (
             <div className="subagents-state">Select a loaded session first.</div>
-          ) : subagents.length === 0 ? (
+          ) : !hasRelationships ? (
             <div className="subagents-state">
-              No direct subagents found in the retained thread page.
+              No direct subagents or forks found in the retained thread page.
               {cursor ? " Load more to continue the runtime scan." : ""}
             </div>
           ) : (
             <div className="subagents-list">
-              {sortedSubagents.map((thread) => (
-                <SubagentRow key={thread.id} thread={thread} />
-              ))}
+              {sortedSubagents.length > 0 && (
+                <section className="thread-graph-group" aria-label="Direct subagents">
+                  <h3>Subagents</h3>
+                  {sortedSubagents.map((thread) => (
+                    <ThreadGraphRow key={thread.id} kind="agent" thread={thread} />
+                  ))}
+                </section>
+              )}
+              {sortedForks.length > 0 && (
+                <section className="thread-graph-group" aria-label="Direct forks">
+                  <h3>Forks</h3>
+                  {sortedForks.map((thread) => (
+                    <ThreadGraphRow key={thread.id} kind="fork" thread={thread} />
+                  ))}
+                </section>
+              )}
             </div>
           )}
 
-          {cursor && subagents.length < MAX_RETAINED_SUBAGENTS && (
-            <button
-              className="subagents-more"
-              disabled={loading}
-              onClick={() => void load(true)}
-              type="button"
-            >
-              {loading ? "Loading…" : "Load more runtime threads"}
-            </button>
-          )}
+          {cursor &&
+            (subagents.length < MAX_RETAINED_SUBAGENTS || forks.length < MAX_RETAINED_FORKS) && (
+              <button
+                className="subagents-more"
+                disabled={loading}
+                onClick={() => void load(true)}
+                type="button"
+              >
+                {loading ? "Loading…" : "Load more runtime threads"}
+              </button>
+            )}
 
           <footer>
-            Runtime thread graph · streamed lifecycle · explicit historical pagination · no polling
+            Runtime relationships · streamed lifecycle · explicit historical pagination · no polling
           </footer>
         </section>
       )}
@@ -189,8 +233,14 @@ export function SubagentsDock() {
   );
 }
 
-function SubagentRow({ thread }: { thread: ThreadSummary }) {
-  const role = thread.agentRole?.trim() || "subagent";
+function ThreadGraphRow({
+  thread,
+  kind,
+}: {
+  thread: ThreadSummary;
+  kind: "agent" | "fork";
+}) {
+  const role = kind === "agent" ? thread.agentRole?.trim() || "subagent" : "fork";
   const nickname = thread.agentNickname?.trim();
   const title = nickname || thread.name || thread.preview || role;
   return (
@@ -203,6 +253,7 @@ function SubagentRow({ thread }: { thread: ThreadSummary }) {
         <code title={thread.id}>{shortId(thread.id)}</code>
         <span>{formatStatus(thread.status)}</span>
         <span>{formatRelativeTime(thread.updatedAt)}</span>
+        {thread.modelProvider && <span>{thread.modelProvider}</span>}
       </div>
       {thread.preview && thread.preview !== title && <p>{thread.preview}</p>}
     </article>
@@ -250,6 +301,7 @@ function toThreadSummary(value: unknown): ThreadSummary | null {
     !thread ||
     typeof thread.id !== "string" ||
     (thread.parentThreadId !== null && typeof thread.parentThreadId !== "string") ||
+    (thread.forkedFromId !== null && typeof thread.forkedFromId !== "string") ||
     typeof thread.updatedAt !== "number"
   ) {
     return null;
