@@ -7,6 +7,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ContextDock } from "./components/ContextDock";
 import { DiagnosticsDock } from "./components/DiagnosticsDock";
 import { GitDock } from "./components/GitDock";
+import { GoalDock } from "./components/GoalDock";
 import { HooksDock } from "./components/HooksDock";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
@@ -47,6 +48,7 @@ createRoot(document.getElementById("root")!).render(
     <SessionHistoryDock />
     <ContextDock />
     <PlanDock />
+    <GoalDock />
     <HooksDock />
     <SettingsDock />
     <DiagnosticsDock />
