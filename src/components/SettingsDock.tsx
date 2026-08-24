@@ -1,8 +1,8 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useCallback, useState } from "react";
+import { appServerClient } from "../runtime/appServerClient";
 import {
   nativeAppServerStatus,
-  stopNativeAppServer,
   type NativeAppServerStatus,
 } from "../runtime/native";
 import {
@@ -60,7 +60,10 @@ export function SettingsDock() {
     setRestarting(true);
     setError(null);
     try {
-      await stopNativeAppServer();
+      // Restart through the app-server client rather than stopping the native
+      // child directly. This rejects pending RPCs and clears the selected
+      // workspace projection before the new runtime process is started.
+      await appServerClient.disconnect();
       window.location.reload();
     } catch (cause) {
       setRestarting(false);
