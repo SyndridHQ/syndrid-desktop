@@ -4,7 +4,9 @@ import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./contextDock.css";
 
 const TOKEN_USAGE_UPDATED = "thread/tokenUsage/updated";
+const ITEM_COMPLETED = "item/completed";
 const MAX_THREAD_SNAPSHOTS = 32;
+const MAX_COMPACTION_THREADS = 32;
 
 type TokenUsageBreakdown = {
   totalTokens: number;
@@ -23,22 +25,38 @@ type ContextSnapshot = {
   receivedAt: number;
 };
 
+type CompactionSnapshot = {
+  threadId: string;
+  turnId: string;
+  count: number;
+  lastCompletedAtMs: number;
+};
+
 export function ContextDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<ContextSnapshot[]>([]);
+  const [compactions, setCompactions] = useState<CompactionSnapshot[]>([]);
 
   useEffect(() =>
     appServerClient.onNotification((notification) => {
-      if (notification.method !== TOKEN_USAGE_UPDATED) return;
-      const next = parseContextSnapshot(notification.params);
-      if (!next) return;
-      setSnapshots((current) => upsertSnapshot(current, next));
+      if (notification.method === TOKEN_USAGE_UPDATED) {
+        const next = parseContextSnapshot(notification.params);
+        if (next) setSnapshots((current) => upsertSnapshot(current, next));
+        return;
+      }
+      if (notification.method !== ITEM_COMPLETED) return;
+      const next = parseCompaction(notification.params);
+      if (next) setCompactions((current) => upsertCompaction(current, next));
     }), []);
 
   const snapshot = useMemo(
     () => workspace ? snapshots.find((item) => item.threadId === workspace.threadId) ?? null : null,
     [snapshots, workspace],
+  );
+  const compaction = useMemo(
+    () => workspace ? compactions.find((item) => item.threadId === workspace.threadId) ?? null : null,
+    [compactions, workspace],
   );
   const used = snapshot?.last.totalTokens ?? null;
   const windowSize = snapshot?.modelContextWindow ?? null;
@@ -91,6 +109,19 @@ export function ContextDock() {
             </>
           )}
 
+          {workspace && (
+            <div className="context-compaction">
+              <strong>Compaction</strong>
+              {compaction ? (
+                <span title={`Last compacted on turn ${compaction.turnId}`}>
+                  {compaction.count} observed · last {formatRelativeTime(compaction.lastCompletedAtMs)}
+                </span>
+              ) : (
+                <span>No compaction observed during this Desktop connection.</span>
+              )}
+            </div>
+          )}
+
           <footer>
             Runtime-reported · latest {MAX_THREAD_SNAPSHOTS} sessions · no local token estimator
           </footer>
@@ -128,6 +159,18 @@ function parseContextSnapshot(value: unknown): ContextSnapshot | null {
   };
 }
 
+function parseCompaction(value: unknown): Omit<CompactionSnapshot, "count"> | null {
+  if (!isRecord(value) || typeof value.threadId !== "string" || typeof value.turnId !== "string") return null;
+  if (!isRecord(value.item) || value.item.type !== "contextCompaction") return null;
+  const completedAtMs = finiteNumber(value.completedAtMs);
+  if (completedAtMs === null) return null;
+  return {
+    threadId: value.threadId,
+    turnId: value.turnId,
+    lastCompletedAtMs: completedAtMs,
+  };
+}
+
 function parseBreakdown(value: unknown): TokenUsageBreakdown | null {
   if (!isRecord(value)) return null;
   const totalTokens = finiteNumber(value.totalTokens);
@@ -147,6 +190,18 @@ function upsertSnapshot(current: ContextSnapshot[], next: ContextSnapshot): Cont
   return [...withoutThread, next].slice(-MAX_THREAD_SNAPSHOTS);
 }
 
+function upsertCompaction(
+  current: CompactionSnapshot[],
+  next: Omit<CompactionSnapshot, "count">,
+): CompactionSnapshot[] {
+  const previous = current.find((item) => item.threadId === next.threadId);
+  const withoutThread = current.filter((item) => item.threadId !== next.threadId);
+  return [
+    ...withoutThread,
+    { ...next, count: (previous?.count ?? 0) + 1 },
+  ].slice(-MAX_COMPACTION_THREADS);
+}
+
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
@@ -157,4 +212,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function formatTokens(value: number): string {
   return new Intl.NumberFormat(undefined, { notation: value >= 10_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatRelativeTime(timestampMs: number): string {
+  const ageMs = Math.max(0, Date.now() - timestampMs);
+  if (ageMs < 60_000) return "now";
+  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}m ago`;
+  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}h ago`;
+  return `${Math.floor(ageMs / 86_400_000)}d ago`;
 }
