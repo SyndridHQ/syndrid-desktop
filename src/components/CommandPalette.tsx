@@ -74,6 +74,13 @@ const commands: Command[] = [
     run: () => clickElement(".plan-toggle"),
   },
   {
+    id: "objective",
+    label: "Open session objective",
+    detail: "Inspect or edit the selected thread goal owned by Syndrid",
+    keywords: "objective goal status token budget runtime session thread",
+    run: () => clickElement(".goal-toggle"),
+  },
+  {
     id: "git",
     label: "Open source control",
     detail: "Inspect Git metadata reported by the selected Syndrid session",
