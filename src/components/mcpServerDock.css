@@ -79,12 +79,21 @@
 .mcp-server-state.error { color: #e6a6a6; }
 .mcp-server-card { display: grid; gap: 6px; border: 1px solid var(--border, #20262d); border-radius: 8px; padding: 8px 9px; background: var(--panel-2, #11151a); }
 .mcp-server-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.mcp-server-card-head > span { display: flex; align-items: center; gap: 5px; }
 .mcp-server-card > small,
 .mcp-server-summary small { color: var(--faint, #5d6670); font-size: 8px; }
 .mcp-server-summary button { padding: 3px 6px; color: #dfb36f; }
-.auth { border-radius: 999px; padding: 2px 6px; font-size: 8px; color: var(--muted, #87919c); background: rgba(135,145,156,.1); }
+.auth,
+.startup { border-radius: 999px; padding: 2px 6px; font-size: 8px; }
+.auth { color: var(--muted, #87919c); background: rgba(135,145,156,.1); }
 .auth-oAuth, .auth-bearerToken { color: var(--success, #65c995); background: rgba(101,201,149,.1); }
 .auth-notLoggedIn { color: #dfb36f; background: rgba(223,179,111,.1); }
+.startup { color: var(--muted, #87919c); background: rgba(135,145,156,.08); font-style: normal; }
+.startup-ready { color: var(--success, #65c995); background: rgba(101,201,149,.08); }
+.startup-starting { color: var(--accent, #7f95ff); background: rgba(127,149,255,.08); }
+.startup-failed { color: #e6a6a6; background: rgba(230,166,166,.08); }
+.startup-cancelled { color: var(--faint, #5d6670); }
+.mcp-startup-error { overflow: hidden; color: #e6a6a6 !important; text-overflow: ellipsis; white-space: nowrap; }
 .mcp-tool-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .mcp-tool-list code, .mcp-tool-list span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 5px; padding: 2px 5px; background: rgba(127,149,255,.08); color: var(--muted, #87919c); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; }
 .mcp-server-more { display: block; width: 100%; }
