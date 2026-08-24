@@ -6,6 +6,12 @@ import "./subagentsDock.css";
 
 const PAGE_SIZE = 80;
 const MAX_RETAINED_SUBAGENTS = 120;
+const CHILD_LIFECYCLE_METHODS = new Set([
+  "thread/status/changed",
+  "thread/archived",
+  "thread/deleted",
+  "thread/closed",
+]);
 
 export function SubagentsDock() {
   const workspace = useRuntimeWorkspace();
@@ -14,6 +20,7 @@ export function SubagentsDock() {
   const [subagents, setSubagents] = useState<ThreadSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [scannedThreads, setScannedThreads] = useState(0);
+  const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
 
@@ -29,6 +36,7 @@ export function SubagentsDock() {
         setSubagents([]);
         setCursor(null);
         setScannedThreads(0);
+        setStale(false);
         setError("Select a loaded Syndrid session first.");
         return;
       }
@@ -62,6 +70,7 @@ export function SubagentsDock() {
         );
         setScannedThreads((current) => (append ? current + result.data.length : result.data.length));
         setCursor(result.nextCursor);
+        setStale(false);
       } catch (cause) {
         if (requestGeneration !== generation.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -77,11 +86,37 @@ export function SubagentsDock() {
     setSubagents([]);
     setCursor(null);
     setScannedThreads(0);
+    setStale(false);
     setError(null);
     if (open) void load(false);
-    // The selected runtime thread is the only invalidation trigger. No polling.
+    // The selected runtime thread is the only selection invalidation trigger. No polling.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspace?.threadId]);
+
+  useEffect(() => {
+    const parentThreadId = workspace?.threadId;
+    if (!open || !parentThreadId) return;
+
+    return appServerClient.onNotification((notification) => {
+      const params = toRecord(notification.params);
+      if (!params) return;
+
+      if (notification.method === "thread/started") {
+        const thread = toRecord(params.thread);
+        if (thread?.parentThreadId === parentThreadId) setStale(true);
+        return;
+      }
+
+      if (!CHILD_LIFECYCLE_METHODS.has(notification.method)) return;
+      const threadId = params.threadId;
+      if (
+        typeof threadId === "string" &&
+        subagents.some((subagent) => subagent.id === threadId)
+      ) {
+        setStale(true);
+      }
+    });
+  }, [open, subagents, workspace?.threadId]);
 
   const sortedSubagents = useMemo(
     () => [...subagents].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -104,13 +139,14 @@ export function SubagentsDock() {
               <small title={workspace?.cwd}>{workspace?.cwd || "Selected session"}</small>
             </span>
             <button disabled={loading} onClick={() => void load(false)} type="button">
-              {loading ? "Loading…" : "Refresh"}
+              {loading ? "Loading…" : stale ? "Refresh · updated" : "Refresh"}
             </button>
           </header>
 
           <div className="subagents-summary">
             <span>{subagents.length} direct child{subagents.length === 1 ? "" : "ren"}</span>
             <span>{scannedThreads} runtime thread{scannedThreads === 1 ? "" : "s"} scanned</span>
+            {stale && <strong>runtime graph changed</strong>}
           </div>
 
           {error ? (
@@ -144,7 +180,7 @@ export function SubagentsDock() {
           )}
 
           <footer>
-            Runtime thread graph · direct children only · explicit pagination · no polling
+            Runtime thread graph · event-invalidated · explicit pagination/refresh · no polling
           </footer>
         </section>
       )}
@@ -199,4 +235,10 @@ function formatRelativeTime(timestampSeconds: number): string {
   if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m ago`;
   if (ageSeconds < 86400) return `${Math.floor(ageSeconds / 3600)}h ago`;
   return `${Math.floor(ageSeconds / 86400)}d ago`;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
 }
