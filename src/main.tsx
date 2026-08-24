@@ -20,6 +20,7 @@ import { SettingsDock } from "./components/SettingsDock";
 import { SkillsDock } from "./components/SkillsDock";
 import { SubagentsDock } from "./components/SubagentsDock";
 import { TerminalDock } from "./components/TerminalDock";
+import { WarningsDock } from "./components/WarningsDock";
 import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
 
@@ -47,6 +48,7 @@ createRoot(document.getElementById("root")!).render(
     <HooksDock />
     <SettingsDock />
     <DiagnosticsDock />
+    <WarningsDock />
     <RuntimeActivityDock />
   </StrictMode>,
 );
