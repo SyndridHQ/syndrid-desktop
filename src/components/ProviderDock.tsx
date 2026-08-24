@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type {
   AccountRateLimitsReadResponse,
@@ -29,6 +29,7 @@ export function ProviderDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rateLimitLoading, setRateLimitLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
   const [config, setConfig] = useState<ConfigReadResponse | null>(null);
@@ -40,6 +41,28 @@ export function ProviderDock() {
   const [reroutes, setReroutes] = useState<RuntimeReroute[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const providerGeneration = useRef(0);
+  const rateLimitGeneration = useRef(0);
+
+  const loadRateLimits = useCallback(async () => {
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setRateLimitError("Connect the Syndrid runtime before reading account limits.");
+      return;
+    }
+    const requestGeneration = ++rateLimitGeneration.current;
+    setRateLimitLoading(true);
+    setRateLimitError(null);
+    try {
+      const snapshot = await appServerClient.readAccountRateLimits();
+      if (requestGeneration !== rateLimitGeneration.current) return;
+      setRateLimits(snapshot);
+    } catch (cause) {
+      if (requestGeneration !== rateLimitGeneration.current) return;
+      setRateLimitError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (requestGeneration === rateLimitGeneration.current) setRateLimitLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     if (appServerClient.getSnapshot().phase !== "ready") {
@@ -47,65 +70,71 @@ export function ProviderDock() {
       return;
     }
 
+    const requestGeneration = ++providerGeneration.current;
+    const expectedThreadId = workspace?.threadId ?? null;
     setLoading(true);
     setError(null);
-    setRateLimitError(null);
     try {
       const configParams = workspace?.cwd
         ? { cwd: workspace.cwd, includeLayers: false }
         : { includeLayers: false };
-      const rateLimitRequest = appServerClient.readAccountRateLimits().then(
-        (value) => ({ value, error: null as string | null }),
-        (cause: unknown) => ({
-          value: null,
-          error: cause instanceof Error ? cause.message : String(cause),
-        }),
-      );
-      const [catalog, providerCapabilities, effectiveConfig, thread, limitResult] =
-        await Promise.all([
-          appServerClient.listModels({ limit: MAX_VISIBLE_MODELS, includeHidden: false }),
-          appServerClient.readModelProviderCapabilities(),
-          appServerClient.readConfig(configParams),
-          workspace?.threadId
-            ? appServerClient.readThread({
-                threadId: workspace.threadId,
-                includeTurns: false,
-              })
-            : Promise.resolve(null),
-          rateLimitRequest,
-        ]);
+      const [catalog, providerCapabilities, effectiveConfig, thread] = await Promise.all([
+        appServerClient.listModels({ limit: MAX_VISIBLE_MODELS, includeHidden: false }),
+        appServerClient.readModelProviderCapabilities(),
+        appServerClient.readConfig(configParams),
+        expectedThreadId
+          ? appServerClient.inspectThread({ threadId: expectedThreadId, includeTurns: false })
+          : Promise.resolve(null),
+      ]);
 
+      if (
+        requestGeneration !== providerGeneration.current ||
+        (appServerClient.getWorkspaceSnapshot()?.threadId ?? null) !== expectedThreadId
+      ) {
+        return;
+      }
       setModels(catalog.data);
       setCapabilities(providerCapabilities);
       setConfig(effectiveConfig);
       setProvider(thread?.thread.modelProvider?.trim() || null);
-      setRateLimits(limitResult.value);
-      setRateLimitError(limitResult.error);
       setLoaded(true);
     } catch (cause) {
+      if (requestGeneration !== providerGeneration.current) return;
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoading(false);
+      if (requestGeneration === providerGeneration.current) setLoading(false);
     }
   }, [workspace?.cwd, workspace?.threadId]);
 
   useEffect(() => {
-    if (!open) return;
+    providerGeneration.current += 1;
     setLoaded(false);
     setProvider(null);
     setConfig(null);
-    setRateLimits(null);
-    setRateLimitError(null);
     setReroutes([]);
     setError(null);
-    void load();
+    if (open) void load();
   }, [load, open]);
+
+  useEffect(() => {
+    rateLimitGeneration.current += 1;
+    setRateLimits(null);
+    setRateLimitError(null);
+    setRateLimitLoading(false);
+    if (open) void loadRateLimits();
+  }, [loadRateLimits, open]);
 
   useEffect(() => {
     const threadId = workspace?.threadId;
     if (!open) return;
 
     return appServerClient.onNotification((notification) => {
+      if (notification.method === "account/updated") {
+        rateLimitGeneration.current += 1;
+        setRateLimits(null);
+        void loadRateLimits();
+        return;
+      }
       if (notification.method === "account/rateLimits/updated") {
         const update = parseRateLimitUpdate(notification.params);
         if (update) {
@@ -128,7 +157,7 @@ export function ProviderDock() {
         ].slice(0, MAX_RETAINED_REROUTES),
       );
     });
-  }, [open, workspace?.threadId]);
+  }, [loadRateLimits, open, workspace?.threadId]);
 
   const visibleModels = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -154,6 +183,7 @@ export function ProviderDock() {
   const effectiveProvider = config?.config.model_provider?.trim() || null;
   const effectiveModel = config?.config.model?.trim() || null;
   const serviceTier = config?.config.service_tier?.trim() || null;
+  const refreshing = loading || rateLimitLoading;
 
   return (
     <aside className="provider-dock" aria-label="Provider manager">
@@ -178,8 +208,15 @@ export function ProviderDock() {
                   : workspace?.cwd ?? "Selected session runtime"}
               </small>
             </span>
-            <button disabled={loading} onClick={() => void load()} type="button">
-              {loading ? "Loading…" : "Refresh"}
+            <button
+              disabled={refreshing}
+              onClick={() => {
+                void load();
+                void loadRateLimits();
+              }}
+              type="button"
+            >
+              {refreshing ? "Loading…" : "Refresh"}
             </button>
           </header>
 
@@ -231,7 +268,7 @@ export function ProviderDock() {
               <div className="provider-limit-state">
                 Rate-limit telemetry unavailable for the current runtime account.
               </div>
-            ) : !rateLimits && loading ? (
+            ) : !rateLimits && rateLimitLoading ? (
               <div className="provider-limit-state">Reading account limits…</div>
             ) : visibleRateLimits.length === 0 ? (
               <div className="provider-limit-state">No account limits reported.</div>
