@@ -1,9 +1,9 @@
 .review-dock {
   position: fixed;
-  top: 58px;
-  left: 84px;
+  right: 220px;
+  bottom: 34px;
   z-index: 42;
-  width: min(390px, calc(100vw - 100px));
+  width: min(390px, calc(100vw - 24px));
   font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text, #e8edf2);
 }
@@ -11,6 +11,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
   min-height: 32px;
   border: 1px solid var(--border-strong, #2b333c);
   border-radius: 9px;
@@ -56,5 +57,5 @@
 .review-state.error { color: #e6a6a6; }
 .review-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
 @media (max-width: 720px) {
-  .review-dock { top: 100px; left: 8px; width: calc(100vw - 16px); }
+  .review-dock { right: 8px; bottom: 234px; width: calc(100vw - 16px); }
 }
