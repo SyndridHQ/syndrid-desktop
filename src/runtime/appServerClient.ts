@@ -69,6 +69,10 @@ import type {
   FsWatchParams,
   FsWatchResponse,
 } from "./fsWatchProtocol";
+import type {
+  PermissionProfileListParams,
+  PermissionProfileListResponse,
+} from "./permissionProfileProtocol";
 import type { ReviewStartParams, ReviewStartResponse } from "./reviewProtocol";
 import type { ThreadForkParams, ThreadForkResponse } from "./threadForkProtocol";
 import type {
@@ -306,6 +310,12 @@ export class SyndridAppServerClient {
 
   async readConfig(params: ConfigReadParams = {}): Promise<ConfigReadResponse> {
     return this.request<ConfigReadResponse>(methods.configRead, params);
+  }
+
+  async listPermissionProfiles(
+    params: PermissionProfileListParams = {},
+  ): Promise<PermissionProfileListResponse> {
+    return this.request<PermissionProfileListResponse>("permissionProfile/list", params);
   }
 
   async readEnvironmentInfo(params: EnvironmentInfoParams): Promise<EnvironmentInfoResponse> {
