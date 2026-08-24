@@ -36,7 +36,7 @@ export function PermissionsDock() {
       );
       if (
         requestGeneration !== generation.current ||
-        appServerClient.getWorkspaceSnapshot()?.cwd !== cwd
+        (appServerClient.getWorkspaceSnapshot()?.cwd ?? null) !== cwd
       ) {
         return;
       }
@@ -77,6 +77,7 @@ export function PermissionsDock() {
   const liveSandbox = sessionSettings?.sandboxPolicy;
   const liveProfile = sessionSettings?.activePermissionProfile;
 
+  const writableRootCount = extractWritableRoots(liveSandbox).length;
   const writableRoots = useMemo(
     () => extractWritableRoots(liveSandbox).slice(0, 8),
     [liveSandbox],
@@ -148,7 +149,7 @@ export function PermissionsDock() {
                         {writableRoots.map((root) => (
                           <code key={root} title={root}>{root}</code>
                         ))}
-                        {extractWritableRoots(liveSandbox).length > writableRoots.length && (
+                        {writableRootCount > writableRoots.length && (
                           <small>Additional roots omitted from this bounded view.</small>
                         )}
                       </div>
