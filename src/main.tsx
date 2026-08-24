@@ -9,6 +9,7 @@ import { DiagnosticsDock } from "./components/DiagnosticsDock";
 import { GitDock } from "./components/GitDock";
 import { GoalDock } from "./components/GoalDock";
 import { HooksDock } from "./components/HooksDock";
+import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
 import { ModelCatalogDock } from "./components/ModelCatalogDock";
@@ -35,6 +36,7 @@ createRoot(document.getElementById("root")!).render(
     <App bootStartedAt={bootStartedAt} />
     <PrimaryNavigationBridge />
     <CommandPalette />
+    <KeyboardShortcuts />
     <ApprovalDock />
     <RuntimeInputDock />
     <McpElicitationDock />
