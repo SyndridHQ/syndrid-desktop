@@ -8,6 +8,12 @@ interface PendingOauth {
   authorizationUrl: string;
 }
 
+type McpStartupState = "starting" | "ready" | "failed" | "cancelled";
+interface RuntimeStartupState {
+  state: McpStartupState;
+  error: string | null;
+}
+
 const PAGE_SIZE = 50;
 const MAX_RETAINED_SERVERS = 200;
 
@@ -18,6 +24,7 @@ export function McpServerDock() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [stale, setStale] = useState(false);
+  const [startupStates, setStartupStates] = useState<Record<string, RuntimeStartupState>>({});
   const [error, setError] = useState<string | null>(null);
   const [oauthStarting, setOauthStarting] = useState<string | null>(null);
   const [pendingOauth, setPendingOauth] = useState<PendingOauth | null>(null);
@@ -93,6 +100,7 @@ export function McpServerDock() {
     setCursor(null);
     setLoaded(false);
     setStale(false);
+    setStartupStates({});
     setLoading(false);
     setError(null);
     setPendingOauth(null);
@@ -107,6 +115,12 @@ export function McpServerDock() {
 
     return appServerClient.onNotification((notification) => {
       if (notification.method === "mcpServer/startupStatus/updated") {
+        const startup = parseStartupState(notification.params);
+        if (!startup) return;
+        setStartupStates((current) => ({
+          ...current,
+          [startup.name]: { state: startup.state, error: startup.error },
+        }));
         setStale(true);
         return;
       }
@@ -169,7 +183,7 @@ export function McpServerDock() {
           )}
           {stale && loaded && (
             <div className="mcp-server-updated">
-              Runtime MCP state changed. The retained inventory remains visible until Refresh.
+              Runtime MCP state changed. Live startup state is shown below; inventory/auth metadata remains retained until Refresh.
             </div>
           )}
           {error ? (
@@ -183,12 +197,23 @@ export function McpServerDock() {
               {servers.map((server) => {
                 const tools = Object.keys(server.tools ?? {});
                 const canOauth = server.authStatus === "notLoggedIn";
+                const startup = startupStates[server.name];
                 return (
                   <article className="mcp-server-card" key={server.name}>
                     <div className="mcp-server-card-head">
                       <strong>{server.name}</strong>
-                      <span className={`auth auth-${server.authStatus}`}>
-                        {authLabel(server.authStatus)}
+                      <span>
+                        {startup && (
+                          <em
+                            className={`startup startup-${startup.state}`}
+                            title={startup.error ?? undefined}
+                          >
+                            {startup.state}
+                          </em>
+                        )}
+                        <span className={`auth auth-${server.authStatus}`}>
+                          {authLabel(server.authStatus)}
+                        </span>
                       </span>
                     </div>
                     <div className="mcp-server-summary">
@@ -203,6 +228,7 @@ export function McpServerDock() {
                         </button>
                       )}
                     </div>
+                    {startup?.error && <small className="mcp-startup-error">{startup.error}</small>}
                     {tools.length > 0 && (
                       <div className="mcp-tool-list">
                         {tools.slice(0, 8).map((tool) => <code key={tool}>{tool}</code>)}
@@ -237,6 +263,23 @@ function dedupeServers(servers: McpServerStatus[]): McpServerStatus[] {
   const byName = new Map<string, McpServerStatus>();
   for (const server of servers) byName.set(server.name, server);
   return [...byName.values()];
+}
+
+function parseStartupState(
+  value: unknown,
+): { name: string; state: McpStartupState; error: string | null } | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.name !== "string" || !isStartupState(record.status)) return null;
+  return {
+    name: record.name,
+    state: record.status,
+    error: typeof record.error === "string" ? record.error : null,
+  };
+}
+
+function isStartupState(value: unknown): value is McpStartupState {
+  return value === "starting" || value === "ready" || value === "failed" || value === "cancelled";
 }
 
 function parseOauthCompletion(value: unknown): { name: string; success: boolean; error: string | null } | null {
