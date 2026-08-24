@@ -81,6 +81,13 @@ const commands: Command[] = [
     run: () => clickElement(".goal-toggle"),
   },
   {
+    id: "context",
+    label: "Open context usage",
+    detail: "Inspect runtime token usage, context window, and compaction activity",
+    keywords: "context tokens usage window compaction compact memory",
+    run: () => clickElement(".context-toggle"),
+  },
+  {
     id: "git",
     label: "Open source control",
     detail: "Inspect Git metadata reported by the selected Syndrid session",
