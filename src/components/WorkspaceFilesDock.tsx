@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
+import type { FsChangedNotification } from "../runtime/fsWatchProtocol";
 import type {
   FsReadDirectoryEntry,
   FuzzyFileSearchResult,
@@ -26,6 +27,8 @@ interface FilePreview {
 export function WorkspaceFilesDock() {
   const workspace = useRuntimeWorkspace();
   const previewRequestRef = useRef(0);
+  const watchSequenceRef = useRef(0);
+  const activeWatchRef = useRef<{ watchId: string; path: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -37,6 +40,9 @@ export function WorkspaceFilesDock() {
   const [searchResults, setSearchResults] = useState<FuzzyFileSearchResult[]>([]);
   const [searchAttempted, setSearchAttempted] = useState(false);
   const [preview, setPreview] = useState<FilePreview | null>(null);
+  const [directoryStale, setDirectoryStale] = useState(false);
+  const [previewStale, setPreviewStale] = useState(false);
+  const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const currentPath = pathStack.at(-1) ?? rootPath;
@@ -45,6 +51,7 @@ export function WorkspaceFilesDock() {
   const clearPreview = useCallback(() => {
     previewRequestRef.current += 1;
     setPreview(null);
+    setPreviewStale(false);
   }, []);
 
   const loadRoot = useCallback(async () => {
@@ -60,6 +67,7 @@ export function WorkspaceFilesDock() {
       setEntries([]);
       setSearchResults([]);
       setSearchAttempted(false);
+      setDirectoryStale(false);
       clearPreview();
       setLoaded(true);
       setLoading(false);
@@ -77,6 +85,7 @@ export function WorkspaceFilesDock() {
       setQuery("");
       setSearchResults([]);
       setSearchAttempted(false);
+      setDirectoryStale(false);
       setLoaded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -93,6 +102,8 @@ export function WorkspaceFilesDock() {
     setQuery("");
     setSearchResults([]);
     setSearchAttempted(false);
+    setDirectoryStale(false);
+    setWatching(false);
     clearPreview();
     setError(null);
     if (open) void loadRoot();
@@ -111,6 +122,7 @@ export function WorkspaceFilesDock() {
         setSearchResults([]);
         setSearchAttempted(false);
         setQuery("");
+        setDirectoryStale(false);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
@@ -119,6 +131,59 @@ export function WorkspaceFilesDock() {
     },
     [clearPreview, loading],
   );
+
+  useEffect(() => {
+    if (!open || !currentPath || appServerClient.getSnapshot().phase !== "ready") {
+      activeWatchRef.current = null;
+      setWatching(false);
+      return;
+    }
+
+    let disposed = false;
+    const watchId = `desktop-files-${++watchSequenceRef.current}`;
+    setWatching(false);
+
+    void appServerClient
+      .watchPath({ watchId, path: currentPath })
+      .then((result) => {
+        if (disposed) {
+          void appServerClient.unwatchPath({ watchId }).catch(() => undefined);
+          return;
+        }
+        activeWatchRef.current = { watchId, path: result.path };
+        setWatching(true);
+      })
+      .catch(() => {
+        if (!disposed) {
+          activeWatchRef.current = null;
+          setWatching(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+      if (activeWatchRef.current?.watchId === watchId) {
+        activeWatchRef.current = null;
+      }
+      setWatching(false);
+      void appServerClient.unwatchPath({ watchId }).catch(() => undefined);
+    };
+  }, [currentPath, open, workspace?.threadId]);
+
+  useEffect(() => {
+    if (!open) return;
+    return appServerClient.onNotification((notification) => {
+      if (notification.method !== "fs/changed") return;
+      const params = notification.params as FsChangedNotification | undefined;
+      const activeWatch = activeWatchRef.current;
+      if (!params || !activeWatch || params.watchId !== activeWatch.watchId) return;
+
+      setDirectoryStale(true);
+      if (preview?.path && params.changedPaths.includes(preview.path)) {
+        setPreviewStale(true);
+      }
+    });
+  }, [open, preview?.path]);
 
   const openDirectory = useCallback(
     (entry: FsReadDirectoryEntry) => {
@@ -133,6 +198,7 @@ export function WorkspaceFilesDock() {
     const requestedThreadId = workspace?.threadId;
     if (!requestedThreadId) return;
 
+    setPreviewStale(false);
     setPreview({ path, name, status: "loading", workspaceThreadId: requestedThreadId });
     const isCurrentRequest = () =>
       previewRequestRef.current === requestGeneration &&
@@ -321,10 +387,16 @@ export function WorkspaceFilesDock() {
                 </button>
               )}
               <button disabled={loading} onClick={refreshCurrent} type="button">
-                {loading ? "Loading…" : "Refresh"}
+                {loading ? "Loading…" : directoryStale ? "Refresh · updated" : "Refresh"}
               </button>
             </div>
           </header>
+
+          {directoryStale && (
+            <div className="workspace-files-state compact">
+              Files changed on disk. The current snapshot is preserved until you refresh.
+            </div>
+          )}
 
           {rootPath && (
             <form
@@ -401,7 +473,9 @@ export function WorkspaceFilesDock() {
           {preview && (
             <FilePreviewPanel
               onClose={clearPreview}
+              onReload={() => void previewPath(preview.path, preview.name)}
               onSaved={(text, sizeBytes, modifiedAtMs) => {
+                setPreviewStale(false);
                 setPreview((current) =>
                   current && current.path === preview.path
                     ? { ...current, text, sizeBytes, modifiedAtMs }
@@ -409,11 +483,12 @@ export function WorkspaceFilesDock() {
                 );
               }}
               preview={preview}
+              stale={previewStale}
             />
           )}
 
           <footer>
-            Runtime-backed · selected session · explicit reads/writes only · {supportsResolvedPaths ? "lazy navigation + bounded editor" : "root-only on this runtime"} · no polling
+            Runtime-backed · selected session · explicit reads/writes only · {supportsResolvedPaths ? "lazy navigation + bounded editor" : "root-only on this runtime"} · {watching ? "event-invalidated" : "watch unavailable"} · no polling
           </footer>
         </section>
       )}
@@ -423,11 +498,15 @@ export function WorkspaceFilesDock() {
 
 function FilePreviewPanel({
   preview,
+  stale,
   onClose,
+  onReload,
   onSaved,
 }: {
   preview: FilePreview;
+  stale: boolean;
   onClose: () => void;
+  onReload: () => void;
   onSaved: (text: string, sizeBytes: number, modifiedAtMs: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -446,6 +525,7 @@ function FilePreviewPanel({
 
   const editable =
     preview.status === "ready" &&
+    !stale &&
     preview.isSymlink === false &&
     typeof preview.modifiedAtMs === "number" &&
     preview.modifiedAtMs > 0 &&
@@ -525,10 +605,15 @@ function FilePreviewPanel({
     <section className="workspace-file-preview" aria-live="polite">
       <header>
         <span>
-          <strong>{preview.name}{dirty ? " · unsaved" : ""}</strong>
+          <strong>{preview.name}{dirty ? " · unsaved" : stale ? " · changed" : ""}</strong>
           <small title={preview.path}>{preview.path}</small>
         </span>
         <div className="workspace-file-preview-actions">
+          {stale && !editing && (
+            <button disabled={saving} onClick={onReload} type="button">
+              Reload
+            </button>
+          )}
           {preview.status === "ready" && !editing && (
             <button disabled={!editable} onClick={() => setEditing(true)} type="button">
               Edit
@@ -548,7 +633,7 @@ function FilePreviewPanel({
               >
                 Cancel
               </button>
-              <button disabled={!dirty || saving} onClick={() => void save()} type="button">
+              <button disabled={!dirty || saving || stale} onClick={() => void save()} type="button">
                 {saving ? "Saving…" : "Save"}
               </button>
             </>
@@ -556,6 +641,11 @@ function FilePreviewPanel({
           <button disabled={saving} onClick={onClose} type="button">Close</button>
         </div>
       </header>
+      {stale && (
+        <div className="workspace-file-save-message error">
+          Syndrid reported this file changed on disk. Reload before editing or saving.
+        </div>
+      )}
       {preview.status === "loading" ? (
         <div className="workspace-files-state compact">Checking metadata…</div>
       ) : preview.status === "ready" ? (
