@@ -84,6 +84,52 @@
   font-size: 8px;
 }
 
+.thread-inspector {
+  border-bottom: 1px solid var(--border, #20262d);
+  background: rgba(127, 149, 255, .035);
+}
+.thread-inspector > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px 5px;
+}
+.thread-inspector > header strong { font-size: 8px; }
+.thread-inspector dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--border, #20262d);
+}
+.thread-inspector dl > div {
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--panel-2, #11151a);
+}
+.thread-inspector dt {
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.thread-inspector dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--muted, #87919c);
+  font: 8px/1.35 "SFMono-Regular", Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thread-inspector-state { padding: 13px 9px; color: var(--faint, #5d6670); text-align: center; }
+.thread-inspector-state.error { color: #e6a6a6; }
+.thread-inspector > footer {
+  padding: 6px 9px;
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+}
+
 .thread-graph-filter {
   display: flex;
   align-items: center;
@@ -135,8 +181,10 @@
   border-radius: 7px;
   padding: 8px;
 }
-.subagent-row:hover { background: rgba(127, 149, 255, .06); }
+.subagent-row:hover,
+.subagent-row.selected { background: rgba(127, 149, 255, .06); }
 .subagent-row > div:first-child { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
+.subagent-row > div:first-child > button { margin-left: auto; flex: 0 0 auto; padding: 2px 5px; font-size: 7px; }
 .subagent-row strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .subagent-row small { flex: 0 0 auto; color: var(--faint, #5d6670); font-size: 8px; }
 .subagent-row p {
@@ -168,4 +216,5 @@
   .thread-graph-filter { flex-wrap: wrap; }
   .thread-graph-filter input { flex-basis: 100%; }
   .thread-graph-filter select { max-width: none; flex: 1; }
+  .thread-inspector dl { grid-template-columns: 1fr; }
 }
