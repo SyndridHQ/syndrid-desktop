@@ -42,13 +42,16 @@ export function HooksDock() {
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
 
-  useEffect(() =>
-    appServerClient.onNotification((notification) => {
+  useEffect(() => {
+    if (!open || view !== "activity") return;
+
+    return appServerClient.onNotification((notification) => {
       if (notification.method !== HOOK_STARTED && notification.method !== HOOK_COMPLETED) return;
       const run = parseHookNotification(notification.params);
       if (!run) return;
       setRuns((current) => upsertHookRun(current, run));
-    }), []);
+    });
+  }, [open, view]);
 
   const loadInventory = useCallback(async () => {
     const requestGeneration = ++inventoryRequestRef.current;
@@ -98,6 +101,10 @@ export function HooksDock() {
       setInventoryLoading(false);
     }
   }, [loadInventory, open, view, workspace?.cwd, workspace?.threadId]);
+
+  useEffect(() => {
+    if (!open || view !== "activity") setRuns([]);
+  }, [open, view]);
 
   const runningCount = useMemo(
     () => runs.filter((run) => run.status === "running").length,
@@ -190,7 +197,7 @@ export function HooksDock() {
                 )}
               </>
             ) : (
-              <span>Event-driven · retains {MAX_RETAINED_RUNS} runs · no polling</span>
+              <span>Visible-only event stream · retains {MAX_RETAINED_RUNS} runs · no polling</span>
             )}
           </footer>
         </section>
@@ -259,7 +266,7 @@ function HookActivity({ recent }: { recent: HookRun[] }) {
   return (
     <div className="hooks-list">
       {recent.length === 0 ? (
-        <div className="hooks-empty">Hook runs appear here when the runtime emits them.</div>
+        <div className="hooks-empty">Hook runs appear here while this activity view is open.</div>
       ) : recent.map((run) => (
         <article className={`hook-card hook-${run.status}`} key={run.id}>
           <div className="hook-card-head">
