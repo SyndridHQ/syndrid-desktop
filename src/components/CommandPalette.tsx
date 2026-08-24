@@ -102,6 +102,13 @@ const commands: Command[] = [
     run: () => clickElement(".provider-toggle"),
   },
   {
+    id: "permissions",
+    label: "Open permissions",
+    detail: "Inspect runtime approval and sandbox policy without changing execution semantics",
+    keywords: "permissions approval policy sandbox security network writable roots profile",
+    run: () => clickElement(".permissions-toggle"),
+  },
+  {
     id: "skills",
     label: "Open skills",
     detail: "Open the selected-workspace skills inventory",
