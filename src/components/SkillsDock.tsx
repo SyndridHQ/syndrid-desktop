@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type { SkillMetadata, SkillsListEntry } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
@@ -11,11 +11,14 @@ export function SkillsDock() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [stale, setStale] = useState(false);
   const [entries, setEntries] = useState<SkillsListEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
 
   const load = useCallback(
     async (forceReload = false) => {
+      if (loading) return;
       if (appServerClient.getSnapshot().phase !== "ready") {
         setError("Connect the Syndrid runtime before loading skills.");
         return;
@@ -23,12 +26,15 @@ export function SkillsDock() {
 
       const root = workspace?.cwd.trim();
       if (!root) {
+        generation.current += 1;
         setEntries([]);
         setLoaded(true);
+        setStale(false);
         setLoading(false);
         return;
       }
 
+      const requestGeneration = ++generation.current;
       setLoading(true);
       setError(null);
       try {
@@ -36,23 +42,43 @@ export function SkillsDock() {
           cwds: [root],
           forceReload,
         });
+        if (
+          requestGeneration !== generation.current ||
+          appServerClient.getWorkspaceSnapshot()?.cwd !== root
+        ) {
+          return;
+        }
         setEntries(result.data);
         setLoaded(true);
+        setStale(false);
       } catch (cause) {
+        if (requestGeneration !== generation.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
-        setLoading(false);
+        if (requestGeneration === generation.current) setLoading(false);
       }
     },
-    [workspace?.cwd],
+    [loading, workspace?.cwd],
   );
 
   useEffect(() => {
+    generation.current += 1;
+    setLoading(false);
     setLoaded(false);
+    setStale(false);
     setEntries([]);
     setError(null);
     if (open) void load(false);
-  }, [load, open, workspace?.threadId]);
+    // The selected runtime workspace is the ownership boundary. No polling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspace?.threadId, workspace?.cwd]);
+
+  useEffect(() => {
+    if (!open) return;
+    return appServerClient.onNotification((notification) => {
+      if (notification.method === "skills/changed") setStale(true);
+    });
+  }, [open]);
 
   const skills = useMemo(
     () =>
@@ -85,13 +111,19 @@ export function SkillsDock() {
             </span>
             <div>
               <button disabled={loading} onClick={() => void load(false)} type="button">
-                Refresh
+                {loading ? "Loading…" : stale ? "Refresh · updated" : "Refresh"}
               </button>
               <button disabled={loading} onClick={() => void load(true)} type="button">
-                {loading ? "Loading…" : "Rescan"}
+                Rescan
               </button>
             </div>
           </header>
+
+          {stale && loaded && (
+            <div className="skills-state compact">
+              Skill files changed. Retained metadata stays visible until you refresh or explicitly rescan.
+            </div>
+          )}
 
           {error ? (
             <div className="skills-state error">{error}</div>
@@ -115,7 +147,7 @@ export function SkillsDock() {
           )}
 
           <footer>
-            <span>Selected session · cached by default · rescan is explicit</span>
+            <span>Selected session · runtime-invalidated · cached by default · refresh/rescan explicit</span>
             {errorCount > 0 && <em>{errorCount} discovery error{errorCount === 1 ? "" : "s"}</em>}
           </footer>
         </section>
