@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
-import type { ThreadSummary } from "../runtime/protocol";
+import type { ThreadReadResponse, ThreadSummary } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./subagentsDock.css";
 
@@ -9,6 +9,14 @@ const MAX_RETAINED_SUBAGENTS = 120;
 const MAX_RETAINED_FORKS = 60;
 const REMOVAL_METHODS = new Set(["thread/archived", "thread/deleted", "thread/closed"]);
 type RelationshipView = "all" | "agents" | "forks";
+type ThreadDetail = ThreadReadResponse["thread"];
+
+type InspectionState = {
+  threadId: string;
+  loading: boolean;
+  thread: ThreadDetail | null;
+  error: string | null;
+};
 
 export function SubagentsDock() {
   const workspace = useRuntimeWorkspace();
@@ -21,9 +29,11 @@ export function SubagentsDock() {
   const [scannedThreads, setScannedThreads] = useState(0);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<RelationshipView>("all");
+  const [inspection, setInspection] = useState<InspectionState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
+  const inspectionGeneration = useRef(0);
 
   const load = useCallback(
     async (append = false) => {
@@ -90,6 +100,46 @@ export function SubagentsDock() {
     [cursor, loading, workspace?.threadId],
   );
 
+  const inspectThread = useCallback(
+    async (thread: ThreadSummary) => {
+      if (appServerClient.getSnapshot().phase !== "ready") {
+        setInspection({
+          threadId: thread.id,
+          loading: false,
+          thread: null,
+          error: "Connect the Syndrid runtime before inspecting this thread.",
+        });
+        return;
+      }
+      const selectedThreadId = workspace?.threadId;
+      if (!selectedThreadId) return;
+
+      const requestGeneration = ++inspectionGeneration.current;
+      setInspection({ threadId: thread.id, loading: true, thread: null, error: null });
+      try {
+        // Metadata-only reads deliberately omit rollout turns/items. The thread graph
+        // is an inspector, not a second conversation store.
+        const result = await appServerClient.inspectThread({ threadId: thread.id });
+        if (
+          requestGeneration !== inspectionGeneration.current ||
+          appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
+        ) {
+          return;
+        }
+        setInspection({ threadId: thread.id, loading: false, thread: result.thread, error: null });
+      } catch (cause) {
+        if (requestGeneration !== inspectionGeneration.current) return;
+        setInspection({
+          threadId: thread.id,
+          loading: false,
+          thread: null,
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
+      }
+    },
+    [workspace?.threadId],
+  );
+
   const forkSelected = useCallback(async () => {
     if (forking || appServerClient.getSnapshot().phase !== "ready") return;
     const selectedThreadId = workspace?.threadId;
@@ -118,12 +168,14 @@ export function SubagentsDock() {
 
   useEffect(() => {
     generation.current += 1;
+    inspectionGeneration.current += 1;
     setSubagents([]);
     setForks([]);
     setCursor(null);
     setScannedThreads(0);
     setQuery("");
     setView("all");
+    setInspection(null);
     setNotice(null);
     setError(null);
     if (open) void load(false);
@@ -165,6 +217,11 @@ export function SubagentsDock() {
           );
         setSubagents(updateStatus);
         setForks(updateStatus);
+        setInspection((current) =>
+          current?.thread?.id === threadId
+            ? { ...current, thread: { ...current.thread, status: params.status as ThreadDetail["status"] } }
+            : current,
+        );
         return;
       }
 
@@ -173,6 +230,7 @@ export function SubagentsDock() {
           current.filter((thread) => thread.id !== threadId);
         setSubagents(removeThread);
         setForks(removeThread);
+        setInspection((current) => (current?.threadId === threadId ? null : current));
       }
     });
   }, [open, workspace?.threadId]);
@@ -231,6 +289,16 @@ export function SubagentsDock() {
 
           {notice && <div className="subagents-notice">{notice}</div>}
 
+          {inspection && (
+            <ThreadInspector
+              inspection={inspection}
+              close={() => {
+                inspectionGeneration.current += 1;
+                setInspection(null);
+              }}
+            />
+          )}
+
           {hasRelationships && (
             <div className="thread-graph-filter">
               <input
@@ -278,7 +346,14 @@ export function SubagentsDock() {
                 <section className="thread-graph-group" aria-label="Direct subagents">
                   <h3>Subagents</h3>
                   {filteredSubagents.map((thread) => (
-                    <ThreadGraphRow key={thread.id} kind="agent" thread={thread} />
+                    <ThreadGraphRow
+                      inspecting={inspection?.loading === true && inspection.threadId === thread.id}
+                      key={thread.id}
+                      kind="agent"
+                      onInspect={inspectThread}
+                      selected={inspection?.threadId === thread.id}
+                      thread={thread}
+                    />
                   ))}
                 </section>
               )}
@@ -286,7 +361,14 @@ export function SubagentsDock() {
                 <section className="thread-graph-group" aria-label="Direct forks">
                   <h3>Forks</h3>
                   {filteredForks.map((thread) => (
-                    <ThreadGraphRow key={thread.id} kind="fork" thread={thread} />
+                    <ThreadGraphRow
+                      inspecting={inspection?.loading === true && inspection.threadId === thread.id}
+                      key={thread.id}
+                      kind="fork"
+                      onInspect={inspectThread}
+                      selected={inspection?.threadId === thread.id}
+                      thread={thread}
+                    />
                   ))}
                 </section>
               )}
@@ -306,7 +388,7 @@ export function SubagentsDock() {
             )}
 
           <footer>
-            Runtime relationships · explicit fork · streamed lifecycle · in-memory filtering · no polling
+            Runtime relationships · metadata-only inspection · streamed lifecycle · no polling
           </footer>
         </section>
       )}
@@ -317,18 +399,27 @@ export function SubagentsDock() {
 function ThreadGraphRow({
   thread,
   kind,
+  selected,
+  inspecting,
+  onInspect,
 }: {
   thread: ThreadSummary;
   kind: "agent" | "fork";
+  selected: boolean;
+  inspecting: boolean;
+  onInspect: (thread: ThreadSummary) => Promise<void>;
 }) {
   const role = kind === "agent" ? thread.agentRole?.trim() || "subagent" : "fork";
   const nickname = thread.agentNickname?.trim();
   const title = nickname || thread.name || thread.preview || role;
   return (
-    <article className="subagent-row">
+    <article className={`subagent-row${selected ? " selected" : ""}`}>
       <div>
         <strong>{title}</strong>
         <small>{role}</small>
+        <button disabled={inspecting} onClick={() => void onInspect(thread)} type="button">
+          {inspecting ? "Reading…" : selected ? "Refresh details" : "Inspect"}
+        </button>
       </div>
       <div className="subagent-meta">
         <code title={thread.id}>{shortId(thread.id)}</code>
@@ -338,6 +429,60 @@ function ThreadGraphRow({
       </div>
       {thread.preview && thread.preview !== title && <p>{thread.preview}</p>}
     </article>
+  );
+}
+
+function ThreadInspector({
+  inspection,
+  close,
+}: {
+  inspection: InspectionState;
+  close: () => void;
+}) {
+  const thread = inspection.thread;
+  return (
+    <section className="thread-inspector" aria-label="Thread details">
+      <header>
+        <strong>Thread details</strong>
+        <button onClick={close} type="button">Close</button>
+      </header>
+      {inspection.loading ? (
+        <div className="thread-inspector-state">Reading runtime metadata…</div>
+      ) : inspection.error ? (
+        <div className="thread-inspector-state error">{inspection.error}</div>
+      ) : thread ? (
+        <dl>
+          <ThreadDetailRow label="Thread" title={thread.id} value={shortId(thread.id)} />
+          <ThreadDetailRow label="Session" title={thread.sessionId} value={shortId(thread.sessionId)} />
+          <ThreadDetailRow label="Status" value={formatStatus(thread.status)} />
+          <ThreadDetailRow label="Provider" value={thread.modelProvider || "—"} />
+          <ThreadDetailRow label="CLI" value={thread.cliVersion || "—"} />
+          <ThreadDetailRow label="Workspace" title={thread.cwd} value={thread.cwd || "—"} />
+          <ThreadDetailRow label="Source" value={formatStructuredValue(thread.source)} />
+          <ThreadDetailRow label="Thread source" value={formatStructuredValue(thread.threadSource)} />
+          {thread.parentThreadId && (
+            <ThreadDetailRow label="Parent" title={thread.parentThreadId} value={shortId(thread.parentThreadId)} />
+          )}
+          {thread.forkedFromId && (
+            <ThreadDetailRow label="Forked from" title={thread.forkedFromId} value={shortId(thread.forkedFromId)} />
+          )}
+          {thread.gitInfo?.branch && <ThreadDetailRow label="Branch" value={thread.gitInfo.branch} />}
+          {thread.gitInfo?.sha && (
+            <ThreadDetailRow label="Commit" title={thread.gitInfo.sha} value={shortId(thread.gitInfo.sha)} />
+          )}
+        </dl>
+      ) : null}
+      <footer>Metadata-only `thread/read` · foreground selection unchanged</footer>
+    </section>
+  );
+}
+
+function ThreadDetailRow({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd title={title}>{value}</dd>
+    </div>
   );
 }
 
@@ -377,6 +522,18 @@ function formatStatus(status: unknown): string {
     }
   }
   return "runtime state";
+}
+
+function formatStructuredValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const key = Object.keys(record)[0];
+    return key ?? "runtime value";
+  }
+  return "runtime value";
 }
 
 function formatRelativeTime(timestampSeconds: number): string {
