@@ -67,6 +67,13 @@ const commands: Command[] = [
     run: () => clickElement(".subagents-toggle"),
   },
   {
+    id: "plan",
+    label: "Open agent plan",
+    detail: "Inspect the latest plan published by the selected Syndrid turn",
+    keywords: "plan steps progress pending completed agent execution",
+    run: () => clickElement(".plan-toggle"),
+  },
+  {
     id: "git",
     label: "Open source control",
     detail: "Inspect Git metadata reported by the selected Syndrid session",
