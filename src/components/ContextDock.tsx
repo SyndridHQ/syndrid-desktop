@@ -42,9 +42,12 @@ export function ContextDock() {
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactRequestedThreadId, setCompactRequestedThreadId] = useState<string | null>(null);
 
-  useEffect(() =>
-    appServerClient.onNotification((notification) => {
+  useEffect(() => {
+    if (!open && compactRequestedThreadId === null) return;
+
+    return appServerClient.onNotification((notification) => {
       if (notification.method === TOKEN_USAGE_UPDATED) {
+        if (!open) return;
         const next = parseContextSnapshot(notification.params);
         if (next) setSnapshots((current) => upsertSnapshot(current, next));
         return;
@@ -52,9 +55,16 @@ export function ContextDock() {
       if (notification.method !== ITEM_COMPLETED) return;
       const next = parseCompaction(notification.params);
       if (!next) return;
-      setCompactions((current) => upsertCompaction(current, next));
+      if (open) setCompactions((current) => upsertCompaction(current, next));
       setCompactRequestedThreadId((current) => current === next.threadId ? null : current);
-    }), []);
+    });
+  }, [compactRequestedThreadId, open]);
+
+  useEffect(() => {
+    if (open) return;
+    setSnapshots([]);
+    setCompactions([]);
+  }, [open]);
 
   useEffect(() => {
     setCompactConfirm(false);
@@ -122,7 +132,7 @@ export function ContextDock() {
             <div className="context-empty">Select a session to inspect its runtime context.</div>
           ) : !snapshot ? (
             <div className="context-empty">
-              Waiting for Syndrid to report token usage for this session.
+              Waiting for Syndrid to report token usage while Context is open.
             </div>
           ) : (
             <>
@@ -155,7 +165,7 @@ export function ContextDock() {
                     {compaction.count} observed · last {formatRelativeTime(compaction.lastCompletedAtMs)}
                   </span>
                 ) : (
-                  <span>No compaction observed during this Desktop connection.</span>
+                  <span>No compaction observed while Context has been open.</span>
                 )}
                 {compactRequested && <small>Runtime compaction requested; waiting for completion.</small>}
                 {compactError && <small className="context-compaction-error">{compactError}</small>}
@@ -187,7 +197,7 @@ export function ContextDock() {
           )}
 
           <footer>
-            Runtime-reported · latest {MAX_THREAD_SNAPSHOTS} sessions · no local token estimator
+            Visible-only token stream · up to {MAX_THREAD_SNAPSHOTS} sessions · no local token estimator
           </footer>
         </section>
       )}
