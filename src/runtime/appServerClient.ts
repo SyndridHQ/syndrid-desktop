@@ -240,6 +240,12 @@ export class SyndridAppServerClient {
     return result;
   }
 
+  async inspectThread(params: ThreadReadParams): Promise<ThreadReadResponse> {
+    // Read-only docks may inspect a thread without changing Desktop's selected
+    // workspace projection. Foreground selection remains owned by App/session flows.
+    return this.request<ThreadReadResponse>(methods.threadRead, params);
+  }
+
   async resumeThread(threadId: string): Promise<ThreadResumeResponse> {
     const result = await this.request<ThreadResumeResponse>(methods.threadResume, { threadId });
     this.setWorkspaceFromThread(result.thread);
