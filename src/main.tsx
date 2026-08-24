@@ -11,6 +11,7 @@ import { McpElicitationDock } from "./components/McpElicitationDock";
 import { McpServerDock } from "./components/McpServerDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { ProviderDock } from "./components/ProviderDock";
+import { ReviewDock } from "./components/ReviewDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { SessionHistoryDock } from "./components/SessionHistoryDock";
@@ -36,6 +37,7 @@ createRoot(document.getElementById("root")!).render(
     <SkillsDock />
     <ProviderDock />
     <GitDock />
+    <ReviewDock />
     <TerminalDock />
     <BackgroundProcessesDock />
     <SubagentsDock />
