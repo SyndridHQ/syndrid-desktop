@@ -19,6 +19,7 @@ export function BackgroundProcessesDock() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ProcessSort>("runtime");
   const [terminating, setTerminating] = useState<Set<string>>(() => new Set());
+  const [stale, setStale] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -33,6 +34,7 @@ export function BackgroundProcessesDock() {
       if (!workspace?.threadId) {
         setProcesses([]);
         setCursor(null);
+        setStale(false);
         setError("Select a loaded Syndrid session first.");
         return;
       }
@@ -61,6 +63,7 @@ export function BackgroundProcessesDock() {
           ),
         );
         setCursor(result.nextCursor);
+        if (!append) setStale(false);
       } catch (cause) {
         if (requestGeneration !== generation.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -80,12 +83,24 @@ export function BackgroundProcessesDock() {
     setTerminating(new Set());
     setCleaning(false);
     setConfirmClean(false);
+    setStale(false);
     setNotice(null);
     setError(null);
     if (open) void load(false);
     // Workspace selection is the invalidation trigger; the fresh callback from
     // this render targets that exact thread without background polling.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspace?.threadId]);
+
+  useEffect(() => {
+    const threadId = workspace?.threadId;
+    if (!open || !threadId) return;
+
+    return appServerClient.onNotification((notification) => {
+      if (notification.method !== "turn/completed") return;
+      const params = toRecord(notification.params);
+      if (params?.threadId === threadId) setStale(true);
+    });
   }, [open, workspace?.threadId]);
 
   const totals = useMemo(() => summarize(processes), [processes]);
@@ -152,6 +167,7 @@ export function BackgroundProcessesDock() {
       await appServerClient.cleanBackgroundTerminals({ threadId });
       if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
       setConfirmClean(false);
+      setStale(true);
       setNotice("Runtime accepted the stop-all request. Refresh to reconcile process exits.");
     } catch (cause) {
       if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
@@ -194,7 +210,7 @@ export function BackgroundProcessesDock() {
                 </button>
               )}
               <button disabled={loading || cleaning} onClick={() => void load(false)} type="button">
-                {loading ? "Loading…" : "Refresh"}
+                {loading ? "Loading…" : stale ? "Refresh · updated" : "Refresh"}
               </button>
             </div>
           </header>
@@ -203,6 +219,7 @@ export function BackgroundProcessesDock() {
             <span>{processes.length} running</span>
             <span>{formatCpu(totals.cpuPercent)} CPU</span>
             <span>{formatMemory(totals.rssKb)} RSS</span>
+            {stale && <strong>runtime may have changed</strong>}
           </div>
 
           {notice && <div className="background-processes-notice">{notice}</div>}
@@ -272,7 +289,7 @@ export function BackgroundProcessesDock() {
           )}
 
           <footer>
-            Runtime-owned · explicit refresh/termination · retains at most {MAX_RETAINED_PROCESSES} processes
+            Runtime-owned · event-invalidated · explicit refresh/termination · retains at most {MAX_RETAINED_PROCESSES} processes
           </footer>
         </section>
       )}
@@ -394,4 +411,8 @@ function formatMemory(kb: number | null): string {
   const mib = kb / 1024;
   if (mib < 1024) return `${mib.toFixed(mib >= 100 ? 0 : 1)} MiB`;
   return `${(mib / 1024).toFixed(1)} GiB`;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
 }
