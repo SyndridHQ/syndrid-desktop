@@ -60,10 +60,10 @@ const commands: Command[] = [
     run: () => clickElement(".background-processes-toggle"),
   },
   {
-    id: "subagents",
-    label: "Open subagents",
-    detail: "Inspect direct child agents in the selected runtime thread graph",
-    keywords: "subagents agents children orchestration delegation thread graph",
+    id: "thread-graph",
+    label: "Open thread graph",
+    detail: "Inspect direct subagents and forks around the selected runtime session",
+    keywords: "subagents agents children orchestration delegation thread graph forks branching",
     run: () => clickElement(".subagents-toggle"),
   },
   {
