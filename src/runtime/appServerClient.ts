@@ -63,6 +63,12 @@ import {
   type TurnStartResponse,
   methods,
 } from "./protocol";
+import type {
+  FsUnwatchParams,
+  FsUnwatchResponse,
+  FsWatchParams,
+  FsWatchResponse,
+} from "./fsWatchProtocol";
 import type { ReviewStartParams, ReviewStartResponse } from "./reviewProtocol";
 import type { ThreadForkParams, ThreadForkResponse } from "./threadForkProtocol";
 import {
@@ -336,6 +342,14 @@ export class SyndridAppServerClient {
 
   async writeFile(params: FsWriteFileParams): Promise<FsWriteFileResponse> {
     return this.request<FsWriteFileResponse>(methods.fsWriteFile, params);
+  }
+
+  async watchPath(params: FsWatchParams): Promise<FsWatchResponse> {
+    return this.request<FsWatchResponse>("fs/watch", params);
+  }
+
+  async unwatchPath(params: FsUnwatchParams): Promise<FsUnwatchResponse> {
+    return this.request<FsUnwatchResponse>("fs/unwatch", params);
   }
 
   async fuzzyFileSearch(
