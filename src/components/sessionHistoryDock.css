@@ -124,9 +124,30 @@
 .session-history-more { width: 100%; margin-top: 4px; }
 .session-history-state { padding: 18px 10px; color: var(--faint, #5d6670); text-align: center; }
 .session-history-state.error { color: #e6a6a6; }
+
+.session-history-inspector {
+  border-top: 1px solid var(--border, #20262d);
+  background: rgba(8, 11, 14, .62);
+}
+.session-history-inspector > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 9px 5px;
+}
+.session-history-inspector > header > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.session-history-inspector > header strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.session-history-inspector > header small { color: var(--faint, #5d6670); font-size: 7px; }
+.session-history-inspector dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0 9px 8px; }
+.session-history-inspector dl > div { min-width: 0; border-top: 1px solid var(--border, #20262d); padding: 6px 4px 4px 0; }
+.session-history-inspector dt { color: var(--faint, #5d6670); font-size: 7px; letter-spacing: .05em; text-transform: uppercase; }
+.session-history-inspector dd { margin: 2px 0 0; overflow: hidden; font: 8px/1.35 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+
 .session-history-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
 
 @media (max-width: 720px) {
   .session-history-dock { left: 8px; bottom: 234px; width: calc(100vw - 16px); }
   .session-history-search { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .session-history-inspector dl { grid-template-columns: 1fr; }
 }
