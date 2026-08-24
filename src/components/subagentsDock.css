@@ -53,6 +53,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.subagents-actions { display: flex; flex: 0 0 auto; gap: 5px; }
 
 .subagents-panel button {
   border: 1px solid var(--border, #20262d);
@@ -73,6 +74,13 @@
   border-bottom: 1px solid var(--border, #20262d);
   padding: 7px 10px;
   color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+.subagents-notice {
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 6px 10px;
+  background: rgba(127, 149, 255, .06);
+  color: var(--muted, #87919c);
   font-size: 8px;
 }
 
@@ -130,4 +138,6 @@
 
 @media (max-width: 720px) {
   .subagents-dock { top: 54px; right: 8px; width: calc(100vw - 16px); }
+  .subagents-panel > header { align-items: flex-start; }
+  .subagents-actions { flex-direction: column; }
 }
