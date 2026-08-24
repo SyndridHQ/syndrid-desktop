@@ -87,6 +87,9 @@ export function GoalDock() {
 
   useEffect(() => {
     generation.current += 1;
+    setLoading(false);
+    setSaving(false);
+    setClearing(false);
     setGoal(null);
     setObjective("");
     setStatus("active");
