@@ -82,6 +82,20 @@
   padding: 6px;
 }
 
+.thread-graph-group + .thread-graph-group {
+  margin-top: 5px;
+  border-top: 1px solid var(--border, #20262d);
+  padding-top: 5px;
+}
+.thread-graph-group > h3 {
+  margin: 2px 7px 4px;
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
 .subagent-row {
   display: grid;
   gap: 5px;
