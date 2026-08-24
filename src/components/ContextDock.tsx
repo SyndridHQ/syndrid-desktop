@@ -37,6 +37,10 @@ export function ContextDock() {
   const [open, setOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<ContextSnapshot[]>([]);
   const [compactions, setCompactions] = useState<CompactionSnapshot[]>([]);
+  const [compactConfirm, setCompactConfirm] = useState(false);
+  const [compacting, setCompacting] = useState(false);
+  const [compactError, setCompactError] = useState<string | null>(null);
+  const [compactRequestedThreadId, setCompactRequestedThreadId] = useState<string | null>(null);
 
   useEffect(() =>
     appServerClient.onNotification((notification) => {
@@ -47,8 +51,17 @@ export function ContextDock() {
       }
       if (notification.method !== ITEM_COMPLETED) return;
       const next = parseCompaction(notification.params);
-      if (next) setCompactions((current) => upsertCompaction(current, next));
+      if (!next) return;
+      setCompactions((current) => upsertCompaction(current, next));
+      setCompactRequestedThreadId((current) => current === next.threadId ? null : current);
     }), []);
+
+  useEffect(() => {
+    setCompactConfirm(false);
+    setCompacting(false);
+    setCompactError(null);
+    setCompactRequestedThreadId(null);
+  }, [workspace?.threadId]);
 
   const snapshot = useMemo(
     () => workspace ? snapshots.find((item) => item.threadId === workspace.threadId) ?? null : null,
@@ -63,6 +76,30 @@ export function ContextDock() {
   const utilization = used !== null && windowSize && windowSize > 0
     ? Math.min(100, Math.max(0, (used / windowSize) * 100))
     : null;
+  const compactRequested = workspace?.threadId === compactRequestedThreadId;
+
+  const requestCompaction = async () => {
+    const threadId = workspace?.threadId;
+    if (!threadId || compacting) return;
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setCompactError("Connect the Syndrid runtime before compacting context.");
+      return;
+    }
+
+    setCompacting(true);
+    setCompactError(null);
+    try {
+      await appServerClient.compactThread({ threadId });
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      setCompactRequestedThreadId(threadId);
+      setCompactConfirm(false);
+    } catch (cause) {
+      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      setCompactError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (appServerClient.getWorkspaceSnapshot()?.threadId === threadId) setCompacting(false);
+    }
+  };
 
   return (
     <aside className="context-dock" aria-label="Context usage">
@@ -111,14 +148,41 @@ export function ContextDock() {
 
           {workspace && (
             <div className="context-compaction">
-              <strong>Compaction</strong>
-              {compaction ? (
-                <span title={`Last compacted on turn ${compaction.turnId}`}>
-                  {compaction.count} observed · last {formatRelativeTime(compaction.lastCompletedAtMs)}
-                </span>
-              ) : (
-                <span>No compaction observed during this Desktop connection.</span>
-              )}
+              <div className="context-compaction-copy">
+                <strong>Compaction</strong>
+                {compaction ? (
+                  <span title={`Last compacted on turn ${compaction.turnId}`}>
+                    {compaction.count} observed · last {formatRelativeTime(compaction.lastCompletedAtMs)}
+                  </span>
+                ) : (
+                  <span>No compaction observed during this Desktop connection.</span>
+                )}
+                {compactRequested && <small>Runtime compaction requested; waiting for completion.</small>}
+                {compactError && <small className="context-compaction-error">{compactError}</small>}
+              </div>
+              <div className="context-compaction-actions">
+                {compactConfirm ? (
+                  <>
+                    <button disabled={compacting} onClick={() => void requestCompaction()} type="button">
+                      {compacting ? "Compacting…" : "Confirm compact"}
+                    </button>
+                    <button disabled={compacting} onClick={() => setCompactConfirm(false)} type="button">
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    disabled={compacting || compactRequested}
+                    onClick={() => {
+                      setCompactError(null);
+                      setCompactConfirm(true);
+                    }}
+                    type="button"
+                  >
+                    {compactRequested ? "Compaction requested" : "Compact context"}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
