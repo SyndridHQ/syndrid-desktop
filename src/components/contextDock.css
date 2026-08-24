@@ -26,8 +26,19 @@
 .context-cumulative { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 8px 9px; border-top: 1px solid var(--border, #20262d); }
 .context-cumulative strong { width: 100%; font-size: 8px; }
 .context-cumulative span { border-radius: 4px; padding: 2px 5px; background: rgba(127,149,255,.07); color: var(--muted, #87919c); font-size: 7px; }
-.context-compaction { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border, #20262d); padding: 8px 9px; }
-.context-compaction strong { flex: 0 0 auto; font-size: 8px; }
-.context-compaction span { min-width: 0; color: var(--faint, #5d6670); font-size: 7px; text-align: right; }
+.context-compaction { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border, #20262d); padding: 8px 9px; }
+.context-compaction-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.context-compaction-copy strong { font-size: 8px; }
+.context-compaction-copy span,
+.context-compaction-copy small { min-width: 0; color: var(--faint, #5d6670); font-size: 7px; }
+.context-compaction-copy .context-compaction-error { color: #e6a6a6; }
+.context-compaction-actions { display: flex; flex: 0 0 auto; gap: 5px; }
+.context-compaction-actions button { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 6px; background: transparent; color: var(--muted, #87919c); font-size: 8px; cursor: pointer; }
+.context-compaction-actions button:hover:not(:disabled) { color: var(--text, #e8edf2); border-color: #3a4450; }
+.context-compaction-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .context-panel > footer { border-top: 1px solid var(--border, #20262d); padding: 7px 9px; color: var(--faint, #5d6670); font-size: 8px; }
-@media (max-width: 720px) { .context-dock { right: 8px; bottom: 190px; width: calc(100vw - 16px); } }
+@media (max-width: 720px) {
+  .context-dock { right: 8px; bottom: 190px; width: calc(100vw - 16px); }
+  .context-compaction { align-items: stretch; flex-direction: column; }
+  .context-compaction-actions { justify-content: flex-end; }
+}
