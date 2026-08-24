@@ -74,6 +74,13 @@ const commands: Command[] = [
     run: () => clickElement(".git-toggle"),
   },
   {
+    id: "review",
+    label: "Open code review",
+    detail: "Launch a detached Syndrid review of uncommitted changes",
+    keywords: "review code review uncommitted changes detached runtime",
+    run: () => clickElement(".review-toggle"),
+  },
+  {
     id: "providers",
     label: "Open providers",
     detail: "Inspect the selected session provider and runtime model catalog",
@@ -236,7 +243,7 @@ export function CommandPalette() {
                 </span>
                 {index === activeIndex && <kbd>↵</kbd>}
               </button>
-            ))
+            ))}
           )}
         </div>
         <footer>↑↓ navigate · ↵ run · Ctrl/⌘ K toggle</footer>
