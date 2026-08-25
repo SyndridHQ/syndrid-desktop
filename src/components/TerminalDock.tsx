@@ -29,6 +29,7 @@ export function TerminalDock() {
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const processIdRef = useRef<string | null>(null);
+  const lifecycleGenerationRef = useRef(0);
   const decoderRef = useRef(new TextDecoder("utf-8", { fatal: false }));
   const outputRef = useRef<HTMLPreElement>(null);
   const lastTerminalSizeRef = useRef<CommandExecTerminalSize | null>(null);
@@ -125,6 +126,7 @@ export function TerminalDock() {
       return;
     }
 
+    const startGeneration = lifecycleGenerationRef.current;
     setStarting(true);
     setError(null);
     setTranscript("");
@@ -132,6 +134,8 @@ export function TerminalDock() {
       const environment = await appServerClient.readEnvironmentInfo({
         environmentId: LOCAL_ENVIRONMENT_ID,
       });
+      if (startGeneration !== lifecycleGenerationRef.current) return;
+
       const shellPath = environment.shell.path.trim();
       if (!shellPath) throw new Error("Syndrid reported no local shell executable.");
 
@@ -182,6 +186,7 @@ export function TerminalDock() {
           setError(cause instanceof Error ? cause.message : String(cause));
         });
     } catch (cause) {
+      if (startGeneration !== lifecycleGenerationRef.current) return;
       processIdRef.current = null;
       lastTerminalSizeRef.current = null;
       setRunning(false);
@@ -191,7 +196,7 @@ export function TerminalDock() {
           : `Local execution environment unavailable: ${String(cause)}`,
       );
     } finally {
-      setStarting(false);
+      if (startGeneration === lifecycleGenerationRef.current) setStarting(false);
     }
   }, [appendTranscript, running, starting]);
 
@@ -215,12 +220,16 @@ export function TerminalDock() {
 
   const toggle = () => {
     if (!open) {
+      lifecycleGenerationRef.current += 1;
       setOpen(true);
       return;
     }
+
+    lifecycleGenerationRef.current += 1;
     if (processIdRef.current) {
       void stop().finally(() => setOpen(false));
     } else {
+      setStarting(false);
       setOpen(false);
     }
   };
