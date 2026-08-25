@@ -24,6 +24,7 @@ jobs:
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
+      - run: node scripts/check-frontend-budget.mjs
 
   tauri-check:
     name: Tauri check (${{ matrix.os }})
