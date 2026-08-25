@@ -6,6 +6,9 @@ import "./warningsDock.css";
 
 const MAX_RETAINED_WARNINGS = 80;
 const MAX_RENDERED_WARNINGS = 24;
+const MAX_WARNING_TITLE_CHARS = 8_192;
+const MAX_WARNING_DETAILS_CHARS = 32_768;
+const MAX_WARNING_PATH_CHARS = 4_096;
 
 type WarningKind = "error" | "guardian" | "warning" | "config" | "deprecation";
 type WarningScope = "selected" | "all";
@@ -138,7 +141,7 @@ function parseWarningNotification(
   const receivedAt = Date.now();
 
   if (notification.method === "warning") {
-    const message = stringValue(params.message);
+    const message = boundedString(params.message, MAX_WARNING_TITLE_CHARS);
     if (!message) return null;
     return {
       id,
@@ -153,7 +156,7 @@ function parseWarningNotification(
   }
 
   if (notification.method === "guardianWarning") {
-    const message = stringValue(params.message);
+    const message = boundedString(params.message, MAX_WARNING_TITLE_CHARS);
     const threadId = stringValue(params.threadId);
     if (!message || !threadId) return null;
     return {
@@ -169,28 +172,28 @@ function parseWarningNotification(
   }
 
   if (notification.method === "configWarning") {
-    const summary = stringValue(params.summary);
+    const summary = boundedString(params.summary, MAX_WARNING_TITLE_CHARS);
     if (!summary) return null;
     return {
       id,
       kind: "config",
       title: summary,
-      details: nullableString(params.details),
+      details: boundedString(params.details, MAX_WARNING_DETAILS_CHARS),
       threadId: null,
-      path: nullableString(params.path),
+      path: boundedString(params.path, MAX_WARNING_PATH_CHARS),
       willRetry: null,
       receivedAt,
     };
   }
 
   if (notification.method === "deprecationNotice") {
-    const summary = stringValue(params.summary);
+    const summary = boundedString(params.summary, MAX_WARNING_TITLE_CHARS);
     if (!summary) return null;
     return {
       id,
       kind: "deprecation",
       title: summary,
-      details: nullableString(params.details),
+      details: boundedString(params.details, MAX_WARNING_DETAILS_CHARS),
       threadId: null,
       path: null,
       willRetry: null,
@@ -200,10 +203,12 @@ function parseWarningNotification(
 
   if (notification.method === "error") {
     const error = toRecord(params.error);
-    const message = error ? stringValue(error.message) : null;
+    const message = error ? boundedString(error.message, MAX_WARNING_TITLE_CHARS) : null;
     const threadId = stringValue(params.threadId);
     if (!message || !threadId) return null;
-    const additionalDetails = error ? nullableString(error.additionalDetails) : null;
+    const additionalDetails = error
+      ? boundedString(error.additionalDetails, MAX_WARNING_DETAILS_CHARS)
+      : null;
     return {
       id,
       kind: "error",
@@ -231,6 +236,13 @@ function stringValue(value: unknown): string | null {
 
 function nullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function boundedString(value: unknown, maxChars: number): string | null {
+  const text = stringValue(value);
+  if (!text) return null;
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
 }
 
 function shortId(value: string): string {
