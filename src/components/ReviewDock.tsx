@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type { ReviewTarget } from "../runtime/reviewProtocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
@@ -20,6 +20,7 @@ type ReviewLaunch = {
 
 export function ReviewDock() {
   const workspace = useRuntimeWorkspace();
+  const lifecycleGeneration = useRef(0);
   const [open, setOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [stoppingReviews, setStoppingReviews] = useState<Set<string>>(() => new Set());
@@ -29,6 +30,7 @@ export function ReviewDock() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    lifecycleGeneration.current += 1;
     setReviews([]);
     setStoppingReviews(new Set());
     setError(null);
@@ -36,7 +38,13 @@ export function ReviewDock() {
   }, [workspace?.threadId]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      lifecycleGeneration.current += 1;
+      setStoppingReviews(new Set());
+      setStarting(false);
+      setError(null);
+      return;
+    }
     return appServerClient.onNotification((notification) => {
       const params = toRecord(notification.params);
       if (!params || typeof params.threadId !== "string") return;
@@ -107,6 +115,7 @@ export function ReviewDock() {
       return;
     }
 
+    const generation = lifecycleGeneration.current;
     setStarting(true);
     setError(null);
     try {
@@ -115,7 +124,12 @@ export function ReviewDock() {
         target: reviewTarget,
         delivery: "detached",
       });
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId) return;
+      if (
+        lifecycleGeneration.current !== generation ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId
+      ) {
+        return;
+      }
       setReviews((current) => [
         {
           threadId: result.reviewThreadId,
@@ -129,10 +143,15 @@ export function ReviewDock() {
         ...current.filter((review) => review.threadId !== result.reviewThreadId),
       ].slice(0, MAX_RETAINED_REVIEWS));
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId) return;
+      if (
+        lifecycleGeneration.current !== generation ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId
+      ) {
+        return;
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setStarting(false);
+      if (lifecycleGeneration.current === generation) setStarting(false);
     }
   }, [reviewTarget, starting, targetKind, workspace?.threadId]);
 
@@ -148,6 +167,7 @@ export function ReviewDock() {
     const sourceThreadId = workspace?.threadId;
     if (!sourceThreadId) return;
 
+    const generation = lifecycleGeneration.current;
     setStoppingReviews((current) => new Set(current).add(review.threadId));
     setError(null);
     try {
@@ -155,10 +175,20 @@ export function ReviewDock() {
         threadId: review.threadId,
         turnId: review.turnId,
       });
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId) return;
+      if (
+        lifecycleGeneration.current !== generation ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId
+      ) {
+        return;
+      }
       // Runtime lifecycle notifications remain authoritative for the final state.
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId) return;
+      if (
+        lifecycleGeneration.current !== generation ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== sourceThreadId
+      ) {
+        return;
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
       setStoppingReviews((current) => removeSetValue(current, review.threadId));
     }
