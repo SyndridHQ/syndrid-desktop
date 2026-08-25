@@ -29,6 +29,7 @@ export function McpServerDock() {
   const [oauthStarting, setOauthStarting] = useState<string | null>(null);
   const [pendingOauth, setPendingOauth] = useState<PendingOauth | null>(null);
   const generation = useRef(0);
+  const oauthGeneration = useRef(0);
 
   const load = useCallback(
     async (append = false) => {
@@ -76,6 +77,7 @@ export function McpServerDock() {
         return;
       }
 
+      const requestGeneration = ++oauthGeneration.current;
       setOauthStarting(serverName);
       setPendingOauth(null);
       setError(null);
@@ -83,12 +85,14 @@ export function McpServerDock() {
         const result = await appServerClient.startMcpServerOauthLogin({
           name: serverName,
         });
+        if (requestGeneration !== oauthGeneration.current) return;
         const authorizationUrl = safeAuthorizationUrl(result.authorizationUrl);
         setPendingOauth({ serverName, authorizationUrl });
       } catch (cause) {
+        if (requestGeneration !== oauthGeneration.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
-        setOauthStarting(null);
+        if (requestGeneration === oauthGeneration.current) setOauthStarting(null);
       }
     },
     [oauthStarting],
@@ -96,6 +100,7 @@ export function McpServerDock() {
 
   useEffect(() => {
     generation.current += 1;
+    oauthGeneration.current += 1;
     setServers([]);
     setCursor(null);
     setLoaded(false);
