@@ -3,7 +3,7 @@ use std::env;
 use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::Mutex;
 use tokio::time::{Duration, timeout};
@@ -11,6 +11,8 @@ use tokio::time::{Duration, timeout};
 const MESSAGE_EVENT: &str = "syndrid://app-server/message";
 const STDERR_EVENT: &str = "syndrid://app-server/stderr";
 const APP_SERVER_STOP_GRACE: Duration = Duration::from_millis(750);
+const MAX_FORWARDED_LINE_BYTES: usize = 32 * 1024 * 1024;
+const FORWARD_READ_BUFFER_BYTES: usize = 16 * 1024;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -230,25 +232,79 @@ fn runtime_candidates(explicit: Option<String>) -> Vec<String> {
     candidates
 }
 
-fn spawn_line_forwarder<R>(app: AppHandle, reader: R, event: &'static str)
+fn spawn_line_forwarder<R>(app: AppHandle, mut reader: R, event: &'static str)
 where
-    R: tokio::io::AsyncRead + Unpin + Send + 'static,
+    R: AsyncRead + Unpin + Send + 'static,
 {
     tauri::async_runtime::spawn(async move {
-        let mut lines = BufReader::new(reader).lines();
+        let mut read_buffer = [0_u8; FORWARD_READ_BUFFER_BYTES];
+        let mut line = Vec::with_capacity(FORWARD_READ_BUFFER_BYTES);
+        let mut dropping_overlong_line = false;
+
         loop {
-            match lines.next_line().await {
-                Ok(Some(line)) => {
-                    let _ = app.emit(event, line);
+            let bytes_read = match reader.read(&mut read_buffer).await {
+                Ok(0) => {
+                    if dropping_overlong_line {
+                        emit_overlong_line_warning(&app, event);
+                    } else if !line.is_empty() {
+                        emit_forwarded_line(&app, event, &line);
+                    }
+                    break;
                 }
-                Ok(None) => break,
+                Ok(bytes_read) => bytes_read,
                 Err(error) => {
                     let _ = app.emit(STDERR_EVENT, format!("stream read error: {error}"));
                     break;
                 }
+            };
+
+            for &byte in &read_buffer[..bytes_read] {
+                if byte == b'\n' {
+                    if dropping_overlong_line {
+                        emit_overlong_line_warning(&app, event);
+                    } else {
+                        emit_forwarded_line(&app, event, &line);
+                    }
+                    line.clear();
+                    dropping_overlong_line = false;
+                    continue;
+                }
+
+                if dropping_overlong_line {
+                    continue;
+                }
+
+                if line.len() >= MAX_FORWARDED_LINE_BYTES {
+                    line.clear();
+                    dropping_overlong_line = true;
+                    continue;
+                }
+                line.push(byte);
             }
         }
     });
+}
+
+fn emit_forwarded_line(app: &AppHandle, event: &'static str, bytes: &[u8]) {
+    let bytes = bytes.strip_suffix(b"\r").unwrap_or(bytes);
+    match std::str::from_utf8(bytes) {
+        Ok(line) => {
+            let _ = app.emit(event, line);
+        }
+        Err(error) => {
+            let _ = app.emit(STDERR_EVENT, format!("stream UTF-8 error: {error}"));
+        }
+    }
+}
+
+fn emit_overlong_line_warning(app: &AppHandle, event: &'static str) {
+    let _ = app.emit(
+        STDERR_EVENT,
+        format!(
+            "dropped overlong {event} line exceeding {} MiB",
+            MAX_FORWARDED_LINE_BYTES / (1024 * 1024)
+        ),
+    );
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
