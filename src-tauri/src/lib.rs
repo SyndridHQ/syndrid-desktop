@@ -202,6 +202,15 @@ async fn terminate_child(mut child: Child) -> Result<(), String> {
 
 fn normalize_runtime_binary(value: String) -> Option<String> {
     let normalized = value.trim();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    let normalized = normalized
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .map(str::trim)
+        .unwrap_or(normalized);
     (!normalized.is_empty()).then(|| normalized.to_string())
 }
 
@@ -283,6 +292,20 @@ mod tests {
                 "  C:\\Program Files\\Syndrid\\syndrid.exe  ".to_string()
             )),
             vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
+        );
+    }
+
+    #[test]
+    fn normalizes_quoted_runtime_binary() {
+        assert_eq!(
+            runtime_candidates(Some(
+                "  \"C:\\Program Files\\Syndrid\\syndrid.exe\"  ".to_string()
+            )),
+            vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
+        );
+        assert_eq!(
+            runtime_candidates(Some("\" /Applications/Syndrid CLI/bin/syndrid \"".to_string())),
+            vec!["/Applications/Syndrid CLI/bin/syndrid".to_string()]
         );
     }
 
