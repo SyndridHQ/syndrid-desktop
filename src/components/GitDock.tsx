@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import {
   notifications,
@@ -53,9 +53,11 @@ export function GitDock() {
   const [fileFilter, setFileFilter] = useState("");
   const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
   const gitInfo = workspace?.git ?? null;
 
   useEffect(() => {
+    generation.current += 1;
     setLoadingDiff(false);
     setDiffLoaded(false);
     setDiffStale(false);
@@ -67,30 +69,36 @@ export function GitDock() {
     setFileFilter("");
     setSelectedSectionKey(null);
     setError(null);
-  }, [workspace?.threadId, workspace?.cwd]);
+  }, [open, workspace?.threadId, workspace?.cwd]);
 
   useEffect(() => {
-    if (!diffLoaded || !workspace?.threadId) return;
+    if (!open || !diffLoaded || !workspace?.threadId) return;
     return appServerClient.onNotification((notification) => {
       if (notification.method !== notifications.turnDiffUpdated) return;
       const event = notification.params as TurnDiffUpdatedNotification | undefined;
       if (event?.threadId === workspace.threadId) setDiffStale(true);
     });
-  }, [diffLoaded, workspace?.threadId]);
+  }, [diffLoaded, open, workspace?.threadId]);
 
   const loadDiff = useCallback(async () => {
     const cwd = workspace?.cwd;
-    if (!cwd || loadingDiff) return;
+    if (!open || !cwd || loadingDiff) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before loading repository changes.");
       return;
     }
 
+    const requestGeneration = ++generation.current;
     setLoadingDiff(true);
     setError(null);
     try {
       const result = await appServerClient.gitDiffToRemote({ cwd });
-      if (appServerClient.getWorkspaceSnapshot()?.cwd !== cwd) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.cwd !== cwd
+      ) {
+        return;
+      }
 
       const isTruncated = result.diff.length > MAX_DIFF_CHARS;
       const retainedDiff = isTruncated ? result.diff.slice(0, MAX_DIFF_CHARS) : result.diff;
@@ -106,15 +114,21 @@ export function GitDock() {
       setSelectedSectionKey(firstDiffSectionKey(retainedDiff, retainedTypedChanges));
       setDiffLoaded(true);
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.cwd === cwd) {
+      if (
+        requestGeneration === generation.current &&
+        appServerClient.getWorkspaceSnapshot()?.cwd === cwd
+      ) {
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     } finally {
-      if (appServerClient.getWorkspaceSnapshot()?.cwd === cwd) {
+      if (
+        requestGeneration === generation.current &&
+        appServerClient.getWorkspaceSnapshot()?.cwd === cwd
+      ) {
         setLoadingDiff(false);
       }
     }
-  }, [loadingDiff, workspace?.cwd]);
+  }, [loadingDiff, open, workspace?.cwd]);
 
   const fallbackDiffStats = useMemo(() => summarizeDiff(diff), [diff]);
   const diffStats = runtimeChangeSummary ?? fallbackDiffStats;
