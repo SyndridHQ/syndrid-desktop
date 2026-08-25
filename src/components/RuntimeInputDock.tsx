@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   appServerClient,
   type RuntimeServerRequest,
@@ -34,8 +34,11 @@ interface RuntimeInputRequest {
 export function RuntimeInputDock() {
   const [queue, setQueue] = useState<RuntimeInputRequest[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingId, setSubmittingId] = useState<RuntimeServerRequest["id"] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const current = queue[0] ?? null;
+  const currentRequestIdRef = useRef<RuntimeServerRequest["id"] | null>(null);
+  currentRequestIdRef.current = current?.request.id ?? null;
 
   useEffect(() => {
     const offRequest = appServerClient.onServerRequest((request) => {
@@ -64,7 +67,6 @@ export function RuntimeInputDock() {
     };
   }, []);
 
-  const current = queue[0] ?? null;
   const canSubmit = useMemo(
     () => current !== null && current.questions.every((question) => Boolean(answers[question.id]?.trim())),
     [answers, current],
@@ -77,9 +79,12 @@ export function RuntimeInputDock() {
 
   if (!current) return null;
 
+  const submitting = submittingId === current.request.id;
+
   const submit = async () => {
     if (!canSubmit || submitting) return;
-    setSubmitting(true);
+    const requestId = current.request.id;
+    setSubmittingId(requestId);
     setError(null);
 
     const responseAnswers: Record<string, { answers: string[] }> = {};
@@ -90,18 +95,22 @@ export function RuntimeInputDock() {
     }
 
     try {
-      await appServerClient.respondToServerRequest(current.request.id, {
+      await appServerClient.respondToServerRequest(requestId, {
         answers: responseAnswers,
       });
       setQueue((entries) =>
-        entries.filter((entry) => entry.request.id !== current.request.id),
+        entries.filter((entry) => entry.request.id !== requestId),
       );
     } catch (responseError) {
-      setError(
-        responseError instanceof Error ? responseError.message : String(responseError),
-      );
+      if (currentRequestIdRef.current === requestId) {
+        setError(
+          responseError instanceof Error ? responseError.message : String(responseError),
+        );
+      }
     } finally {
-      setSubmitting(false);
+      setSubmittingId((activeRequestId) =>
+        activeRequestId === requestId ? null : activeRequestId,
+      );
     }
   };
 
