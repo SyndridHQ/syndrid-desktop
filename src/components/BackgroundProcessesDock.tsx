@@ -120,6 +120,7 @@ export function BackgroundProcessesDock() {
       const threadId = workspace?.threadId;
       if (!threadId || cleaning || terminating.has(process.processId)) return;
 
+      const requestGeneration = generation.current;
       setTerminating((current) => new Set(current).add(process.processId));
       setNotice(null);
       setError(null);
@@ -128,7 +129,12 @@ export function BackgroundProcessesDock() {
           threadId,
           processId: process.processId,
         });
-        if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+        if (
+          requestGeneration !== generation.current ||
+          appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+        ) {
+          return;
+        }
         if (result.terminated) {
           setProcesses((current) =>
             current.filter((entry) => entry.processId !== process.processId),
@@ -137,14 +143,21 @@ export function BackgroundProcessesDock() {
           setError(`Runtime did not terminate process ${process.processId}. Refresh to reconcile.`);
         }
       } catch (cause) {
-        if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+        if (
+          requestGeneration !== generation.current ||
+          appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+        ) {
+          return;
+        }
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
-        setTerminating((current) => {
-          const next = new Set(current);
-          next.delete(process.processId);
-          return next;
-        });
+        if (requestGeneration === generation.current) {
+          setTerminating((current) => {
+            const next = new Set(current);
+            next.delete(process.processId);
+            return next;
+          });
+        }
       }
     },
     [cleaning, terminating, workspace?.threadId],
@@ -161,20 +174,31 @@ export function BackgroundProcessesDock() {
       return;
     }
 
+    const requestGeneration = generation.current;
     setCleaning(true);
     setNotice(null);
     setError(null);
     try {
       await appServerClient.cleanBackgroundTerminals({ threadId });
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+      ) {
+        return;
+      }
       setConfirmClean(false);
       setStale(true);
       setNotice("Runtime accepted the stop-all request. Refresh to reconcile process exits.");
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+      ) {
+        return;
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setCleaning(false);
+      if (requestGeneration === generation.current) setCleaning(false);
     }
   }, [cleaning, confirmClean, processes.length, workspace?.threadId]);
 
@@ -221,7 +245,11 @@ export function BackgroundProcessesDock() {
                   Cancel
                 </button>
               )}
-              <button disabled={loading || cleaning} onClick={() => void load(false)} type="button">
+              <button
+                disabled={loading || cleaning || terminating.size > 0}
+                onClick={() => void load(false)}
+                type="button"
+              >
                 {loading ? "Loading…" : stale ? "Refresh · updated" : "Refresh"}
               </button>
             </div>
@@ -290,7 +318,7 @@ export function BackgroundProcessesDock() {
               {cursor && processes.length < MAX_RETAINED_PROCESSES && (
                 <button
                   className="background-processes-more"
-                  disabled={loading || cleaning}
+                  disabled={loading || cleaning || terminating.size > 0}
                   onClick={() => void load(true)}
                   type="button"
                 >
