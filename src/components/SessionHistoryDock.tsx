@@ -69,6 +69,7 @@ export function SessionHistoryDock() {
     setThreads([]);
     setCursor(null);
     setError(null);
+    setMutatingThreadId(null);
     setInspectedThread(null);
     setInspectingThreadId(null);
     if (open) void load(false);
@@ -84,6 +85,7 @@ export function SessionHistoryDock() {
     setThreads([]);
     setCursor(null);
     setError(null);
+    setMutatingThreadId(null);
     setInspectedThread(null);
     setInspectingThreadId(null);
     void load(false);
@@ -126,6 +128,9 @@ export function SessionHistoryDock() {
       }
 
       const requestGeneration = generation.current;
+      inspectionGeneration.current += 1;
+      setInspectingThreadId(null);
+      if (inspectedThread?.id === thread.id) setInspectedThread(null);
       setMutatingThreadId(thread.id);
       setError(null);
       try {
@@ -136,7 +141,6 @@ export function SessionHistoryDock() {
         }
         if (requestGeneration !== generation.current) return;
         setThreads((current) => current.filter((item) => item.id !== thread.id));
-        if (inspectedThread?.id === thread.id) setInspectedThread(null);
       } catch (cause) {
         if (requestGeneration !== generation.current) return;
         setError(cause instanceof Error ? cause.message : String(cause));
