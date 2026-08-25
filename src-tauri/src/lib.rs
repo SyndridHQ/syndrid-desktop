@@ -11,6 +11,8 @@ use tokio::time::{Duration, timeout};
 const MESSAGE_EVENT: &str = "syndrid://app-server/message";
 const STDERR_EVENT: &str = "syndrid://app-server/stderr";
 const APP_SERVER_STOP_GRACE: Duration = Duration::from_millis(750);
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Default)]
 struct AppServerInner {
@@ -76,6 +78,8 @@ async fn start_app_server(
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
 
         match command.spawn() {
             Ok(mut child) => {
