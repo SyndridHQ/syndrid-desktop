@@ -207,10 +207,10 @@ fn runtime_candidates(explicit: Option<String>) -> Vec<String> {
     }
 
     let mut candidates = Vec::new();
-    if let Ok(binary) = env::var("SYNDRID_APP_SERVER_BINARY") {
-        if let Some(binary) = normalize_runtime_binary(binary) {
-            candidates.push(binary);
-        }
+    if let Ok(binary) = env::var("SYNDRID_APP_SERVER_BINARY")
+        && let Some(binary) = normalize_runtime_binary(binary)
+    {
+        candidates.push(binary);
     }
     candidates.push("syndrid".to_string());
     candidates.dedup();
@@ -236,32 +236,6 @@ where
             }
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn normalizes_explicit_runtime_binary() {
-        assert_eq!(
-            runtime_candidates(Some(
-                "  C:\\Program Files\\Syndrid\\syndrid.exe  ".to_string()
-            )),
-            vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
-        );
-    }
-
-    #[test]
-    fn ignores_blank_explicit_runtime_binary() {
-        let candidates = runtime_candidates(Some("  \t  ".to_string()));
-        assert!(candidates.iter().any(|candidate| candidate == "syndrid"));
-        assert!(
-            candidates
-                .iter()
-                .all(|candidate| !candidate.trim().is_empty())
-        );
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -292,4 +266,30 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Syndrid Desktop");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_explicit_runtime_binary() {
+        assert_eq!(
+            runtime_candidates(Some(
+                "  C:\\Program Files\\Syndrid\\syndrid.exe  ".to_string()
+            )),
+            vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
+        );
+    }
+
+    #[test]
+    fn ignores_blank_explicit_runtime_binary() {
+        let candidates = runtime_candidates(Some("  \t  ".to_string()));
+        assert!(candidates.iter().any(|candidate| candidate == "syndrid"));
+        assert!(
+            candidates
+                .iter()
+                .all(|candidate| !candidate.trim().is_empty())
+        );
+    }
 }
