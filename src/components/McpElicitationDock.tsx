@@ -34,11 +34,18 @@ interface McpFormRequest {
   fields: McpFormField[];
 }
 
+interface RequestError {
+  requestId: RuntimeServerRequest["id"];
+  message: string;
+}
+
 export function McpElicitationDock() {
   const [queue, setQueue] = useState<McpFormRequest[]>([]);
   const [values, setValues] = useState<Record<string, PrimitiveValue>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submittingRequestId, setSubmittingRequestId] = useState<
+    RuntimeServerRequest["id"] | null
+  >(null);
+  const [error, setError] = useState<RequestError | null>(null);
 
   useEffect(() => {
     const offRequest = appServerClient.onServerRequest((request) => {
@@ -81,6 +88,9 @@ export function McpElicitationDock() {
   }, []);
 
   const current = queue[0] ?? null;
+  const submitting = current !== null && submittingRequestId === current.request.id;
+  const currentError =
+    current !== null && error?.requestId === current.request.id ? error.message : null;
 
   useEffect(() => {
     if (!current) {
@@ -106,13 +116,15 @@ export function McpElicitationDock() {
   if (!current) return null;
 
   const respond = async (action: "accept" | "decline" | "cancel") => {
-    if (submitting) return;
-    setSubmitting(true);
+    const request = current;
+    const requestId = request.request.id;
+    if (submittingRequestId === requestId) return;
+    setSubmittingRequestId(requestId);
     setError(null);
 
     const content: Record<string, PrimitiveValue> = {};
     if (action === "accept") {
-      for (const field of current.fields) {
+      for (const field of request.fields) {
         const value = values[field.key];
         if (value === undefined || !fieldValueValid(field, value)) continue;
         if (typeof value === "string" && value.length === 0 && !field.required) continue;
@@ -121,18 +133,23 @@ export function McpElicitationDock() {
     }
 
     try {
-      await appServerClient.respondToServerRequest(current.request.id, {
+      await appServerClient.respondToServerRequest(requestId, {
         action,
         content: action === "accept" ? content : null,
         _meta: null,
       });
       setQueue((entries) =>
-        entries.filter((entry) => entry.request.id !== current.request.id),
+        entries.filter((entry) => entry.request.id !== requestId),
       );
     } catch (responseError) {
-      setError(responseError instanceof Error ? responseError.message : String(responseError));
+      setError({
+        requestId,
+        message: responseError instanceof Error ? responseError.message : String(responseError),
+      });
     } finally {
-      setSubmitting(false);
+      setSubmittingRequestId((activeRequestId) =>
+        activeRequestId === requestId ? null : activeRequestId,
+      );
     }
   };
 
@@ -167,7 +184,7 @@ export function McpElicitationDock() {
             {renderField(field, values[field.key], (value) => updateField(field, value))}
           </label>
         ))}
-        {error && <p className="mcp-elicitation-error">{error}</p>}
+        {currentError && <p className="mcp-elicitation-error">{currentError}</p>}
       </div>
 
       <footer>
