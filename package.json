@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "budget": "node scripts/check-frontend-budget.mjs",
-    "check": "npm run typecheck && npm run build && npm run budget",
+    "version:check": "node scripts/check-version-coherence.mjs",
+    "check": "npm run version:check && npm run typecheck && npm run build && npm run budget",
     "tauri": "tauri"
   },
   "dependencies": {
