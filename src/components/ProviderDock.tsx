@@ -113,7 +113,14 @@ export function ProviderDock() {
     setConfig(null);
     setReroutes([]);
     setError(null);
-    if (open) void load();
+    if (!open) {
+      setLoading(false);
+      setModels([]);
+      setCapabilities(null);
+      setQuery("");
+      return;
+    }
+    void load();
   }, [load, open]);
 
   useEffect(() => {
