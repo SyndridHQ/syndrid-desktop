@@ -153,13 +153,11 @@ export function App({ bootStartedAt }: AppProps) {
       } else {
         setSelectedThread(null);
       }
-
-      void loadRuntimeCatalogs();
     } catch (error) {
       setRuntime(appServerClient.getSnapshot());
       appendRuntimeError(error, setRuntimeLogs);
     }
-  }, [hydrateThread, loadRuntimeCatalogs]);
+  }, [hydrateThread]);
 
   const refreshThreads = useCallback(async () => {
     if (runtime.phase !== "ready") return;
