@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import {
   nativeAppServerStatus,
@@ -19,24 +19,39 @@ export function SettingsDock() {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const statusGeneration = useRef(0);
 
   const refreshStatus = useCallback(async () => {
     if (!isTauri() || loadingStatus) return;
+    const requestGeneration = ++statusGeneration.current;
     setLoadingStatus(true);
     setError(null);
     try {
-      setStatus(await nativeAppServerStatus());
+      const nextStatus = await nativeAppServerStatus();
+      if (requestGeneration !== statusGeneration.current) return;
+      setStatus(nextStatus);
     } catch (cause) {
+      if (requestGeneration !== statusGeneration.current) return;
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoadingStatus(false);
+      if (requestGeneration === statusGeneration.current) setLoadingStatus(false);
     }
   }, [loadingStatus]);
 
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    if (next) void refreshStatus();
+    if (next) {
+      void refreshStatus();
+      return;
+    }
+
+    // Settings is an on-demand supervisor surface. Closing it invalidates any
+    // in-flight native status read and releases process/path details while idle.
+    statusGeneration.current += 1;
+    setStatus(null);
+    setLoadingStatus(false);
+    setError(null);
   };
 
   const save = () => {
