@@ -170,14 +170,19 @@ async fn stop_app_server(state: State<'_, AppServerState>) -> Result<(), String>
     Ok(())
 }
 
+fn normalize_runtime_binary(value: String) -> Option<String> {
+    let normalized = value.trim();
+    (!normalized.is_empty()).then(|| normalized.to_string())
+}
+
 fn runtime_candidates(explicit: Option<String>) -> Vec<String> {
-    if let Some(binary) = explicit.filter(|value| !value.trim().is_empty()) {
+    if let Some(binary) = explicit.and_then(normalize_runtime_binary) {
         return vec![binary];
     }
 
     let mut candidates = Vec::new();
     if let Ok(binary) = env::var("SYNDRID_APP_SERVER_BINARY") {
-        if !binary.trim().is_empty() {
+        if let Some(binary) = normalize_runtime_binary(binary) {
             candidates.push(binary);
         }
     }
@@ -205,6 +210,26 @@ where
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_explicit_runtime_binary() {
+        assert_eq!(
+            runtime_candidates(Some("  C:\\Program Files\\Syndrid\\syndrid.exe  ".to_string())),
+            vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
+        );
+    }
+
+    #[test]
+    fn ignores_blank_explicit_runtime_binary() {
+        let candidates = runtime_candidates(Some("  \t  ".to_string()));
+        assert!(candidates.iter().any(|candidate| candidate == "syndrid"));
+        assert!(candidates.iter().all(|candidate| !candidate.trim().is_empty()));
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
