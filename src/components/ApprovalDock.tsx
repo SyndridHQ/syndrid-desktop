@@ -85,7 +85,7 @@ export function ApprovalDock() {
     } catch (responseError) {
       setError(errorMessage(responseError));
     } finally {
-      setRespondingId(null);
+      setRespondingId((activeId) => activeId === responseKey ? null : activeId);
     }
   };
 
@@ -107,7 +107,7 @@ export function ApprovalDock() {
     } catch (responseError) {
       setError(errorMessage(responseError));
     } finally {
-      setRespondingId(null);
+      setRespondingId((activeId) => activeId === responseKey ? null : activeId);
     }
   };
 
