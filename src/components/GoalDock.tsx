@@ -148,6 +148,7 @@ export function GoalDock() {
       }
     }
 
+    const requestGeneration = ++generation.current;
     setSaving(true);
     setError(null);
     try {
@@ -157,13 +158,23 @@ export function GoalDock() {
         status,
         tokenBudget: parsedBudget,
       });
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+      ) {
+        return;
+      }
       applyGoal(response.goal);
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+      ) {
+        return;
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId === threadId) setSaving(false);
+      if (requestGeneration === generation.current) setSaving(false);
     }
   }, [applyGoal, objective, saving, status, tokenBudget, workspace?.threadId]);
 
@@ -175,11 +186,17 @@ export function GoalDock() {
       return;
     }
 
+    const requestGeneration = ++generation.current;
     setClearing(true);
     setError(null);
     try {
       const response = await appServerClient.clearThreadGoal({ threadId });
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+      ) {
+        return;
+      }
       if (!response.cleared) {
         setError("Runtime did not clear the objective. Refresh to reconcile.");
         return;
@@ -187,10 +204,15 @@ export function GoalDock() {
       applyGoal(null);
       setConfirmClear(false);
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        requestGeneration !== generation.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId
+      ) {
+        return;
+      }
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId === threadId) setClearing(false);
+      if (requestGeneration === generation.current) setClearing(false);
     }
   }, [applyGoal, clearing, confirmClear, workspace?.threadId]);
 
