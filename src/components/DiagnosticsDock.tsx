@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient, type RuntimeConnectionSnapshot } from "../runtime/appServerClient";
 import { PROTOCOL_SOURCE_SHORT_SHA, type EnvironmentInfoResponse } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
@@ -17,9 +17,11 @@ export function DiagnosticsDock() {
   const [snapshot, setSnapshot] = useState<DiagnosticsSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const diagnosticGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
     if (loading) return;
+    const requestGeneration = ++diagnosticGeneration.current;
     const connection = appServerClient.getSnapshot();
     setLoading(true);
     setError(null);
@@ -28,12 +30,14 @@ export function DiagnosticsDock() {
       const environment = connection.phase === "ready"
         ? await appServerClient.readEnvironmentInfo({ environmentId: "local" })
         : null;
+      if (requestGeneration !== diagnosticGeneration.current) return;
       setSnapshot({
         connection: appServerClient.getSnapshot(),
         environment,
         capturedAt: Date.now(),
       });
     } catch (cause) {
+      if (requestGeneration !== diagnosticGeneration.current) return;
       setSnapshot({
         connection: appServerClient.getSnapshot(),
         environment: null,
@@ -41,7 +45,7 @@ export function DiagnosticsDock() {
       });
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoading(false);
+      if (requestGeneration === diagnosticGeneration.current) setLoading(false);
     }
   }, [loading]);
 
@@ -59,8 +63,17 @@ export function DiagnosticsDock() {
   }, [loading, snapshot, workspace]);
 
   useEffect(() => {
-    if (open) void refresh();
-    // Opening is the only automatic diagnostic read. No interval sampling.
+    if (open) {
+      void refresh();
+      return;
+    }
+    diagnosticGeneration.current += 1;
+    setLoading(false);
+    setSnapshot(null);
+    setError(null);
+    setCopied(false);
+    // Opening is the only automatic diagnostic read. Closing invalidates any
+    // in-flight read and releases path-rich snapshot data retained by the panel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
