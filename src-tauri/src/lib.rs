@@ -6,9 +6,11 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::Mutex;
+use tokio::time::{timeout, Duration};
 
 const MESSAGE_EVENT: &str = "syndrid://app-server/message";
 const STDERR_EVENT: &str = "syndrid://app-server/stderr";
+const APP_SERVER_STOP_GRACE: Duration = Duration::from_millis(750);
 
 #[derive(Default)]
 struct AppServerInner {
@@ -161,13 +163,31 @@ async fn app_server_status(state: State<'_, AppServerState>) -> Result<AppServer
 #[tauri::command]
 async fn stop_app_server(state: State<'_, AppServerState>) -> Result<(), String> {
     let mut inner = state.0.lock().await;
-    if let Some(mut child) = inner.process.take() {
-        child.kill().await.map_err(|error| error.to_string())?;
-        let _ = child.wait().await;
-    }
+    // Closing stdin first gives the stdio app-server a bounded opportunity to
+    // observe EOF and perform its own cleanup before Desktop force-terminates it.
     inner.stdin = None;
+    let process = inner.process.take();
     inner.binary = None;
+    drop(inner);
+
+    if let Some(child) = process {
+        terminate_child(child).await?;
+    }
     Ok(())
+}
+
+async fn terminate_child(mut child: Child) -> Result<(), String> {
+    match timeout(APP_SERVER_STOP_GRACE, child.wait()).await {
+        Ok(result) => {
+            result.map_err(|error| error.to_string())?;
+            Ok(())
+        }
+        Err(_) => {
+            child.kill().await.map_err(|error| error.to_string())?;
+            child.wait().await.map_err(|error| error.to_string())?;
+            Ok(())
+        }
+    }
 }
 
 fn normalize_runtime_binary(value: String) -> Option<String> {
@@ -248,12 +268,13 @@ pub fn run() {
                 let state = state.inner().clone();
                 tauri::async_runtime::spawn(async move {
                     let mut inner = state.0.lock().await;
-                    if let Some(mut child) = inner.process.take() {
-                        let _ = child.kill().await;
-                        let _ = child.wait().await;
-                    }
                     inner.stdin = None;
+                    let process = inner.process.take();
                     inner.binary = None;
+                    drop(inner);
+                    if let Some(child) = process {
+                        let _ = terminate_child(child).await;
+                    }
                 });
             }
         })
