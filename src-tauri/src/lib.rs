@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::Mutex;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 const MESSAGE_EVENT: &str = "syndrid://app-server/message";
 const STDERR_EVENT: &str = "syndrid://app-server/stderr";
@@ -38,7 +38,10 @@ async fn start_app_server(
 ) -> Result<AppServerStatus, String> {
     let mut inner = state.0.lock().await;
 
-    let active_binary = inner.binary.clone().unwrap_or_else(|| "syndrid".to_string());
+    let active_binary = inner
+        .binary
+        .clone()
+        .unwrap_or_else(|| "syndrid".to_string());
     if let Some(child) = inner.process.as_mut() {
         match child.try_wait().map_err(|error| error.to_string())? {
             None => {
@@ -139,7 +142,10 @@ async fn app_server_send(state: State<'_, AppServerState>, line: String) -> Resu
 #[tauri::command]
 async fn app_server_status(state: State<'_, AppServerState>) -> Result<AppServerStatus, String> {
     let mut inner = state.0.lock().await;
-    let active_binary = inner.binary.clone().unwrap_or_else(|| "syndrid".to_string());
+    let active_binary = inner
+        .binary
+        .clone()
+        .unwrap_or_else(|| "syndrid".to_string());
     let Some(child) = inner.process.as_mut() else {
         return Ok(AppServerStatus::Stopped);
     };
@@ -239,7 +245,9 @@ mod tests {
     #[test]
     fn normalizes_explicit_runtime_binary() {
         assert_eq!(
-            runtime_candidates(Some("  C:\\Program Files\\Syndrid\\syndrid.exe  ".to_string())),
+            runtime_candidates(Some(
+                "  C:\\Program Files\\Syndrid\\syndrid.exe  ".to_string()
+            )),
             vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
         );
     }
@@ -248,7 +256,11 @@ mod tests {
     fn ignores_blank_explicit_runtime_binary() {
         let candidates = runtime_candidates(Some("  \t  ".to_string()));
         assert!(candidates.iter().any(|candidate| candidate == "syndrid"));
-        assert!(candidates.iter().all(|candidate| !candidate.trim().is_empty()));
+        assert!(
+            candidates
+                .iter()
+                .all(|candidate| !candidate.trim().is_empty())
+        );
     }
 }
 
