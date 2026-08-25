@@ -360,7 +360,9 @@ mod tests {
             vec!["C:\\Program Files\\Syndrid\\syndrid.exe".to_string()]
         );
         assert_eq!(
-            runtime_candidates(Some("\" /Applications/Syndrid CLI/bin/syndrid \"".to_string())),
+            runtime_candidates(Some(
+                "\" /Applications/Syndrid CLI/bin/syndrid \"".to_string()
+            )),
             vec!["/Applications/Syndrid CLI/bin/syndrid".to_string()]
         );
     }
