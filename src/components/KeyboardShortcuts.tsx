@@ -96,6 +96,12 @@ export function KeyboardShortcuts() {
         return;
       }
 
+      if (open && event.key === "Tab") {
+        event.preventDefault();
+        closeButtonRef.current?.focus();
+        return;
+      }
+
       if (open && isPrimaryMod(event) && event.key.toLowerCase() === "k") {
         setOpen(false);
         return;
