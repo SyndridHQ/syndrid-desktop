@@ -26,6 +26,7 @@ import { SkillsDock } from "./components/SkillsDock";
 import { SubagentsDock } from "./components/SubagentsDock";
 import { TerminalDock } from "./components/TerminalDock";
 import { WarningsDock } from "./components/WarningsDock";
+import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
 import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
 
@@ -33,32 +34,34 @@ const bootStartedAt = performance.now();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App bootStartedAt={bootStartedAt} />
-    <PrimaryNavigationBridge />
-    <CommandPalette />
-    <KeyboardShortcuts />
-    <ApprovalDock />
-    <RuntimeInputDock />
-    <McpElicitationDock />
-    <McpServerDock />
-    <WorkspaceFilesDock />
-    <SkillsDock />
-    <ProviderDock />
-    <ModelCatalogDock />
-    <PermissionsDock />
-    <GitDock />
-    <ReviewDock />
-    <TerminalDock />
-    <BackgroundProcessesDock />
-    <SubagentsDock />
-    <SessionHistoryDock />
-    <ContextDock />
-    <PlanDock />
-    <GoalDock />
-    <HooksDock />
-    <SettingsDock />
-    <DiagnosticsDock />
-    <WarningsDock />
-    <RuntimeActivityDock />
+    <WorkbenchErrorBoundary>
+      <App bootStartedAt={bootStartedAt} />
+      <PrimaryNavigationBridge />
+      <CommandPalette />
+      <KeyboardShortcuts />
+      <ApprovalDock />
+      <RuntimeInputDock />
+      <McpElicitationDock />
+      <McpServerDock />
+      <WorkspaceFilesDock />
+      <SkillsDock />
+      <ProviderDock />
+      <ModelCatalogDock />
+      <PermissionsDock />
+      <GitDock />
+      <ReviewDock />
+      <TerminalDock />
+      <BackgroundProcessesDock />
+      <SubagentsDock />
+      <SessionHistoryDock />
+      <ContextDock />
+      <PlanDock />
+      <GoalDock />
+      <HooksDock />
+      <SettingsDock />
+      <DiagnosticsDock />
+      <WarningsDock />
+      <RuntimeActivityDock />
+    </WorkbenchErrorBoundary>
   </StrictMode>,
 );
