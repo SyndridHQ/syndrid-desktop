@@ -9,6 +9,10 @@ const HOOK_COMPLETED = "hook/completed";
 const MAX_RETAINED_RUNS = 80;
 const MAX_VISIBLE_RUNS = 16;
 const MAX_VISIBLE_HOOKS = 120;
+const MAX_RETAINED_ENTRIES_PER_RUN = 12;
+const MAX_HOOK_LABEL_CHARS = 8 * 1024;
+const MAX_HOOK_DETAIL_CHARS = 32 * 1024;
+const MAX_HOOK_PATH_CHARS = 4 * 1024;
 
 type HookOutputEntry = { kind: string; text: string };
 type HookRun = {
@@ -316,25 +320,33 @@ function parseHookNotification(value: unknown): HookRun | null {
     typeof run.status !== "string"
   ) return null;
 
-  const entries = Array.isArray(run.entries)
-    ? run.entries.flatMap((entry): HookOutputEntry[] =>
-        isRecord(entry) && typeof entry.kind === "string" && typeof entry.text === "string"
-          ? [{ kind: entry.kind, text: entry.text }]
-          : [])
-    : [];
+  const entries: HookOutputEntry[] = [];
+  if (Array.isArray(run.entries)) {
+    const entryCount = Math.min(run.entries.length, MAX_RETAINED_ENTRIES_PER_RUN);
+    for (let index = 0; index < entryCount; index += 1) {
+      const entry = run.entries[index];
+      if (!isRecord(entry) || typeof entry.kind !== "string" || typeof entry.text !== "string") continue;
+      entries.push({
+        kind: boundText(entry.kind, MAX_HOOK_LABEL_CHARS),
+        text: boundText(entry.text, MAX_HOOK_DETAIL_CHARS),
+      });
+    }
+  }
 
   return {
-    id: run.id,
-    threadId: value.threadId,
-    turnId: typeof value.turnId === "string" ? value.turnId : null,
-    eventName: run.eventName,
-    handlerType: run.handlerType,
-    executionMode: run.executionMode,
-    scope: run.scope,
-    sourcePath: run.sourcePath,
-    source: run.source,
-    status: run.status,
-    statusMessage: typeof run.statusMessage === "string" ? run.statusMessage : null,
+    id: boundText(run.id, MAX_HOOK_LABEL_CHARS),
+    threadId: boundText(value.threadId, MAX_HOOK_LABEL_CHARS),
+    turnId: typeof value.turnId === "string" ? boundText(value.turnId, MAX_HOOK_LABEL_CHARS) : null,
+    eventName: boundText(run.eventName, MAX_HOOK_LABEL_CHARS),
+    handlerType: boundText(run.handlerType, MAX_HOOK_LABEL_CHARS),
+    executionMode: boundText(run.executionMode, MAX_HOOK_LABEL_CHARS),
+    scope: boundText(run.scope, MAX_HOOK_LABEL_CHARS),
+    sourcePath: boundText(run.sourcePath, MAX_HOOK_PATH_CHARS),
+    source: boundText(run.source, MAX_HOOK_LABEL_CHARS),
+    status: boundText(run.status, MAX_HOOK_LABEL_CHARS),
+    statusMessage: typeof run.statusMessage === "string"
+      ? boundText(run.statusMessage, MAX_HOOK_DETAIL_CHARS)
+      : null,
     startedAt: finiteNumber(run.startedAt) ?? Date.now(),
     completedAt: finiteNumber(run.completedAt),
     durationMs: finiteNumber(run.durationMs),
@@ -348,6 +360,11 @@ function upsertHookRun(current: HookRun[], next: HookRun): HookRun[] {
     ? [...current, next]
     : current.map((run, runIndex) => runIndex === index ? next : run);
   return updated.slice(-MAX_RETAINED_RUNS);
+}
+
+function boundText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
 }
 
 function finiteNumber(value: unknown): number | null {
