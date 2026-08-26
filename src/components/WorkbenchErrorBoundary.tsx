@@ -50,6 +50,7 @@ export class WorkbenchErrorBoundary extends Component<
             screen. SyndridCLI remains the runtime authority.
           </p>
           <button
+            autoFocus
             disabled={this.state.recovering}
             onClick={() => void this.reload()}
             type="button"
