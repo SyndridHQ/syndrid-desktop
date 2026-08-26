@@ -9,7 +9,7 @@ export function getRuntimeBinaryOverride(): string | null {
   }
 }
 
-export function setRuntimeBinaryOverride(value: string | null): void {
+export function setRuntimeBinaryOverride(value: string | null): boolean {
   try {
     const normalized = value?.trim();
     if (normalized) {
@@ -17,8 +17,10 @@ export function setRuntimeBinaryOverride(value: string | null): void {
     } else {
       window.localStorage.removeItem(RUNTIME_BINARY_KEY);
     }
+    return true;
   } catch {
     // Storage can be unavailable in constrained webviews. The runtime remains usable
     // through SYNDRID_APP_SERVER_BINARY or PATH in that case.
+    return false;
   }
 }
