@@ -9,6 +9,12 @@ const MAX_RENDERED_WARNINGS = 24;
 const MAX_WARNING_TITLE_CHARS = 8_192;
 const MAX_WARNING_DETAILS_CHARS = 32_768;
 const MAX_WARNING_PATH_CHARS = 4_096;
+const WARNING_TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 type WarningKind = "error" | "guardian" | "warning" | "config" | "deprecation";
 type WarningScope = "selected" | "all";
@@ -108,7 +114,9 @@ export function WarningsDock() {
                   </div>
                   {entry.details && <p>{entry.details}</p>}
                   <div className="warning-row-meta">
-                    <span>{formatRelativeTime(entry.receivedAt)}</span>
+                    <time dateTime={new Date(entry.receivedAt).toISOString()}>
+                      {WARNING_TIME_FORMAT.format(new Date(entry.receivedAt))}
+                    </time>
                     {entry.threadId && <code title={entry.threadId}>{shortId(entry.threadId)}</code>}
                     {entry.path && <code title={entry.path}>{entry.path}</code>}
                     {entry.willRetry !== null && <span>{entry.willRetry ? "runtime will retry" : "no retry reported"}</span>}
@@ -252,12 +260,4 @@ function shortId(value: string): string {
 function formatKind(kind: WarningKind): string {
   if (kind === "guardian") return "safety";
   return kind;
-}
-
-function formatRelativeTime(timestampMs: number): string {
-  const ageSeconds = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
-  if (ageSeconds < 60) return "now";
-  if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m ago`;
-  if (ageSeconds < 86400) return `${Math.floor(ageSeconds / 3600)}h ago`;
-  return `${Math.floor(ageSeconds / 86400)}d ago`;
 }
