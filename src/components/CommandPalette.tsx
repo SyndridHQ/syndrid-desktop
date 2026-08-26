@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import "./commandPalette.css";
 
 type Command = {
@@ -191,6 +197,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const paletteRef = useRef<HTMLElement>(null);
   const modLabel = useMemo(() => (isApplePlatform() ? "⌘" : "Ctrl"), []);
 
   const filtered = useMemo(() => {
@@ -228,9 +235,16 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     setQuery("");
     setActiveIndex(0);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
   }, [open]);
 
   useEffect(() => {
@@ -254,12 +268,15 @@ export function CommandPalette() {
       aria-label="Command palette"
       aria-modal="true"
       className="command-palette-backdrop"
+      onKeyDown={(event) => {
+        if (event.key === "Tab") trapFocus(event, paletteRef.current);
+      }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}
       role="dialog"
     >
-      <section className="command-palette">
+      <section className="command-palette" ref={paletteRef}>
         <div className="command-palette-search">
           <span aria-hidden="true">⌘</span>
           <input
@@ -316,6 +333,30 @@ export function CommandPalette() {
       </section>
     </div>
   );
+}
+
+function trapFocus(event: ReactKeyboardEvent<HTMLElement>, root: HTMLElement | null): void {
+  if (!root) return;
+  const focusable = Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'input, button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => element.tabIndex >= 0);
+  if (focusable.length === 0) return;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (!root.contains(active)) {
+    event.preventDefault();
+    first?.focus();
+  } else if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last?.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first?.focus();
+  }
 }
 
 function clickElement(selector: string): void {
