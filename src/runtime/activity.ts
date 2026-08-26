@@ -32,6 +32,7 @@ export interface RuntimeItemLifecycleEnvelope {
 }
 
 const MAX_ACTIVITY_TEXT_CHARS = 8_192;
+const MAX_ACTIVITY_COLLECTION_SCAN = 256;
 
 export function isRuntimeItemLifecycleEnvelope(
   value: unknown,
@@ -189,26 +190,27 @@ export function upsertRuntimeActivity(
 
 function summarizeFileChanges(value: unknown): string | null {
   if (!Array.isArray(value)) return null;
-  const paths = value
-    .map((entry) => {
-      if (!isRecord(entry)) return null;
-      return (
-        stringValue(entry.path) ??
-        stringValue(entry.filePath) ??
-        stringValue(entry.file_path)
-      );
-    })
-    .filter((path): path is string => Boolean(path));
+  const paths: string[] = [];
+  const scanLimit = Math.min(value.length, MAX_ACTIVITY_COLLECTION_SCAN);
+  for (let index = 0; index < scanLimit && paths.length < 2; index += 1) {
+    const entry = value[index];
+    if (!isRecord(entry)) continue;
+    const path =
+      stringValue(entry.path) ??
+      stringValue(entry.filePath) ??
+      stringValue(entry.file_path);
+    if (path) paths.push(path);
+  }
   if (paths.length === 0) return null;
-  if (paths.length <= 2) return boundedText(paths.join(", "));
-  return boundedText(`${paths.slice(0, 2).join(", ")} +${paths.length - 2}`);
+  if (value.length <= paths.length) return boundedText(paths.join(", "));
+  return boundedText(`${paths.join(", ")} +${value.length - paths.length}`);
 }
 
 function summarizeAgents(value: unknown): string | null {
-  if (!Array.isArray(value)) return null;
-  const ids = value.filter((entry): entry is string => typeof entry === "string");
-  if (ids.length === 0) return null;
-  return ids.length === 1 ? boundedText(ids[0] ?? "") || null : `${ids.length} agents`;
+  if (!Array.isArray(value) || value.length === 0) return null;
+  if (value.length > 1) return `${value.length} agents`;
+  const first = value[0];
+  return typeof first === "string" ? boundedText(first) || null : null;
 }
 
 function statusValue(status: unknown, exitCode: unknown): string | null {
