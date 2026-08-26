@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./keyboardShortcuts.css";
 
 type Shortcut = {
@@ -43,6 +43,8 @@ const shortcutDefinitions: Omit<Shortcut, "keys">[] = [
 
 export function KeyboardShortcuts() {
   const [open, setOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
   const modLabel = useMemo(() => (isApplePlatform() ? "⌘" : "Ctrl"), []);
   const shortcuts = useMemo<Shortcut[]>(
     () => [
@@ -71,6 +73,20 @@ export function KeyboardShortcuts() {
     window.addEventListener("syndrid:open-shortcuts", openHelp);
     return () => window.removeEventListener("syndrid:open-shortcuts", openHelp);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      const previousFocus = previousFocusRef.current;
+      previousFocusRef.current = null;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [open]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -111,7 +127,7 @@ export function KeyboardShortcuts() {
 
   return (
     <div
-      aria-label="Keyboard shortcuts"
+      aria-labelledby="keyboard-shortcuts-title"
       aria-modal="true"
       className="keyboard-shortcuts-backdrop"
       onMouseDown={(event) => {
@@ -122,10 +138,10 @@ export function KeyboardShortcuts() {
       <section className="keyboard-shortcuts-panel">
         <header>
           <span>
-            <strong>Keyboard shortcuts</strong>
+            <strong id="keyboard-shortcuts-title">Keyboard shortcuts</strong>
             <small>Workbench controls only · runtime behavior stays in SyndridCLI</small>
           </span>
-          <button onClick={() => setOpen(false)} type="button">
+          <button onClick={() => setOpen(false)} ref={closeButtonRef} type="button">
             Close
           </button>
         </header>
