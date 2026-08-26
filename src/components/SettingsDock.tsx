@@ -7,6 +7,7 @@ import {
 } from "../runtime/native";
 import {
   getRuntimeBinaryOverride,
+  MAX_RUNTIME_BINARY_CHARS,
   setRuntimeBinaryOverride,
 } from "../runtime/runtimeBinaryPreference";
 import "./settingsDock.css";
@@ -56,6 +57,12 @@ export function SettingsDock() {
 
   const save = (): boolean => {
     const normalized = binary.trim();
+    if (normalized.length > MAX_RUNTIME_BINARY_CHARS) {
+      setError(
+        `The runtime executable path cannot exceed ${MAX_RUNTIME_BINARY_CHARS.toLocaleString()} characters.`,
+      );
+      return false;
+    }
     if (!setRuntimeBinaryOverride(normalized || null)) {
       setError("Desktop could not persist the runtime executable preference in local storage.");
       return false;
@@ -119,6 +126,7 @@ export function SettingsDock() {
             <input
               autoComplete="off"
               id="runtime-binary"
+              maxLength={MAX_RUNTIME_BINARY_CHARS}
               onChange={(event) => setBinary(event.target.value)}
               placeholder="syndrid (use PATH / environment default)"
               spellCheck={false}
