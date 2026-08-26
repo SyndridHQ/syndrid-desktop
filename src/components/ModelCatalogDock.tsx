@@ -11,6 +11,8 @@ const MAX_DESCRIPTION_CHARS = 32 * 1024;
 const MAX_MODALITIES = 16;
 const MAX_MODALITY_CHARS = 512;
 const OPEN_EVENT = "syndrid:open-model-catalog";
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 type RetainedModel = {
   id: string;
@@ -31,6 +33,8 @@ export function ModelCatalogDock() {
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const load = useCallback(
     async (append = false) => {
@@ -69,7 +73,11 @@ export function ModelCatalogDock() {
   );
 
   useEffect(() => {
-    const onOpen = () => setOpen(true);
+    const onOpen = () => {
+      const active = document.activeElement;
+      previousFocusRef.current = active instanceof HTMLElement ? active : null;
+      setOpen(true);
+    };
     window.addEventListener(OPEN_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_EVENT, onOpen);
   }, []);
@@ -82,6 +90,9 @@ export function ModelCatalogDock() {
       setCursor(null);
       setQuery("");
       setError(null);
+      const previousFocus = previousFocusRef.current;
+      previousFocusRef.current = null;
+      if (previousFocus?.isConnected) previousFocus.focus();
       return;
     }
     setModels([]);
@@ -99,7 +110,34 @@ export function ModelCatalogDock() {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -128,18 +166,19 @@ export function ModelCatalogDock() {
 
   return (
     <div
-      aria-label="Runtime model catalog"
+      aria-labelledby="runtime-model-catalog-title"
       aria-modal="true"
       className="model-catalog-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}
+      ref={dialogRef}
       role="dialog"
     >
       <section className="model-catalog-panel">
         <header>
           <span>
-            <strong>Runtime model catalog</strong>
+            <strong id="runtime-model-catalog-title">Runtime model catalog</strong>
             <small>
               {models.length} retained{cursor ? " · more available" : " · end of catalog"}
             </small>
