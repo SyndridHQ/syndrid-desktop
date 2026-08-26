@@ -210,6 +210,8 @@ export function CommandPalette() {
         .includes(needle),
     );
   }, [query]);
+  const activeCommand = filtered[activeIndex];
+  const activeOptionId = activeCommand ? optionId(activeCommand.id) : undefined;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -283,6 +285,10 @@ export function CommandPalette() {
         <div className="command-palette-search">
           <span aria-hidden="true">⌘</span>
           <input
+            aria-activedescendant={activeOptionId}
+            aria-autocomplete="list"
+            aria-controls="command-palette-results"
+            aria-expanded="true"
             aria-label="Search commands"
             onChange={(event) => {
               setQuery(event.target.value);
@@ -302,11 +308,12 @@ export function CommandPalette() {
             }}
             placeholder="Search Syndrid commands…"
             ref={inputRef}
+            role="combobox"
             value={query}
           />
           <kbd>Esc</kbd>
         </div>
-        <div className="command-palette-results" role="listbox">
+        <div className="command-palette-results" id="command-palette-results" role="listbox">
           {filtered.length === 0 ? (
             <div className="command-palette-empty">No matching commands</div>
           ) : (
@@ -314,6 +321,7 @@ export function CommandPalette() {
               <button
                 aria-selected={index === activeIndex}
                 className={index === activeIndex ? "active" : ""}
+                id={optionId(command.id)}
                 key={command.id}
                 onClick={() => execute(command)}
                 onMouseEnter={() => setActiveIndex(index)}
@@ -336,6 +344,10 @@ export function CommandPalette() {
       </section>
     </div>
   );
+}
+
+function optionId(commandId: string): string {
+  return `command-palette-option-${commandId}`;
 }
 
 function trapFocus(event: ReactKeyboardEvent<HTMLElement>, root: HTMLElement | null): void {
