@@ -214,17 +214,18 @@ function retainSkills(data: SkillsListEntry[]): RetainedSkills {
 }
 
 function boundSkillMetadata(skill: SkillMetadata): SkillMetadata {
+  const {
+    shortDescription,
+    interface: _interface,
+    dependencies: _dependencies,
+    ...retained
+  } = skill;
   return {
-    ...skill,
+    ...retained,
     description: boundText(skill.description, MAX_SKILL_DESCRIPTION_CHARS),
-    shortDescription: skill.shortDescription === undefined
-      ? undefined
-      : boundText(skill.shortDescription, MAX_SKILL_SHORT_DESCRIPTION_CHARS),
-    // These opaque discovery payloads are not rendered by the current Desktop
-    // surface. Keep discovery/runtime ownership in SyndridCLI without retaining
-    // potentially large unused structures in the visual client.
-    interface: undefined,
-    dependencies: undefined,
+    ...(shortDescription === undefined
+      ? {}
+      : { shortDescription: boundText(shortDescription, MAX_SKILL_SHORT_DESCRIPTION_CHARS) }),
   };
 }
 
