@@ -131,7 +131,7 @@ export function DiagnosticsDock() {
             <Diagnostic label="Selected thread" value={capturedWorkspace?.threadId ? shortId(capturedWorkspace.threadId) : "None"} title={capturedWorkspace?.threadId} />
             <Diagnostic label="Workspace" value={capturedWorkspace?.cwd || "None"} title={capturedWorkspace?.cwd} />
             <Diagnostic label="Git" value={gitLabel} />
-            <Diagnostic label="Captured" value={snapshot ? formatAge(snapshot.capturedAt) : "Not yet"} />
+            <Diagnostic label="Captured" value={snapshot ? formatTimestamp(snapshot.capturedAt) : "Not yet"} />
           </dl>
 
           <footer>
@@ -213,9 +213,6 @@ function shortId(id: string): string {
   return id.length > 10 ? `${id.slice(0, 8)}…` : id;
 }
 
-function formatAge(timestamp: number): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  return `${Math.floor(seconds / 60)}m ago`;
+function formatTimestamp(timestamp: number): string {
+  return new Date(timestamp).toLocaleString();
 }
