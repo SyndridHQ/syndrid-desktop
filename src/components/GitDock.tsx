@@ -28,6 +28,7 @@ interface RuntimeChangeSummary {
   files: number;
   added: number;
   removed: number;
+  truncated: boolean;
 }
 
 type DiffLineKind = "metadata" | "hunk" | "added" | "removed" | "context";
@@ -107,7 +108,11 @@ export function GitDock() {
       setBaseSha(result.sha);
       setDiff(retainedDiff);
       setRuntimeChanges(retainedTypedChanges);
-      setRuntimeChangeSummary(allTypedChanges ? summarizeRuntimeChanges(allTypedChanges) : null);
+      setRuntimeChangeSummary(
+        allTypedChanges && retainedTypedChanges
+          ? summarizeRuntimeChanges(retainedTypedChanges, allTypedChanges.length)
+          : null,
+      );
       setDiffTruncated(isTruncated);
       setDiffStale(false);
       setFileFilter("");
@@ -232,6 +237,7 @@ export function GitDock() {
                       <em>
                         {totalChangedFiles > 0 && `${totalChangedFiles} files · `}
                         +{diffStats.added} −{diffStats.removed}
+                        {runtimeChangeSummary?.truncated && " · stats capped"}
                       </em>
                     )}
                   </div>
@@ -299,6 +305,11 @@ export function GitDock() {
                         <div className="git-state compact">No changed files match this filter.</div>
                       ) : (
                         <DiffText text={diff} />
+                      )}
+                      {runtimeChangeSummary?.truncated && (
+                        <div className="git-state compact">
+                          Typed line statistics are capped at the first {MAX_TYPED_DIFF_CHANGES.toLocaleString()} files.
+                        </div>
                       )}
                       {diffTruncated && (
                         <div className="git-state compact">
@@ -468,14 +479,22 @@ function summarizeDiff(diff: string): { added: number; removed: number } {
   return { added, removed };
 }
 
-function summarizeRuntimeChanges(changes: GitDiffChange[]): RuntimeChangeSummary {
+function summarizeRuntimeChanges(
+  changes: GitDiffChange[],
+  totalFiles: number,
+): RuntimeChangeSummary {
   let added = 0;
   let removed = 0;
   for (const change of changes) {
     added += change.addedLines;
     removed += change.removedLines;
   }
-  return { files: changes.length, added, removed };
+  return {
+    files: totalFiles,
+    added,
+    removed,
+    truncated: totalFiles > changes.length,
+  };
 }
 
 function changeKindShortLabel(kind: GitDiffChangeKind): string {
