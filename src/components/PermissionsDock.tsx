@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import type { PermissionProfileSummary } from "../runtime/permissionProfileProtocol";
-import type { ConfigReadResponse } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./permissionsDock.css";
 
 const PROFILE_PAGE_SIZE = 40;
 const MAX_RETAINED_PROFILES = 120;
 const MAX_RETAINED_WRITABLE_ROOTS = 32;
+const MAX_WRITABLE_ROOT_SCAN = 256;
 const MAX_PRESENTATION_TEXT = 8_192;
 const MAX_PATH_TEXT = 4_096;
+
+type RuntimeWorkspaceDefaults = {
+  approvalPolicy: string;
+  sandboxMode: string;
+};
 
 type RuntimeThreadSettings = {
   approvalPolicy: string;
@@ -17,14 +22,14 @@ type RuntimeThreadSettings = {
   sandbox: string;
   activePermissionProfileId: string | null;
   writableRoots: string[];
-  writableRootCount: number;
+  writableRootsOmitted: boolean;
 };
 
 export function PermissionsDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [config, setConfig] = useState<ConfigReadResponse | null>(null);
+  const [config, setConfig] = useState<RuntimeWorkspaceDefaults | null>(null);
   const [sessionSettings, setSessionSettings] = useState<RuntimeThreadSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -54,7 +59,10 @@ export function PermissionsDock() {
       ) {
         return;
       }
-      setConfig(result);
+      setConfig({
+        approvalPolicy: limitPresentation(formatPolicy(result.config.approval_policy)),
+        sandboxMode: limitPresentation(formatPolicy(result.config.sandbox_mode)),
+      });
     } catch (cause) {
       if (requestGeneration !== generation.current) return;
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -134,11 +142,11 @@ export function PermissionsDock() {
     });
   }, [open, workspace?.threadId]);
 
-  const workspaceApproval = config?.config.approval_policy;
-  const workspaceSandbox = config?.config.sandbox_mode;
   const liveProfileId = sessionSettings?.activePermissionProfileId ?? null;
   const writableRoots = sessionSettings?.writableRoots.slice(0, 8) ?? [];
-  const writableRootCount = sessionSettings?.writableRootCount ?? 0;
+  const writableRootsOmitted =
+    sessionSettings?.writableRootsOmitted === true ||
+    (sessionSettings?.writableRoots.length ?? 0) > writableRoots.length;
   const allowedProfileCount = useMemo(
     () => profiles.reduce((count, profile) => count + (profile.allowed ? 1 : 0), 0),
     [profiles],
@@ -182,8 +190,14 @@ export function PermissionsDock() {
                   <small>Effective `config/read` values for this workspace</small>
                 </header>
                 <dl className="permissions-grid">
-                  <PermissionValue label="Approval policy" value={formatPolicy(workspaceApproval)} />
-                  <PermissionValue label="Sandbox mode" value={formatPolicy(workspaceSandbox)} />
+                  <PermissionValue
+                    label="Approval policy"
+                    value={config?.approvalPolicy ?? "Runtime default"}
+                  />
+                  <PermissionValue
+                    label="Sandbox mode"
+                    value={config?.sandboxMode ?? "Runtime default"}
+                  />
                 </dl>
               </section>
 
@@ -213,7 +227,7 @@ export function PermissionsDock() {
                         {writableRoots.map((root, index) => (
                           <code key={`${index}:${root}`} title={root}>{root}</code>
                         ))}
-                        {writableRootCount > writableRoots.length && (
+                        {writableRootsOmitted && (
                           <small>Additional roots omitted from this bounded view.</small>
                         )}
                       </div>
@@ -311,7 +325,7 @@ function parseThreadSettingsUpdated(value: unknown): {
   const threadSettings = toRecord(record?.threadSettings);
   if (!record || typeof record.threadId !== "string" || !threadSettings) return null;
 
-  const writableRoots = extractWritableRoots(threadSettings.sandboxPolicy);
+  const writableRoots = summarizeWritableRoots(threadSettings.sandboxPolicy);
   return {
     threadId: record.threadId,
     settings: {
@@ -319,10 +333,8 @@ function parseThreadSettingsUpdated(value: unknown): {
       approvalsReviewer: limitPresentation(formatPolicy(threadSettings.approvalsReviewer)),
       sandbox: limitPresentation(formatSandbox(threadSettings.sandboxPolicy)),
       activePermissionProfileId: extractPermissionProfileId(threadSettings.activePermissionProfile),
-      writableRoots: writableRoots
-        .slice(0, MAX_RETAINED_WRITABLE_ROOTS)
-        .map((root) => limitText(root, MAX_PATH_TEXT)),
-      writableRootCount: writableRoots.length,
+      writableRoots: writableRoots.roots,
+      writableRootsOmitted: writableRoots.omitted,
     },
   };
 }
@@ -378,10 +390,23 @@ function extractPermissionProfileId(value: unknown): string | null {
   return null;
 }
 
-function extractWritableRoots(value: unknown): string[] {
+function summarizeWritableRoots(value: unknown): { roots: string[]; omitted: boolean } {
   const record = toRecord(value);
-  if (!record || !Array.isArray(record.writableRoots)) return [];
-  return record.writableRoots.filter((root): root is string => typeof root === "string");
+  if (!record || !Array.isArray(record.writableRoots)) return { roots: [], omitted: false };
+
+  const roots: string[] = [];
+  const scanLimit = Math.min(record.writableRoots.length, MAX_WRITABLE_ROOT_SCAN);
+  let omitted = record.writableRoots.length > scanLimit;
+  for (let index = 0; index < scanLimit; index += 1) {
+    const root = record.writableRoots[index];
+    if (typeof root !== "string") continue;
+    if (roots.length >= MAX_RETAINED_WRITABLE_ROOTS) {
+      omitted = true;
+      break;
+    }
+    roots.push(limitText(root, MAX_PATH_TEXT));
+  }
+  return { roots, omitted };
 }
 
 function formatNetworkAccess(value: unknown): string | null {
