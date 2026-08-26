@@ -28,6 +28,7 @@ const MAX_TOOL_SCAN = 256;
 const MAX_VISIBLE_TOOL_NAMES = 8;
 const MAX_PRESENTATION_TEXT = 8_192;
 const MAX_ERROR_TEXT = 32_768;
+const MAX_AUTHORIZATION_URL_LENGTH = 16_384;
 
 export function McpServerDock() {
   const [open, setOpen] = useState(false);
@@ -256,7 +257,7 @@ export function McpServerDock() {
                     {startup?.error && <small className="mcp-startup-error">{startup.error}</small>}
                     {server.toolNames.length > 0 && (
                       <div className="mcp-tool-list">
-                        {server.toolNames.map((tool) => <code key={tool}>{tool}</code>)}
+                        {server.toolNames.map((tool, index) => <code key={index}>{tool}</code>)}
                         {(server.toolCountTruncated || server.toolCount > server.toolNames.length) && (
                           <span>
                             +{server.toolCountTruncated
@@ -350,6 +351,9 @@ function parseOauthCompletion(value: unknown): { name: string; success: boolean;
 }
 
 function safeAuthorizationUrl(raw: string): string {
+  if (raw.length > MAX_AUTHORIZATION_URL_LENGTH) {
+    throw new Error("MCP authorization URL exceeds the Desktop safety limit.");
+  }
   const url = new URL(raw);
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error(`Unsupported MCP authorization URL scheme: ${url.protocol}`);
