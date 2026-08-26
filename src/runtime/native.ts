@@ -5,6 +5,9 @@ import { getRuntimeBinaryOverride } from "./runtimeBinaryPreference";
 export const APP_SERVER_MESSAGE_EVENT = "syndrid://app-server/message";
 export const APP_SERVER_STDERR_EVENT = "syndrid://app-server/stderr";
 
+const MAX_APP_SERVER_LINE_BYTES = 32 * 1024 * 1024;
+const textEncoder = new TextEncoder();
+
 export type NativeAppServerStatus =
   | { state: "stopped" }
   | { state: "running"; pid: number; binary: string }
@@ -34,6 +37,11 @@ export async function nativeAppServerStatus(): Promise<NativeAppServerStatus> {
 export async function sendNativeAppServerLine(line: string): Promise<void> {
   if (!isTauri()) {
     throw new Error("Cannot send app-server messages outside the Tauri desktop runtime.");
+  }
+  if (textEncoder.encode(line).byteLength > MAX_APP_SERVER_LINE_BYTES) {
+    throw new Error(
+      `Syndrid app-server message exceeds the ${MAX_APP_SERVER_LINE_BYTES / (1024 * 1024)} MiB desktop transport limit.`,
+    );
   }
   await invoke("app_server_send", { line });
 }
