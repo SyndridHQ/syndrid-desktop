@@ -6,7 +6,19 @@ import "./sessionHistoryDock.css";
 
 const PAGE_SIZE = 40;
 const MAX_RETAINED_THREADS = 160;
+const MAX_TITLE_CHARS = 16 * 1024;
+const MAX_PATH_CHARS = 8 * 1024;
+const MAX_PROVIDER_CHARS = 4 * 1024;
 type HistoryKind = "active" | "archived";
+
+type RetainedThread = {
+  id: string;
+  name: string | null;
+  preview: string;
+  cwd: string;
+  modelProvider: string;
+  updatedAt: number;
+};
 
 export function SessionHistoryDock() {
   const workspace = useRuntimeWorkspace();
@@ -14,8 +26,8 @@ export function SessionHistoryDock() {
   const [loading, setLoading] = useState(false);
   const [mutatingThreadId, setMutatingThreadId] = useState<string | null>(null);
   const [inspectingThreadId, setInspectingThreadId] = useState<string | null>(null);
-  const [inspectedThread, setInspectedThread] = useState<ThreadSummary | null>(null);
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [inspectedThread, setInspectedThread] = useState<RetainedThread | null>(null);
+  const [threads, setThreads] = useState<RetainedThread[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -46,8 +58,9 @@ export function SessionHistoryDock() {
           searchTerm: submittedQuery || null,
         });
         if (requestGeneration !== generation.current) return;
+        const projected = result.data.map(retainThread);
         setThreads((current) =>
-          (append ? [...current, ...result.data] : result.data).slice(
+          (append ? [...current, ...projected] : projected).slice(
             0,
             MAX_RETAINED_THREADS,
           ),
@@ -97,7 +110,7 @@ export function SessionHistoryDock() {
   const visibleThreads = useMemo(() => dedupeThreads(threads), [threads]);
   const normalizedQuery = query.trim();
 
-  const inspectThread = useCallback(async (thread: ThreadSummary) => {
+  const inspectThread = useCallback(async (thread: RetainedThread) => {
     if (inspectingThreadId) return;
     const requestGeneration = ++inspectionGeneration.current;
     setInspectingThreadId(thread.id);
@@ -108,7 +121,7 @@ export function SessionHistoryDock() {
         includeTurns: false,
       });
       if (requestGeneration !== inspectionGeneration.current) return;
-      setInspectedThread(result.thread);
+      setInspectedThread(retainThread(result.thread));
     } catch (cause) {
       if (requestGeneration !== inspectionGeneration.current) return;
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -120,7 +133,7 @@ export function SessionHistoryDock() {
   }, [inspectingThreadId]);
 
   const mutateThread = useCallback(
-    async (thread: ThreadSummary) => {
+    async (thread: RetainedThread) => {
       if (mutatingThreadId) return;
       if (historyKind === "active" && thread.id === workspace?.threadId) {
         setError("The currently selected session cannot be archived from History.");
@@ -296,7 +309,7 @@ export function SessionHistoryDock() {
           )}
 
           <footer>
-            Runtime-backed · {historyKind} · explicit pagination · retains at most {MAX_RETAINED_THREADS} sessions
+            Runtime-backed · {historyKind} · explicit pagination · retains at most {MAX_RETAINED_THREADS} bounded session summaries
           </footer>
         </section>
       )}
@@ -321,7 +334,7 @@ function ThreadRow({
   inspectPending: boolean;
   onAction: () => void;
   onInspect: () => void;
-  thread: ThreadSummary;
+  thread: RetainedThread;
 }) {
   const title = thread.name?.trim() || thread.preview?.trim() || "Untitled session";
   return (
@@ -360,7 +373,23 @@ function ThreadRow({
   );
 }
 
-function dedupeThreads(threads: ThreadSummary[]): ThreadSummary[] {
+function retainThread(thread: ThreadSummary): RetainedThread {
+  return {
+    id: thread.id,
+    name: thread.name === null ? null : boundText(thread.name, MAX_TITLE_CHARS),
+    preview: boundText(thread.preview, MAX_TITLE_CHARS),
+    cwd: boundText(thread.cwd, MAX_PATH_CHARS),
+    modelProvider: boundText(thread.modelProvider, MAX_PROVIDER_CHARS),
+    updatedAt: thread.updatedAt,
+  };
+}
+
+function boundText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function dedupeThreads(threads: RetainedThread[]): RetainedThread[] {
   const seen = new Set<string>();
   return threads.filter((thread) => {
     if (seen.has(thread.id)) return false;
