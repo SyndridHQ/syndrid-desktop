@@ -6,12 +6,12 @@ type RailAction = {
 };
 
 const actions: RailAction[] = [
-  { title: "Workspace", run: () => click(".workspace-files-toggle") },
+  { title: "Workspace", run: () => open(".workspace-files-toggle", ".workspace-files-panel") },
   { title: "Agent", run: () => focus(".composer-input") },
-  { title: "Changes", run: () => click(".git-toggle") },
-  { title: "Git", run: () => click(".git-toggle") },
-  { title: "Extensions", run: () => click(".skills-toggle") },
-  { title: "Settings", run: () => click(".settings-toggle") },
+  { title: "Changes", run: () => open(".git-toggle", ".git-panel") },
+  { title: "Git", run: () => open(".git-toggle", ".git-panel") },
+  { title: "Extensions", run: () => open(".skills-toggle", ".skills-panel") },
+  { title: "Settings", run: () => open(".settings-toggle", ".settings-panel") },
 ];
 
 export function PrimaryNavigationBridge() {
@@ -40,6 +40,11 @@ export function PrimaryNavigationBridge() {
   }, []);
 
   return null;
+}
+
+function open(toggleSelector: string, panelSelector: string): void {
+  if (document.querySelector(panelSelector)) return;
+  click(toggleSelector);
 }
 
 function click(selector: string): void {
