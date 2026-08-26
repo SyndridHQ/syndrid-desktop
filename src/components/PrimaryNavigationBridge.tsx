@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 type RailAction = {
   title: string;
-  run: () => void;
+  run: () => boolean;
 };
 
 const actions: RailAction[] = [
@@ -17,6 +17,10 @@ const actions: RailAction[] = [
 export function PrimaryNavigationBridge() {
   useEffect(() => {
     const cleanups: Array<() => void> = [];
+    const initiallyActive = document.querySelector<HTMLButtonElement>(
+      ".activity-rail .rail-button.active",
+    );
+    if (initiallyActive) initiallyActive.setAttribute("aria-current", "page");
 
     for (const action of actions) {
       const button = document.querySelector<HTMLButtonElement>(
@@ -24,11 +28,13 @@ export function PrimaryNavigationBridge() {
       );
       if (!button) continue;
       const onClick = () => {
+        if (!action.run()) return;
         document.querySelectorAll(".activity-rail .rail-button.active").forEach((element) => {
           element.classList.remove("active");
+          element.removeAttribute("aria-current");
         });
         button.classList.add("active");
-        action.run();
+        button.setAttribute("aria-current", "page");
       };
       button.addEventListener("click", onClick);
       cleanups.push(() => button.removeEventListener("click", onClick));
@@ -42,17 +48,21 @@ export function PrimaryNavigationBridge() {
   return null;
 }
 
-function open(toggleSelector: string, panelSelector: string): void {
-  if (document.querySelector(panelSelector)) return;
-  click(toggleSelector);
+function open(toggleSelector: string, panelSelector: string): boolean {
+  if (document.querySelector(panelSelector)) return true;
+  return click(toggleSelector);
 }
 
-function click(selector: string): void {
+function click(selector: string): boolean {
   const element = document.querySelector<HTMLElement>(selector);
-  if (element && !element.hasAttribute("disabled")) element.click();
+  if (!element || element.hasAttribute("disabled")) return false;
+  element.click();
+  return true;
 }
 
-function focus(selector: string): void {
+function focus(selector: string): boolean {
   const element = document.querySelector<HTMLElement>(selector);
-  if (element && !element.hasAttribute("disabled")) element.focus();
+  if (!element || element.hasAttribute("disabled")) return false;
+  element.focus();
+  return document.activeElement === element;
 }
