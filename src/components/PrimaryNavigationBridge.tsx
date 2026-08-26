@@ -5,6 +5,12 @@ type RailAction = {
   run: () => boolean;
 };
 
+type SurfaceToggle = {
+  toggleSelector: string;
+  panelSelector: string;
+  railTitles: readonly string[];
+};
+
 const actions: RailAction[] = [
   { title: "Workspace", run: () => open(".workspace-files-toggle", ".workspace-files-panel") },
   { title: "Agent", run: () => focus(".composer-input") },
@@ -12,6 +18,29 @@ const actions: RailAction[] = [
   { title: "Git", run: () => open(".git-toggle", ".git-panel") },
   { title: "Extensions", run: () => open(".skills-toggle", ".skills-panel") },
   { title: "Settings", run: () => open(".settings-toggle", ".settings-panel") },
+];
+
+const surfaceToggles: SurfaceToggle[] = [
+  {
+    toggleSelector: ".workspace-files-toggle",
+    panelSelector: ".workspace-files-panel",
+    railTitles: ["Workspace"],
+  },
+  {
+    toggleSelector: ".git-toggle",
+    panelSelector: ".git-panel",
+    railTitles: ["Changes", "Git"],
+  },
+  {
+    toggleSelector: ".skills-toggle",
+    panelSelector: ".skills-panel",
+    railTitles: ["Extensions"],
+  },
+  {
+    toggleSelector: ".settings-toggle",
+    panelSelector: ".settings-panel",
+    railTitles: ["Settings"],
+  },
 ];
 
 export function PrimaryNavigationBridge() {
@@ -23,21 +52,34 @@ export function PrimaryNavigationBridge() {
     if (initiallyActive) initiallyActive.setAttribute("aria-current", "page");
 
     for (const action of actions) {
-      const button = document.querySelector<HTMLButtonElement>(
-        `.activity-rail .rail-button[title="${action.title}"]`,
-      );
+      const button = railButton(action.title);
       if (!button) continue;
       const onClick = () => {
         if (!action.run()) return;
-        document.querySelectorAll(".activity-rail .rail-button.active").forEach((element) => {
-          element.classList.remove("active");
-          element.removeAttribute("aria-current");
-        });
-        button.classList.add("active");
-        button.setAttribute("aria-current", "page");
+        activateRailButton(button);
       };
       button.addEventListener("click", onClick);
       cleanups.push(() => button.removeEventListener("click", onClick));
+    }
+
+    for (const surface of surfaceToggles) {
+      const toggle = document.querySelector<HTMLElement>(surface.toggleSelector);
+      if (!toggle) continue;
+      const onToggle = () => {
+        // React handles the dock toggle later in the same click dispatch. Reconcile
+        // after that state update without introducing a MutationObserver or polling.
+        queueMicrotask(() => {
+          if (document.querySelector(surface.panelSelector)) return;
+          const active = document.querySelector<HTMLButtonElement>(
+            ".activity-rail .rail-button.active",
+          );
+          if (!active || !surface.railTitles.includes(active.title)) return;
+          const agent = railButton("Agent");
+          if (agent) activateRailButton(agent);
+        });
+      };
+      toggle.addEventListener("click", onToggle);
+      cleanups.push(() => toggle.removeEventListener("click", onToggle));
     }
 
     return () => {
@@ -46,6 +88,21 @@ export function PrimaryNavigationBridge() {
   }, []);
 
   return null;
+}
+
+function railButton(title: string): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>(
+    `.activity-rail .rail-button[title="${title}"]`,
+  );
+}
+
+function activateRailButton(button: HTMLButtonElement): void {
+  document.querySelectorAll(".activity-rail .rail-button.active").forEach((element) => {
+    element.classList.remove("active");
+    element.removeAttribute("aria-current");
+  });
+  button.classList.add("active");
+  button.setAttribute("aria-current", "page");
 }
 
 function open(toggleSelector: string, panelSelector: string): boolean {
