@@ -218,7 +218,8 @@ export function PermissionsDock() {
                       <PermissionValue label="Sandbox" value={sessionSettings.sandbox} />
                       <PermissionValue
                         label="Permission profile"
-                        value={sessionSettings.activePermissionProfileId ?? "None reported"}
+                        title={liveProfileId ?? undefined}
+                        value={liveProfileId ? limitPresentation(liveProfileId) : "None reported"}
                       />
                     </dl>
                     {writableRoots.length > 0 && (
@@ -273,7 +274,7 @@ export function PermissionsDock() {
                         key={profile.id}
                       >
                         <div>
-                          <strong>{profile.id}</strong>
+                          <strong title={profile.id}>{limitPresentation(profile.id)}</strong>
                           {profile.description && <small>{profile.description}</small>}
                         </div>
                         <span className={profile.allowed ? "allowed" : "blocked"}>
@@ -308,11 +309,19 @@ export function PermissionsDock() {
   );
 }
 
-function PermissionValue({ label, value }: { label: string; value: string }) {
+function PermissionValue({
+  label,
+  value,
+  title,
+}: {
+  label: string;
+  value: string;
+  title?: string | undefined;
+}) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
+      <dd title={title ?? value}>{value}</dd>
     </div>
   );
 }
