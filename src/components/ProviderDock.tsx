@@ -16,6 +16,7 @@ import "./providerDock.css";
 
 const MAX_VISIBLE_MODELS = 120;
 const MAX_VISIBLE_RATE_LIMITS = 6;
+const MAX_RATE_LIMIT_SCAN = 64;
 const MAX_RETAINED_REROUTES = 12;
 
 interface RuntimeReroute {
@@ -25,6 +26,12 @@ interface RuntimeReroute {
   reason: string;
 }
 
+interface EffectiveProviderConfig {
+  modelProvider: string | null;
+  model: string | null;
+  serviceTier: string | null;
+}
+
 export function ProviderDock() {
   const workspace = useRuntimeWorkspace();
   const [open, setOpen] = useState(false);
@@ -32,7 +39,7 @@ export function ProviderDock() {
   const [rateLimitLoading, setRateLimitLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
-  const [config, setConfig] = useState<ConfigReadResponse | null>(null);
+  const [config, setConfig] = useState<EffectiveProviderConfig | null>(null);
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [capabilities, setCapabilities] =
     useState<ModelProviderCapabilities | null>(null);
@@ -55,7 +62,7 @@ export function ProviderDock() {
     try {
       const snapshot = await appServerClient.readAccountRateLimits();
       if (requestGeneration !== rateLimitGeneration.current) return;
-      setRateLimits(snapshot);
+      setRateLimits(projectRateLimitSnapshot(snapshot));
     } catch (cause) {
       if (requestGeneration !== rateLimitGeneration.current) return;
       setRateLimitError(cause instanceof Error ? cause.message : String(cause));
@@ -95,7 +102,7 @@ export function ProviderDock() {
       }
       setModels(catalog.data);
       setCapabilities(providerCapabilities);
-      setConfig(effectiveConfig);
+      setConfig(projectEffectiveProviderConfig(effectiveConfig));
       setProvider(thread?.thread.modelProvider?.trim() || null);
       setLoaded(true);
     } catch (cause) {
@@ -187,9 +194,6 @@ export function ProviderDock() {
   }, [models, query]);
 
   const visibleRateLimits = useMemo(() => collectRateLimits(rateLimits), [rateLimits]);
-  const effectiveProvider = config?.config.model_provider?.trim() || null;
-  const effectiveModel = config?.config.model?.trim() || null;
-  const serviceTier = config?.config.service_tier?.trim() || null;
   const refreshing = loading || rateLimitLoading;
 
   return (
@@ -235,15 +239,15 @@ export function ProviderDock() {
               </div>
               <div>
                 <dt>Workspace default</dt>
-                <dd>{effectiveProvider ?? "Runtime default"}</dd>
+                <dd>{config.modelProvider ?? "Runtime default"}</dd>
               </div>
               <div>
                 <dt>Default model</dt>
-                <dd>{effectiveModel ?? "Runtime-selected"}</dd>
+                <dd>{config.model ?? "Runtime-selected"}</dd>
               </div>
               <div>
                 <dt>Service tier</dt>
-                <dd>{serviceTier ?? "Default"}</dd>
+                <dd>{config.serviceTier ?? "Default"}</dd>
               </div>
             </dl>
           )}
@@ -413,15 +417,52 @@ function RateLimitMeter({ label, window }: { label: string; window: RateLimitWin
   );
 }
 
+function projectEffectiveProviderConfig(response: ConfigReadResponse): EffectiveProviderConfig {
+  return {
+    modelProvider: response.config.model_provider?.trim() || null,
+    model: response.config.model?.trim() || null,
+    serviceTier: response.config.service_tier?.trim() || null,
+  };
+}
+
+function projectRateLimitSnapshot(
+  response: AccountRateLimitsReadResponse,
+): AccountRateLimitsReadResponse {
+  const source = response.rateLimitsByLimitId;
+  if (!source) return response;
+
+  const retained: NonNullable<AccountRateLimitsReadResponse["rateLimitsByLimitId"]> = {};
+  const primaryId = response.rateLimits.limitId;
+  let scanned = 0;
+  let retainedCount = 0;
+  for (const id in source) {
+    if (scanned >= MAX_RATE_LIMIT_SCAN || retainedCount >= MAX_VISIBLE_RATE_LIMITS - 1) break;
+    scanned += 1;
+    const limit = source[id];
+    if (!limit || id === primaryId || limit.limitId === primaryId) continue;
+    retained[id] = limit;
+    retainedCount += 1;
+  }
+
+  return {
+    ...response,
+    rateLimitsByLimitId: retained,
+  };
+}
+
 function collectRateLimits(response: AccountRateLimitsReadResponse | null): RateLimitSnapshot[] {
   if (!response) return [];
   const result: RateLimitSnapshot[] = [response.rateLimits];
   const primaryId = response.rateLimits.limitId;
-  if (response.rateLimitsByLimitId) {
-    for (const [id, limit] of Object.entries(response.rateLimitsByLimitId)) {
-      if (id === primaryId || limit.limitId === primaryId) continue;
+  const source = response.rateLimitsByLimitId;
+  if (source) {
+    let scanned = 0;
+    for (const id in source) {
+      if (scanned >= MAX_RATE_LIMIT_SCAN || result.length >= MAX_VISIBLE_RATE_LIMITS) break;
+      scanned += 1;
+      const limit = source[id];
+      if (!limit || id === primaryId || limit.limitId === primaryId) continue;
       result.push(limit);
-      if (result.length >= MAX_VISIBLE_RATE_LIMITS) break;
     }
   }
   return result.filter(hasVisibleLimitData).slice(0, MAX_VISIBLE_RATE_LIMITS);
