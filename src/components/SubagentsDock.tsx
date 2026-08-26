@@ -34,6 +34,7 @@ export function SubagentsDock() {
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
   const inspectionGeneration = useRef(0);
+  const forkGeneration = useRef(0);
 
   const load = useCallback(async (append = false) => {
     if (loading) return;
@@ -128,25 +129,34 @@ export function SubagentsDock() {
       return;
     }
 
+    const requestGeneration = ++forkGeneration.current;
     setForking(true);
     setNotice(null);
     setError(null);
     try {
       const result = await appServerClient.forkThread({ threadId: selectedThreadId });
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId) return;
+      if (
+        requestGeneration !== forkGeneration.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
+      ) return;
       setForks((current) => dedupeThreads([result.thread, ...current]).slice(0, MAX_RETAINED_FORKS));
       setNotice(`Fork created · ${shortId(result.thread.id)} · selection unchanged`);
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId) return;
+      if (
+        requestGeneration !== forkGeneration.current ||
+        appServerClient.getWorkspaceSnapshot()?.threadId !== selectedThreadId
+      ) return;
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setForking(false);
+      if (requestGeneration === forkGeneration.current) setForking(false);
     }
   }, [forking, workspace?.threadId]);
 
   useEffect(() => {
     generation.current += 1;
     inspectionGeneration.current += 1;
+    forkGeneration.current += 1;
+    setForking(false);
     setSubagents([]);
     setForks([]);
     setCursor(null);
