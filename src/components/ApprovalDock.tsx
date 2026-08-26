@@ -10,6 +10,7 @@ const FILE_APPROVAL = "item/fileChange/requestApproval";
 const PERMISSIONS_APPROVAL = "item/permissions/requestApproval";
 const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
 const MAX_PERMISSION_SUMMARY_ITEMS = 32;
+const MAX_PERMISSION_PATHS_PER_KIND = 12;
 const MAX_PERMISSION_PATH_SCAN = 128;
 const MAX_PERMISSION_PATH_LABEL = 4096;
 
@@ -304,14 +305,21 @@ function appendPermissionPaths(summary: string[], label: string, value: unknown)
   if (!Array.isArray(value) || summary.length >= MAX_PERMISSION_SUMMARY_ITEMS) return;
 
   const scanLimit = Math.min(value.length, MAX_PERMISSION_PATH_SCAN);
-  for (let index = 0; index < scanLimit && summary.length < MAX_PERMISSION_SUMMARY_ITEMS; index += 1) {
+  let emitted = 0;
+  for (
+    let index = 0;
+    index < scanLimit && emitted < MAX_PERMISSION_PATHS_PER_KIND;
+    index += 1
+  ) {
     const path = value[index];
     if (typeof path !== "string") continue;
     summary.push(`${label}: ${boundedLabel(path, MAX_PERMISSION_PATH_LABEL)}`);
+    emitted += 1;
   }
 
-  if (value.length > scanLimit && summary.length < MAX_PERMISSION_SUMMARY_ITEMS) {
-    summary.push(`${label}: ${value.length - scanLimit} additional path${value.length - scanLimit === 1 ? "" : "s"} not scanned`);
+  const omitted = Math.max(0, value.length - emitted);
+  if (omitted > 0 && summary.length < MAX_PERMISSION_SUMMARY_ITEMS) {
+    summary.push(`${label}: ${omitted} additional path${omitted === 1 ? "" : "s"} not shown`);
   }
 }
 
