@@ -198,6 +198,7 @@ export function CommandPalette() {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const paletteRef = useRef<HTMLElement>(null);
+  const restoreFocusRef = useRef(true);
   const modLabel = useMemo(() => (isApplePlatform() ? "⌘" : "Ctrl"), []);
 
   const filtered = useMemo(() => {
@@ -235,6 +236,7 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (!open) return;
+    restoreFocusRef.current = true;
     const previousFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
@@ -243,7 +245,7 @@ export function CommandPalette() {
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
     return () => {
       cancelAnimationFrame(frame);
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (restoreFocusRef.current && previousFocus?.isConnected) previousFocus.focus();
     };
   }, [open]);
 
@@ -257,6 +259,7 @@ export function CommandPalette() {
 
   const execute = (command: Command | undefined) => {
     if (!command) return;
+    restoreFocusRef.current = false;
     setOpen(false);
     command.run();
   };
