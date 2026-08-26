@@ -31,6 +31,8 @@ export interface RuntimeItemLifecycleEnvelope {
   completedAtMs?: number;
 }
 
+const MAX_ACTIVITY_TEXT_CHARS = 8_192;
+
 export function isRuntimeItemLifecycleEnvelope(
   value: unknown,
 ): value is RuntimeItemLifecycleEnvelope {
@@ -83,9 +85,12 @@ export function activityFromLifecycle(
       return {
         ...base,
         kind: "mcp-tool",
-        title: [stringValue(item.server), stringValue(item.tool)]
-          .filter(Boolean)
-          .join(" · ") || "MCP tool",
+        title:
+          boundedText(
+            [stringValue(item.server), stringValue(item.tool)]
+              .filter(Boolean)
+              .join(" · "),
+          ) || "MCP tool",
         detail: stringValue(item.pluginId),
         status: stringValue(item.status),
       };
@@ -93,9 +98,12 @@ export function activityFromLifecycle(
       return {
         ...base,
         kind: "dynamic-tool",
-        title: [stringValue(item.namespace), stringValue(item.tool)]
-          .filter(Boolean)
-          .join(" · ") || "Dynamic tool",
+        title:
+          boundedText(
+            [stringValue(item.namespace), stringValue(item.tool)]
+              .filter(Boolean)
+              .join(" · "),
+          ) || "Dynamic tool",
         detail:
           typeof item.success === "boolean"
             ? item.success
@@ -108,7 +116,7 @@ export function activityFromLifecycle(
       return {
         ...base,
         kind: "subagent",
-        title: `Agent ${stringValue(item.tool) ?? "operation"}`,
+        title: boundedText(`Agent ${stringValue(item.tool) ?? "operation"}`),
         detail: summarizeAgents(item.receiverThreadIds),
         status: stringValue(item.status),
       };
@@ -116,7 +124,7 @@ export function activityFromLifecycle(
       return {
         ...base,
         kind: "subagent",
-        title: `Subagent ${stringValue(item.kind) ?? "activity"}`,
+        title: boundedText(`Subagent ${stringValue(item.kind) ?? "activity"}`),
         detail: stringValue(item.agentPath) ?? stringValue(item.agentThreadId),
         status: phase,
       };
@@ -147,7 +155,7 @@ export function activityFromLifecycle(
       return {
         ...base,
         kind: "other",
-        title: humanize(type),
+        title: boundedText(humanize(type)),
         detail: null,
         status: phase,
       };
@@ -192,21 +200,21 @@ function summarizeFileChanges(value: unknown): string | null {
     })
     .filter((path): path is string => Boolean(path));
   if (paths.length === 0) return null;
-  if (paths.length <= 2) return paths.join(", ");
-  return `${paths.slice(0, 2).join(", ")} +${paths.length - 2}`;
+  if (paths.length <= 2) return boundedText(paths.join(", "));
+  return boundedText(`${paths.slice(0, 2).join(", ")} +${paths.length - 2}`);
 }
 
 function summarizeAgents(value: unknown): string | null {
   if (!Array.isArray(value)) return null;
   const ids = value.filter((entry): entry is string => typeof entry === "string");
   if (ids.length === 0) return null;
-  return ids.length === 1 ? (ids[0] ?? null) : `${ids.length} agents`;
+  return ids.length === 1 ? boundedText(ids[0] ?? "") || null : `${ids.length} agents`;
 }
 
 function statusValue(status: unknown, exitCode: unknown): string | null {
   const statusText = stringValue(status);
   if (typeof exitCode === "number") {
-    return statusText ? `${statusText} · exit ${exitCode}` : `exit ${exitCode}`;
+    return boundedText(statusText ? `${statusText} · exit ${exitCode}` : `exit ${exitCode}`);
   }
   return statusText;
 }
@@ -216,7 +224,12 @@ function arrayLength(value: unknown): number {
 }
 
 function stringValue(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
+  return typeof value === "string" && value.length > 0 ? boundedText(value) : null;
+}
+
+function boundedText(value: string): string {
+  if (value.length <= MAX_ACTIVITY_TEXT_CHARS) return value;
+  return `${value.slice(0, MAX_ACTIVITY_TEXT_CHARS - 1)}…`;
 }
 
 function humanize(value: string): string {
