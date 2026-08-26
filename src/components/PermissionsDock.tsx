@@ -7,12 +7,17 @@ import "./permissionsDock.css";
 
 const PROFILE_PAGE_SIZE = 40;
 const MAX_RETAINED_PROFILES = 120;
+const MAX_RETAINED_WRITABLE_ROOTS = 32;
+const MAX_PRESENTATION_TEXT = 8_192;
+const MAX_PATH_TEXT = 4_096;
 
 type RuntimeThreadSettings = {
-  approvalPolicy: unknown;
-  approvalsReviewer: unknown;
-  sandboxPolicy: unknown;
-  activePermissionProfile: unknown | null;
+  approvalPolicy: string;
+  approvalsReviewer: string;
+  sandbox: string;
+  activePermissionProfileId: string | null;
+  writableRoots: string[];
+  writableRootCount: number;
 };
 
 export function PermissionsDock() {
@@ -131,16 +136,9 @@ export function PermissionsDock() {
 
   const workspaceApproval = config?.config.approval_policy;
   const workspaceSandbox = config?.config.sandbox_mode;
-  const liveApproval = sessionSettings?.approvalPolicy;
-  const liveSandbox = sessionSettings?.sandboxPolicy;
-  const liveProfile = sessionSettings?.activePermissionProfile;
-  const liveProfileId = extractPermissionProfileId(liveProfile);
-
-  const writableRootCount = extractWritableRoots(liveSandbox).length;
-  const writableRoots = useMemo(
-    () => extractWritableRoots(liveSandbox).slice(0, 8),
-    [liveSandbox],
-  );
+  const liveProfileId = sessionSettings?.activePermissionProfileId ?? null;
+  const writableRoots = sessionSettings?.writableRoots.slice(0, 8) ?? [];
+  const writableRootCount = sessionSettings?.writableRootCount ?? 0;
   const allowedProfileCount = useMemo(
     () => profiles.reduce((count, profile) => count + (profile.allowed ? 1 : 0), 0),
     [profiles],
@@ -201,16 +199,19 @@ export function PermissionsDock() {
                 {sessionSettings ? (
                   <>
                     <dl className="permissions-grid">
-                      <PermissionValue label="Approval policy" value={formatPolicy(liveApproval)} />
-                      <PermissionValue label="Approvals reviewer" value={formatPolicy(sessionSettings.approvalsReviewer)} />
-                      <PermissionValue label="Sandbox" value={formatSandbox(liveSandbox)} />
-                      <PermissionValue label="Permission profile" value={formatPermissionProfile(liveProfile)} />
+                      <PermissionValue label="Approval policy" value={sessionSettings.approvalPolicy} />
+                      <PermissionValue label="Approvals reviewer" value={sessionSettings.approvalsReviewer} />
+                      <PermissionValue label="Sandbox" value={sessionSettings.sandbox} />
+                      <PermissionValue
+                        label="Permission profile"
+                        value={sessionSettings.activePermissionProfileId ?? "None reported"}
+                      />
                     </dl>
                     {writableRoots.length > 0 && (
                       <div className="permissions-roots">
                         <strong>Writable roots</strong>
-                        {writableRoots.map((root) => (
-                          <code key={root} title={root}>{root}</code>
+                        {writableRoots.map((root, index) => (
+                          <code key={`${index}:${root}`} title={root}>{root}</code>
                         ))}
                         {writableRootCount > writableRoots.length && (
                           <small>Additional roots omitted from this bounded view.</small>
@@ -309,20 +310,34 @@ function parseThreadSettingsUpdated(value: unknown): {
   const record = toRecord(value);
   const threadSettings = toRecord(record?.threadSettings);
   if (!record || typeof record.threadId !== "string" || !threadSettings) return null;
+
+  const writableRoots = extractWritableRoots(threadSettings.sandboxPolicy);
   return {
     threadId: record.threadId,
     settings: {
-      approvalPolicy: threadSettings.approvalPolicy,
-      approvalsReviewer: threadSettings.approvalsReviewer,
-      sandboxPolicy: threadSettings.sandboxPolicy,
-      activePermissionProfile: threadSettings.activePermissionProfile ?? null,
+      approvalPolicy: limitPresentation(formatPolicy(threadSettings.approvalPolicy)),
+      approvalsReviewer: limitPresentation(formatPolicy(threadSettings.approvalsReviewer)),
+      sandbox: limitPresentation(formatSandbox(threadSettings.sandboxPolicy)),
+      activePermissionProfileId: extractPermissionProfileId(threadSettings.activePermissionProfile),
+      writableRoots: writableRoots
+        .slice(0, MAX_RETAINED_WRITABLE_ROOTS)
+        .map((root) => limitText(root, MAX_PATH_TEXT)),
+      writableRootCount: writableRoots.length,
     },
   };
 }
 
 function dedupeProfiles(profiles: PermissionProfileSummary[]): PermissionProfileSummary[] {
   const byId = new Map<string, PermissionProfileSummary>();
-  for (const profile of profiles) byId.set(profile.id, profile);
+  for (const profile of profiles) {
+    byId.set(profile.id, {
+      id: profile.id,
+      description: profile.description === null
+        ? null
+        : limitPresentation(profile.description),
+      allowed: profile.allowed,
+    });
+  }
   return [...byId.values()];
 }
 
@@ -336,6 +351,7 @@ function formatPolicy(value: unknown): string {
     const granular = toRecord(record.granular);
     if (!granular) return "Granular";
     const enabled = Object.entries(granular)
+      .slice(0, 64)
       .filter(([, flag]) => flag === true)
       .map(([key]) => humanize(key));
     return enabled.length > 0 ? `Granular · ${enabled.join(", ")}` : "Granular · no approval gates";
@@ -349,10 +365,6 @@ function formatSandbox(value: unknown): string {
   const type = typeof record.type === "string" ? humanize(record.type) : "Runtime-defined";
   const network = formatNetworkAccess(record.networkAccess);
   return network ? `${type} · network ${network}` : type;
-}
-
-function formatPermissionProfile(value: unknown): string {
-  return extractPermissionProfileId(value) ?? "None reported";
 }
 
 function extractPermissionProfileId(value: unknown): string | null {
@@ -391,6 +403,14 @@ function humanize(value: string): string {
     .replace(/[_-]+/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function limitPresentation(value: string): string {
+  return limitText(value, MAX_PRESENTATION_TEXT);
+}
+
+function limitText(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
