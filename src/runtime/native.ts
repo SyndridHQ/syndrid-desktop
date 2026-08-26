@@ -38,7 +38,7 @@ export async function sendNativeAppServerLine(line: string): Promise<void> {
   if (!isTauri()) {
     throw new Error("Cannot send app-server messages outside the Tauri desktop runtime.");
   }
-  if (textEncoder.encode(line).byteLength > MAX_APP_SERVER_LINE_BYTES) {
+  if (exceedsUtf8ByteLimit(line, MAX_APP_SERVER_LINE_BYTES)) {
     throw new Error(
       `Syndrid app-server message exceeds the ${MAX_APP_SERVER_LINE_BYTES / (1024 * 1024)} MiB desktop transport limit.`,
     );
@@ -56,4 +56,13 @@ export async function onNativeAppServerStderr(
   handler: (line: string) => void,
 ): Promise<UnlistenFn> {
   return listen<string>(APP_SERVER_STDERR_EVENT, (event) => handler(event.payload));
+}
+
+function exceedsUtf8ByteLimit(value: string, limit: number): boolean {
+  // UTF-8 uses at least one byte and at most three bytes per UTF-16 code unit.
+  // Ordinary JSON-RPC lines are far below this threshold, so avoid allocating an
+  // encoded copy unless the string is actually large enough to need exact sizing.
+  if (value.length > limit) return true;
+  if (value.length <= Math.floor(limit / 3)) return false;
+  return textEncoder.encode(value).byteLength > limit;
 }
