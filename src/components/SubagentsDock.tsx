@@ -19,7 +19,7 @@ type GraphThreadSummary = {
   preview: string;
   modelProvider: string;
   updatedAt: number;
-  status: unknown;
+  statusLabel: string;
   agentNickname: string | null;
   agentRole: string | null;
   name: string | null;
@@ -27,15 +27,15 @@ type GraphThreadSummary = {
 type ThreadDetail = {
   id: string;
   sessionId: string;
-  status: unknown;
+  statusLabel: string;
   modelProvider: string;
   cliVersion: string;
   cwd: string;
-  source: unknown;
-  threadSource: unknown | null;
+  source: string;
+  threadSource: string | null;
   parentThreadId: string | null;
   forkedFromId: string | null;
-  gitInfo: unknown | null;
+  gitInfo: InspectedGitInfo | null;
 };
 type InspectionState = {
   threadId: string;
@@ -232,13 +232,14 @@ export function SubagentsDock() {
       if (typeof threadId !== "string") return;
 
       if (notification.method === "thread/status/changed") {
+        const statusLabel = formatStatus(params.status);
         const updateStatus = (current: GraphThreadSummary[]) =>
-          current.map((thread) => thread.id === threadId ? { ...thread, status: params.status } : thread);
+          current.map((thread) => thread.id === threadId ? { ...thread, statusLabel } : thread);
         setSubagents(updateStatus);
         setForks(updateStatus);
         setInspection((current) =>
           current?.thread?.id === threadId
-            ? { ...current, thread: { ...current.thread, status: params.status } }
+            ? { ...current, thread: { ...current.thread, statusLabel } }
             : current,
         );
         return;
@@ -420,7 +421,7 @@ function ThreadGraphRow({
       </div>
       <div className="subagent-meta">
         <code title={thread.id}>{shortId(thread.id)}</code>
-        <span>{formatStatus(thread.status)}</span>
+        <span>{thread.statusLabel}</span>
         <span>{formatRelativeTime(thread.updatedAt)}</span>
         {thread.modelProvider && <span>{thread.modelProvider}</span>}
       </div>
@@ -431,7 +432,7 @@ function ThreadGraphRow({
 
 function ThreadInspector({ inspection, close }: { inspection: InspectionState; close: () => void }) {
   const thread = inspection.thread;
-  const gitInfo = parseGitInfo(thread?.gitInfo);
+  const gitInfo = thread?.gitInfo ?? null;
   return (
     <section className="thread-inspector" aria-label="Thread details">
       <header>
@@ -446,12 +447,12 @@ function ThreadInspector({ inspection, close }: { inspection: InspectionState; c
         <dl>
           <ThreadDetailRow label="Thread" title={thread.id} value={shortId(thread.id)} />
           <ThreadDetailRow label="Session" title={thread.sessionId} value={shortId(thread.sessionId)} />
-          <ThreadDetailRow label="Status" value={formatStatus(thread.status)} />
+          <ThreadDetailRow label="Status" value={thread.statusLabel} />
           <ThreadDetailRow label="Provider" value={thread.modelProvider || "—"} />
           <ThreadDetailRow label="CLI" value={thread.cliVersion || "—"} />
           <ThreadDetailRow label="Workspace" title={thread.cwd} value={thread.cwd || "—"} />
-          <ThreadDetailRow label="Source" value={formatStructuredValue(thread.source)} />
-          <ThreadDetailRow label="Thread source" value={formatStructuredValue(thread.threadSource)} />
+          <ThreadDetailRow label="Source" value={thread.source} />
+          <ThreadDetailRow label="Thread source" value={thread.threadSource ?? "—"} />
           {thread.parentThreadId && <ThreadDetailRow label="Parent" title={thread.parentThreadId} value={shortId(thread.parentThreadId)} />}
           {thread.forkedFromId && <ThreadDetailRow label="Forked from" title={thread.forkedFromId} value={shortId(thread.forkedFromId)} />}
           {gitInfo?.branch && <ThreadDetailRow label="Branch" value={gitInfo.branch} />}
@@ -484,7 +485,7 @@ function filterThreads(threads: GraphThreadSummary[], query: string): GraphThrea
       thread.agentNickname ?? "",
       thread.agentRole ?? "",
       thread.modelProvider,
-      formatStatus(thread.status),
+      thread.statusLabel,
     ];
     return fields.some((field) => field.toLocaleLowerCase().includes(normalized));
   });
@@ -498,7 +499,7 @@ function projectGraphThread(thread: ThreadSummary): GraphThreadSummary {
     preview: boundedText(thread.preview, MAX_PREVIEW_CHARS),
     modelProvider: boundedText(thread.modelProvider, MAX_LABEL_CHARS),
     updatedAt: thread.updatedAt,
-    status: thread.status,
+    statusLabel: formatStatus(thread.status),
     agentNickname: boundedNullableText(thread.agentNickname, MAX_LABEL_CHARS),
     agentRole: boundedNullableText(thread.agentRole, MAX_LABEL_CHARS),
     name: boundedNullableText(thread.name, MAX_LABEL_CHARS),
@@ -509,7 +510,7 @@ function projectThreadDetail(thread: ThreadSummary): ThreadDetail {
   return {
     id: thread.id,
     sessionId: thread.sessionId,
-    status: thread.status,
+    statusLabel: formatStatus(thread.status),
     modelProvider: boundedText(thread.modelProvider, MAX_LABEL_CHARS),
     cliVersion: boundedText(thread.cliVersion, MAX_LABEL_CHARS),
     cwd: boundedText(thread.cwd, MAX_PATH_CHARS),
@@ -615,7 +616,7 @@ function toGraphThreadSummary(value: unknown): GraphThreadSummary | null {
     preview: boundedText(thread.preview, MAX_PREVIEW_CHARS),
     modelProvider: boundedText(thread.modelProvider, MAX_LABEL_CHARS),
     updatedAt: thread.updatedAt,
-    status: thread.status,
+    statusLabel: formatStatus(thread.status),
     agentNickname: boundedNullableText(thread.agentNickname, MAX_LABEL_CHARS),
     agentRole: boundedNullableText(thread.agentRole, MAX_LABEL_CHARS),
     name: boundedNullableText(thread.name, MAX_LABEL_CHARS),
