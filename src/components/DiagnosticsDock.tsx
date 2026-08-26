@@ -25,6 +25,7 @@ export function DiagnosticsDock() {
     const requestGeneration = ++diagnosticGeneration.current;
     const connection = appServerClient.getSnapshot();
     const capturedWorkspace = workspace;
+    const capturedAt = Date.now();
     setLoading(true);
     setError(null);
     setCopied(false);
@@ -34,18 +35,18 @@ export function DiagnosticsDock() {
         : null;
       if (requestGeneration !== diagnosticGeneration.current) return;
       setSnapshot({
-        connection: appServerClient.getSnapshot(),
+        connection,
         environment,
         workspace: capturedWorkspace,
-        capturedAt: Date.now(),
+        capturedAt,
       });
     } catch (cause) {
       if (requestGeneration !== diagnosticGeneration.current) return;
       setSnapshot({
-        connection: appServerClient.getSnapshot(),
+        connection,
         environment: null,
         workspace: capturedWorkspace,
-        capturedAt: Date.now(),
+        capturedAt,
       });
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
