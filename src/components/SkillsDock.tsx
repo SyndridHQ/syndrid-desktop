@@ -5,6 +5,15 @@ import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./skillsDock.css";
 
 const MAX_VISIBLE_SKILLS = 120;
+const MAX_RETAINED_SKILLS = 240;
+const MAX_SKILL_DESCRIPTION_CHARS = 32 * 1024;
+const MAX_SKILL_SHORT_DESCRIPTION_CHARS = 8 * 1024;
+
+type RetainedSkills = {
+  entries: SkillsListEntry[];
+  totalSkills: number;
+  errorCount: number;
+};
 
 export function SkillsDock() {
   const workspace = useRuntimeWorkspace();
@@ -13,6 +22,8 @@ export function SkillsDock() {
   const [loaded, setLoaded] = useState(false);
   const [stale, setStale] = useState(false);
   const [entries, setEntries] = useState<SkillsListEntry[]>([]);
+  const [totalSkills, setTotalSkills] = useState(0);
+  const [discoveryErrorCount, setDiscoveryErrorCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
 
@@ -28,6 +39,8 @@ export function SkillsDock() {
       if (!root) {
         generation.current += 1;
         setEntries([]);
+        setTotalSkills(0);
+        setDiscoveryErrorCount(0);
         setLoaded(true);
         setStale(false);
         setLoading(false);
@@ -48,7 +61,10 @@ export function SkillsDock() {
         ) {
           return;
         }
-        setEntries(result.data);
+        const retained = retainSkills(result.data);
+        setEntries(retained.entries);
+        setTotalSkills(retained.totalSkills);
+        setDiscoveryErrorCount(retained.errorCount);
         setLoaded(true);
         setStale(false);
       } catch (cause) {
@@ -67,6 +83,8 @@ export function SkillsDock() {
     setLoaded(false);
     setStale(false);
     setEntries([]);
+    setTotalSkills(0);
+    setDiscoveryErrorCount(0);
     setError(null);
     if (open) void load(false);
     // The selected runtime workspace is the ownership boundary. No polling.
@@ -87,10 +105,6 @@ export function SkillsDock() {
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
     [entries],
   );
-  const errorCount = useMemo(
-    () => entries.reduce((count, entry) => count + entry.errors.length, 0),
-    [entries],
-  );
 
   const toggle = () => setOpen((current) => !current);
   const cwd = workspace?.cwd ?? null;
@@ -100,7 +114,7 @@ export function SkillsDock() {
       <button className="skills-toggle" onClick={toggle} type="button">
         <span aria-hidden="true">✦</span>
         Skills
-        {loaded && <span>{skills.length}</span>}
+        {loaded && <span>{totalSkills}</span>}
       </button>
       {open && (
         <section className="skills-panel">
@@ -131,16 +145,16 @@ export function SkillsDock() {
             <div className="skills-state">Loading cached runtime skills…</div>
           ) : !cwd ? (
             <div className="skills-state">No selected session workspace reported.</div>
-          ) : skills.length === 0 ? (
+          ) : totalSkills === 0 ? (
             <div className="skills-state">No skills reported for this workspace.</div>
           ) : (
             <div className="skills-list">
               {skills.slice(0, MAX_VISIBLE_SKILLS).map((skill) => (
                 <SkillRow key={`${skill.path}:${skill.name}`} skill={skill} />
               ))}
-              {skills.length > MAX_VISIBLE_SKILLS && (
+              {totalSkills > MAX_VISIBLE_SKILLS && (
                 <div className="skills-state compact">
-                  Showing {MAX_VISIBLE_SKILLS} of {skills.length} skills.
+                  Showing {Math.min(MAX_VISIBLE_SKILLS, skills.length)} of {totalSkills} skills.
                 </div>
               )}
             </div>
@@ -148,7 +162,9 @@ export function SkillsDock() {
 
           <footer>
             <span>Selected session · runtime-invalidated · cached by default · refresh/rescan explicit</span>
-            {errorCount > 0 && <em>{errorCount} discovery error{errorCount === 1 ? "" : "s"}</em>}
+            {discoveryErrorCount > 0 && (
+              <em>{discoveryErrorCount} discovery error{discoveryErrorCount === 1 ? "" : "s"}</em>
+            )}
           </footer>
         </section>
       )}
@@ -169,4 +185,50 @@ function SkillRow({ skill }: { skill: SkillMetadata }) {
       {summary && <small>{summary}</small>}
     </article>
   );
+}
+
+function retainSkills(data: SkillsListEntry[]): RetainedSkills {
+  let remainingSkills = MAX_RETAINED_SKILLS;
+  let totalSkills = 0;
+  let errorCount = 0;
+  const entries: SkillsListEntry[] = [];
+
+  for (const entry of data) {
+    totalSkills += entry.skills.length;
+    errorCount += entry.errors.length;
+    if (remainingSkills <= 0) continue;
+
+    const skills = entry.skills.slice(0, remainingSkills).map(boundSkillMetadata);
+    remainingSkills -= skills.length;
+    if (skills.length === 0) continue;
+    entries.push({
+      cwd: entry.cwd,
+      skills,
+      // Discovery errors are currently surfaced only as a count. Avoid retaining
+      // arbitrary runtime payloads solely to render that aggregate indicator.
+      errors: [],
+    });
+  }
+
+  return { entries, totalSkills, errorCount };
+}
+
+function boundSkillMetadata(skill: SkillMetadata): SkillMetadata {
+  return {
+    ...skill,
+    description: boundText(skill.description, MAX_SKILL_DESCRIPTION_CHARS),
+    shortDescription: skill.shortDescription === undefined
+      ? undefined
+      : boundText(skill.shortDescription, MAX_SKILL_SHORT_DESCRIPTION_CHARS),
+    // These opaque discovery payloads are not rendered by the current Desktop
+    // surface. Keep discovery/runtime ownership in SyndridCLI without retaining
+    // potentially large unused structures in the visual client.
+    interface: undefined,
+    dependencies: undefined,
+  };
+}
+
+function boundText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
 }
