@@ -67,7 +67,6 @@ export function ContextDock() {
     setSnapshots([]);
     setCompactions([]);
     setCompactConfirm(false);
-    setCompacting(false);
     setCompactError(null);
   }, [open]);
 
@@ -120,10 +119,10 @@ export function ContextDock() {
       ) return;
       setCompactError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      if (
-        appServerClient.getWorkspaceSnapshot()?.threadId === threadId &&
-        compactUiGeneration.current === uiGeneration
-      ) setCompacting(false);
+      // `compacting` represents the transport-level request, not one rendered
+      // panel generation. Keep it true across close/reopen so the same thread
+      // cannot submit a duplicate compaction before this RPC settles.
+      if (appServerClient.getWorkspaceSnapshot()?.threadId === threadId) setCompacting(false);
     }
   };
 
