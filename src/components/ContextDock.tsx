@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./contextDock.css";
@@ -34,6 +34,7 @@ type CompactionSnapshot = {
 
 export function ContextDock() {
   const workspace = useRuntimeWorkspace();
+  const compactUiGeneration = useRef(0);
   const [open, setOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<ContextSnapshot[]>([]);
   const [compactions, setCompactions] = useState<CompactionSnapshot[]>([]);
@@ -62,11 +63,16 @@ export function ContextDock() {
 
   useEffect(() => {
     if (open) return;
+    compactUiGeneration.current += 1;
     setSnapshots([]);
     setCompactions([]);
+    setCompactConfirm(false);
+    setCompacting(false);
+    setCompactError(null);
   }, [open]);
 
   useEffect(() => {
+    compactUiGeneration.current += 1;
     setCompactConfirm(false);
     setCompacting(false);
     setCompactError(null);
@@ -96,18 +102,28 @@ export function ContextDock() {
       return;
     }
 
+    const uiGeneration = compactUiGeneration.current;
     setCompacting(true);
     setCompactError(null);
     try {
       await appServerClient.compactThread({ threadId });
       if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      // Runtime completion tracking intentionally survives a closed panel. This
+      // keeps the listener alive until SyndridCLI reports ContextCompaction while
+      // preventing the old request from mutating a newly opened UI generation.
       setCompactRequestedThreadId(threadId);
-      setCompactConfirm(false);
+      if (compactUiGeneration.current === uiGeneration) setCompactConfirm(false);
     } catch (cause) {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId !== threadId) return;
+      if (
+        appServerClient.getWorkspaceSnapshot()?.threadId !== threadId ||
+        compactUiGeneration.current !== uiGeneration
+      ) return;
       setCompactError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      if (appServerClient.getWorkspaceSnapshot()?.threadId === threadId) setCompacting(false);
+      if (
+        appServerClient.getWorkspaceSnapshot()?.threadId === threadId &&
+        compactUiGeneration.current === uiGeneration
+      ) setCompacting(false);
     }
   };
 
