@@ -54,16 +54,23 @@ export function SettingsDock() {
     setError(null);
   };
 
-  const save = () => {
+  const save = (): boolean => {
     const normalized = binary.trim();
-    setRuntimeBinaryOverride(normalized || null);
+    if (!setRuntimeBinaryOverride(normalized || null)) {
+      setError("Desktop could not persist the runtime executable preference in local storage.");
+      return false;
+    }
     setSavedBinary(normalized);
     setBinary(normalized);
     setError(null);
+    return true;
   };
 
   const reset = () => {
-    setRuntimeBinaryOverride(null);
+    if (!setRuntimeBinaryOverride(null)) {
+      setError("Desktop could not clear the runtime executable preference from local storage.");
+      return;
+    }
     setBinary("");
     setSavedBinary("");
     setError(null);
@@ -71,9 +78,8 @@ export function SettingsDock() {
 
   const saveAndRestart = async () => {
     if (!isTauri() || restarting) return;
-    save();
+    if (!save()) return;
     setRestarting(true);
-    setError(null);
     try {
       // Restart through the app-server client rather than stopping the native
       // child directly. This rejects pending RPCs and clears the selected
