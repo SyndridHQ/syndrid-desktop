@@ -7,6 +7,8 @@ import "./mcpElicitationDock.css";
 
 const MCP_ELICITATION = "mcpServer/elicitation/request";
 const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
+const MAX_MCP_FORM_FIELDS = 64;
+const MAX_MCP_ENUM_OPTIONS = 256;
 
 type PrimitiveValue = string | number | boolean;
 type FieldKind = "string" | "number" | "integer" | "boolean" | "enum";
@@ -309,10 +311,14 @@ function normalizeMcpForm(request: RuntimeServerRequest): McpFormRequest | null 
   if (!threadId || !serverName || !message || !isRecord(schema)) return null;
   if (schema.type !== "object" || !isRecord(schema.properties)) return null;
 
-  const required = new Set(stringArray(schema.required));
+  const required = requiredFieldSet(schema.required);
+  if (!required) return null;
+
   const fields: McpFormField[] = [];
-  for (const [key, rawField] of Object.entries(schema.properties)) {
-    const field = normalizeField(key, rawField, required.has(key));
+  for (const key in schema.properties) {
+    if (!Object.prototype.hasOwnProperty.call(schema.properties, key)) continue;
+    if (fields.length >= MAX_MCP_FORM_FIELDS) return null;
+    const field = normalizeField(key, schema.properties[key], required.has(key));
     if (!field) return null;
     fields.push(field);
   }
@@ -338,8 +344,8 @@ function normalizeField(
   const type = rawField.type;
 
   if (type === "string" && Array.isArray(rawField.enum)) {
-    const options = stringArray(rawField.enum);
-    if (options.length === 0) return null;
+    const options = boundedStringArray(rawField.enum, MAX_MCP_ENUM_OPTIONS);
+    if (!options || options.length === 0) return null;
     const defaultValue = typeof rawField.default === "string" ? rawField.default : null;
     if (defaultValue !== null && !options.includes(defaultValue)) return null;
     return baseField(key, "enum", title, description, required, {
@@ -397,6 +403,27 @@ function baseField(
   };
 }
 
+function requiredFieldSet(value: unknown): Set<string> | null {
+  if (value === undefined) return new Set();
+  if (!Array.isArray(value) || value.length > MAX_MCP_FORM_FIELDS) return null;
+  const required = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") return null;
+    required.add(entry);
+  }
+  return required;
+}
+
+function boundedStringArray(value: unknown[], limit: number): string[] | null {
+  if (value.length > limit) return null;
+  const strings: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") return null;
+    strings.push(entry);
+  }
+  return strings;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -411,11 +438,6 @@ function stringValue(value: unknown): string | null {
 
 function nullableString(value: unknown): string | null {
   return value === null ? null : stringValue(value);
-}
-
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 function numberValue(value: unknown): number | null {
