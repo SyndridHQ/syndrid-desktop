@@ -9,6 +9,7 @@ const HOOK_COMPLETED = "hook/completed";
 const MAX_RETAINED_RUNS = 80;
 const MAX_VISIBLE_RUNS = 16;
 const MAX_VISIBLE_HOOKS = 120;
+const MAX_RETAINED_HOOKS = 240;
 const MAX_RETAINED_ENTRIES_PER_RUN = 12;
 const MAX_HOOK_LABEL_CHARS = 8 * 1024;
 const MAX_HOOK_DETAIL_CHARS = 32 * 1024;
@@ -35,6 +36,13 @@ type HookRun = {
 
 type HooksView = "inventory" | "activity";
 
+type RetainedHookInventory = {
+  entries: HooksListEntry[];
+  totalHooks: number;
+  warningCount: number;
+  errorCount: number;
+};
+
 export function HooksDock() {
   const workspace = useRuntimeWorkspace();
   const inventoryRequestRef = useRef(0);
@@ -42,6 +50,9 @@ export function HooksDock() {
   const [view, setView] = useState<HooksView>("inventory");
   const [runs, setRuns] = useState<HookRun[]>([]);
   const [inventory, setInventory] = useState<HooksListEntry[]>([]);
+  const [inventoryTotalHooks, setInventoryTotalHooks] = useState(0);
+  const [inventoryWarningCount, setInventoryWarningCount] = useState(0);
+  const [inventoryErrorCount, setInventoryErrorCount] = useState(0);
   const [inventoryLoaded, setInventoryLoaded] = useState(false);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
@@ -68,6 +79,9 @@ export function HooksDock() {
     const cwd = workspace?.cwd.trim();
     if (!cwd) {
       setInventory([]);
+      setInventoryTotalHooks(0);
+      setInventoryWarningCount(0);
+      setInventoryErrorCount(0);
       setInventoryLoaded(true);
       setInventoryLoading(false);
       setInventoryError(null);
@@ -82,7 +96,11 @@ export function HooksDock() {
       if (inventoryRequestRef.current !== requestGeneration) return;
       const current = appServerClient.getWorkspaceSnapshot();
       if (current?.threadId !== requestedThreadId || current.cwd !== cwd) return;
-      setInventory(result.data);
+      const retained = retainHookInventory(result.data);
+      setInventory(retained.entries);
+      setInventoryTotalHooks(retained.totalHooks);
+      setInventoryWarningCount(retained.warningCount);
+      setInventoryErrorCount(retained.errorCount);
       setInventoryLoaded(true);
     } catch (cause) {
       if (inventoryRequestRef.current !== requestGeneration) return;
@@ -96,6 +114,9 @@ export function HooksDock() {
 
   useEffect(() => {
     setInventory([]);
+    setInventoryTotalHooks(0);
+    setInventoryWarningCount(0);
+    setInventoryErrorCount(0);
     setInventoryLoaded(false);
     setInventoryError(null);
     if (open && view === "inventory") {
@@ -119,14 +140,6 @@ export function HooksDock() {
     () => inventory.flatMap((entry) => entry.hooks).sort(compareHooks),
     [inventory],
   );
-  const warningCount = useMemo(
-    () => inventory.reduce((count, entry) => count + entry.warnings.length, 0),
-    [inventory],
-  );
-  const discoveryErrorCount = useMemo(
-    () => inventory.reduce((count, entry) => count + entry.errors.length, 0),
-    [inventory],
-  );
   const enabledCount = useMemo(() => hooks.filter((hook) => hook.enabled).length, [hooks]);
   const cwd = workspace?.cwd ?? null;
 
@@ -135,7 +148,7 @@ export function HooksDock() {
       <button className="hooks-toggle" onClick={() => setOpen((value) => !value)} type="button">
         <span aria-hidden="true">↯</span>
         Hooks
-        <span>{runningCount > 0 ? `${runningCount} running` : inventoryLoaded ? hooks.length : runs.length}</span>
+        <span>{runningCount > 0 ? `${runningCount} running` : inventoryLoaded ? inventoryTotalHooks : runs.length}</span>
       </button>
       {open && (
         <section className="hooks-panel">
@@ -162,7 +175,7 @@ export function HooksDock() {
               onClick={() => setView("inventory")}
               type="button"
             >
-              Inventory {inventoryLoaded ? `· ${hooks.length}` : ""}
+              Inventory {inventoryLoaded ? `· ${inventoryTotalHooks}` : ""}
             </button>
             <button
               aria-pressed={view === "activity"}
@@ -181,6 +194,7 @@ export function HooksDock() {
               hooks={hooks}
               loaded={inventoryLoaded}
               loading={inventoryLoading}
+              totalHooks={inventoryTotalHooks}
             />
           ) : (
             <HookActivity recent={recent} />
@@ -189,13 +203,17 @@ export function HooksDock() {
           <footer>
             {view === "inventory" ? (
               <>
-                <span>{enabledCount} enabled · explicit runtime discovery · no polling</span>
-                {(warningCount > 0 || discoveryErrorCount > 0) && (
+                <span>
+                  {enabledCount} enabled in retained catalog · explicit runtime discovery · no polling
+                </span>
+                {(inventoryWarningCount > 0 || inventoryErrorCount > 0) && (
                   <em>
-                    {warningCount > 0 ? `${warningCount} warning${warningCount === 1 ? "" : "s"}` : ""}
-                    {warningCount > 0 && discoveryErrorCount > 0 ? " · " : ""}
-                    {discoveryErrorCount > 0
-                      ? `${discoveryErrorCount} error${discoveryErrorCount === 1 ? "" : "s"}`
+                    {inventoryWarningCount > 0
+                      ? `${inventoryWarningCount} warning${inventoryWarningCount === 1 ? "" : "s"}`
+                      : ""}
+                    {inventoryWarningCount > 0 && inventoryErrorCount > 0 ? " · " : ""}
+                    {inventoryErrorCount > 0
+                      ? `${inventoryErrorCount} error${inventoryErrorCount === 1 ? "" : "s"}`
                       : ""}
                   </em>
                 )}
@@ -216,26 +234,28 @@ function HookInventory({
   hooks,
   loaded,
   loading,
+  totalHooks,
 }: {
   cwd: string | null;
   error: string | null;
   hooks: HookMetadata[];
   loaded: boolean;
   loading: boolean;
+  totalHooks: number;
 }) {
   if (error) return <div className="hooks-empty hooks-error">{error}</div>;
   if (loading && !loaded) return <div className="hooks-empty">Loading runtime hook inventory…</div>;
   if (!cwd) return <div className="hooks-empty">No selected session workspace reported.</div>;
-  if (loaded && hooks.length === 0) return <div className="hooks-empty">No hooks reported for this workspace.</div>;
+  if (loaded && totalHooks === 0) return <div className="hooks-empty">No hooks reported for this workspace.</div>;
 
   return (
     <div className="hooks-list hook-inventory-list">
       {hooks.slice(0, MAX_VISIBLE_HOOKS).map((hook) => (
         <HookInventoryCard hook={hook} key={hook.key} />
       ))}
-      {hooks.length > MAX_VISIBLE_HOOKS && (
+      {totalHooks > MAX_VISIBLE_HOOKS && (
         <div className="hooks-empty compact">
-          Showing {MAX_VISIBLE_HOOKS} of {hooks.length} hooks.
+          Showing {Math.min(MAX_VISIBLE_HOOKS, hooks.length)} of {totalHooks} hooks.
         </div>
       )}
     </div>
@@ -298,6 +318,50 @@ function HookActivity({ recent }: { recent: HookRun[] }) {
       ))}
     </div>
   );
+}
+
+function retainHookInventory(data: HooksListEntry[]): RetainedHookInventory {
+  let remainingHooks = MAX_RETAINED_HOOKS;
+  let totalHooks = 0;
+  let warningCount = 0;
+  let errorCount = 0;
+  const entries: HooksListEntry[] = [];
+
+  for (const entry of data) {
+    totalHooks += entry.hooks.length;
+    warningCount += entry.warnings.length;
+    errorCount += entry.errors.length;
+    if (remainingHooks <= 0) continue;
+
+    const hooks = entry.hooks.slice(0, remainingHooks).map(boundHookMetadata);
+    remainingHooks -= hooks.length;
+    if (hooks.length === 0) continue;
+    entries.push({
+      cwd: boundText(entry.cwd, MAX_HOOK_PATH_CHARS),
+      hooks,
+      // The current UI only exposes aggregate discovery counts. Do not retain
+      // potentially large warning/error payloads merely to render those counts.
+      warnings: [],
+      errors: [],
+    });
+  }
+
+  return { entries, totalHooks, warningCount, errorCount };
+}
+
+function boundHookMetadata(hook: HookMetadata): HookMetadata {
+  return {
+    ...hook,
+    handlerType: boundText(hook.handlerType, MAX_HOOK_LABEL_CHARS),
+    matcher: hook.matcher === null ? null : boundText(hook.matcher, MAX_HOOK_DETAIL_CHARS),
+    command: hook.command === null ? null : boundText(hook.command, MAX_HOOK_DETAIL_CHARS),
+    statusMessage: hook.statusMessage === null
+      ? null
+      : boundText(hook.statusMessage, MAX_HOOK_DETAIL_CHARS),
+    sourcePath: boundText(hook.sourcePath, MAX_HOOK_PATH_CHARS),
+    source: boundText(hook.source, MAX_HOOK_LABEL_CHARS),
+    pluginId: hook.pluginId === null ? null : boundText(hook.pluginId, MAX_HOOK_LABEL_CHARS),
+  };
 }
 
 function compareHooks(a: HookMetadata, b: HookMetadata): number {
