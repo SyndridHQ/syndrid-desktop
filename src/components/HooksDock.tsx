@@ -334,9 +334,9 @@ function parseHookNotification(value: unknown): HookRun | null {
   }
 
   return {
-    id: boundText(run.id, MAX_HOOK_LABEL_CHARS),
-    threadId: boundText(value.threadId, MAX_HOOK_LABEL_CHARS),
-    turnId: typeof value.turnId === "string" ? boundText(value.turnId, MAX_HOOK_LABEL_CHARS) : null,
+    id: run.id,
+    threadId: value.threadId,
+    turnId: typeof value.turnId === "string" ? value.turnId : null,
     eventName: boundText(run.eventName, MAX_HOOK_LABEL_CHARS),
     handlerType: boundText(run.handlerType, MAX_HOOK_LABEL_CHARS),
     executionMode: boundText(run.executionMode, MAX_HOOK_LABEL_CHARS),
