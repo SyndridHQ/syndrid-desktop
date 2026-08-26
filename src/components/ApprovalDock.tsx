@@ -9,6 +9,9 @@ const COMMAND_APPROVAL = "item/commandExecution/requestApproval";
 const FILE_APPROVAL = "item/fileChange/requestApproval";
 const PERMISSIONS_APPROVAL = "item/permissions/requestApproval";
 const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
+const MAX_PERMISSION_SUMMARY_ITEMS = 32;
+const MAX_PERMISSION_PATH_SCAN = 128;
+const MAX_PERMISSION_PATH_LABEL = 4096;
 
 type ApprovalDecision = "accept" | "acceptForSession" | "decline";
 type PermissionScope = "turn" | "session";
@@ -132,8 +135,8 @@ export function ApprovalDock() {
         {current.reason && <p>{current.reason}</p>}
         {current.permissionSummary.length > 0 && (
           <ul className="permission-summary" aria-label="Requested permissions">
-            {current.permissionSummary.map((permission) => (
-              <li key={permission}>{permission}</li>
+            {current.permissionSummary.map((permission, index) => (
+              <li key={`${index}:${permission}`}>{permission}</li>
             ))}
           </ul>
         )}
@@ -286,12 +289,10 @@ function summarizePermissions(permissions: Record<string, unknown>): string[] {
 
   const fileSystem = permissions.fileSystem;
   if (isRecord(fileSystem)) {
-    const reads = stringArray(fileSystem.read);
-    const writes = stringArray(fileSystem.write);
-    for (const path of reads) summary.push(`Read: ${path}`);
-    for (const path of writes) summary.push(`Write: ${path}`);
+    appendPermissionPaths(summary, "Read", fileSystem.read);
+    appendPermissionPaths(summary, "Write", fileSystem.write);
 
-    if (Array.isArray(fileSystem.entries) && fileSystem.entries.length > 0) {
+    if (summary.length < MAX_PERMISSION_SUMMARY_ITEMS && Array.isArray(fileSystem.entries) && fileSystem.entries.length > 0) {
       summary.push(`${fileSystem.entries.length} filesystem rule${fileSystem.entries.length === 1 ? "" : "s"}`);
     }
   }
@@ -299,9 +300,24 @@ function summarizePermissions(permissions: Record<string, unknown>): string[] {
   return summary.length > 0 ? summary : ["Runtime-requested sandbox access"];
 }
 
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is string => typeof entry === "string");
+function appendPermissionPaths(summary: string[], label: string, value: unknown): void {
+  if (!Array.isArray(value) || summary.length >= MAX_PERMISSION_SUMMARY_ITEMS) return;
+
+  const scanLimit = Math.min(value.length, MAX_PERMISSION_PATH_SCAN);
+  for (let index = 0; index < scanLimit && summary.length < MAX_PERMISSION_SUMMARY_ITEMS; index += 1) {
+    const path = value[index];
+    if (typeof path !== "string") continue;
+    summary.push(`${label}: ${boundedLabel(path, MAX_PERMISSION_PATH_LABEL)}`);
+  }
+
+  if (value.length > scanLimit && summary.length < MAX_PERMISSION_SUMMARY_ITEMS) {
+    summary.push(`${label}: ${value.length - scanLimit} additional path${value.length - scanLimit === 1 ? "" : "s"} not scanned`);
+  }
+}
+
+function boundedLabel(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
