@@ -120,13 +120,13 @@ export function ModelCatalogDock() {
       const dialog = dialogRef.current;
       if (!dialog) return;
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-      if (focusable.length === 0) {
+      const first = focusable.at(0);
+      const last = focusable.at(-1);
+      if (!first || !last) {
         event.preventDefault();
         return;
       }
 
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
       const active = document.activeElement;
       if (!(active instanceof HTMLElement) || !dialog.contains(active)) {
         event.preventDefault();
