@@ -14,12 +14,24 @@ interface RuntimeStartupState {
   error: string | null;
 }
 
+interface RetainedMcpServer {
+  name: string;
+  authStatus: McpServerStatus["authStatus"];
+  toolNames: string[];
+  toolCount: number;
+  toolCountTruncated: boolean;
+}
+
 const PAGE_SIZE = 50;
 const MAX_RETAINED_SERVERS = 200;
+const MAX_TOOL_SCAN = 256;
+const MAX_VISIBLE_TOOL_NAMES = 8;
+const MAX_PRESENTATION_TEXT = 8_192;
+const MAX_ERROR_TEXT = 32_768;
 
 export function McpServerDock() {
   const [open, setOpen] = useState(false);
-  const [servers, setServers] = useState<McpServerStatus[]>([]);
+  const [servers, setServers] = useState<RetainedMcpServer[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -50,8 +62,9 @@ export function McpServerDock() {
         });
         if (requestGeneration !== generation.current) return;
 
+        const projected = page.data.map(projectServer);
         setServers((current) =>
-          dedupeServers(append ? [...current, ...page.data] : page.data).slice(
+          dedupeServers(append ? [...current, ...projected] : projected).slice(
             0,
             MAX_RETAINED_SERVERS,
           ),
@@ -61,7 +74,7 @@ export function McpServerDock() {
         setStale(false);
       } catch (cause) {
         if (requestGeneration !== generation.current) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(limitError(cause instanceof Error ? cause.message : String(cause)));
       } finally {
         if (requestGeneration === generation.current) setLoading(false);
       }
@@ -90,7 +103,7 @@ export function McpServerDock() {
         setPendingOauth({ serverName, authorizationUrl });
       } catch (cause) {
         if (requestGeneration !== oauthGeneration.current) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(limitError(cause instanceof Error ? cause.message : String(cause)));
       } finally {
         if (requestGeneration === oauthGeneration.current) setOauthStarting(null);
       }
@@ -138,7 +151,10 @@ export function McpServerDock() {
         current?.serverName === completed.name ? null : current,
       );
       if (!completed.success) {
-        setError(completed.error || `OAuth sign-in failed for ${completed.name}.`);
+        setError(
+          completed.error ||
+            limitError(`OAuth sign-in failed for ${completed.name}.`),
+        );
       }
     });
   }, [open]);
@@ -165,7 +181,9 @@ export function McpServerDock() {
             <div className="mcp-oauth-banner">
               <span>
                 <strong>Authorization ready</strong>
-                <small>{pendingOauth.serverName} · credentials stay in SyndridCLI</small>
+                <small title={pendingOauth.serverName}>
+                  {limitPresentation(pendingOauth.serverName)} · credentials stay in SyndridCLI
+                </small>
               </span>
               <a
                 href={pendingOauth.authorizationUrl}
@@ -200,13 +218,12 @@ export function McpServerDock() {
           ) : (
             <div className="mcp-server-list">
               {servers.map((server) => {
-                const tools = Object.keys(server.tools ?? {});
                 const canOauth = server.authStatus === "notLoggedIn";
                 const startup = startupStates[server.name];
                 return (
                   <article className="mcp-server-card" key={server.name}>
                     <div className="mcp-server-card-head">
-                      <strong>{server.name}</strong>
+                      <strong title={server.name}>{limitPresentation(server.name)}</strong>
                       <span>
                         {startup && (
                           <em
@@ -222,7 +239,10 @@ export function McpServerDock() {
                       </span>
                     </div>
                     <div className="mcp-server-summary">
-                      <small>{tools.length} tool{tools.length === 1 ? "" : "s"}</small>
+                      <small>
+                        {server.toolCount}{server.toolCountTruncated ? "+" : ""} tool
+                        {server.toolCount === 1 && !server.toolCountTruncated ? "" : "s"}
+                      </small>
                       {canOauth && (
                         <button
                           disabled={oauthStarting !== null}
@@ -234,10 +254,16 @@ export function McpServerDock() {
                       )}
                     </div>
                     {startup?.error && <small className="mcp-startup-error">{startup.error}</small>}
-                    {tools.length > 0 && (
+                    {server.toolNames.length > 0 && (
                       <div className="mcp-tool-list">
-                        {tools.slice(0, 8).map((tool) => <code key={tool}>{tool}</code>)}
-                        {tools.length > 8 && <span>+{tools.length - 8} more</span>}
+                        {server.toolNames.map((tool) => <code key={tool}>{tool}</code>)}
+                        {(server.toolCountTruncated || server.toolCount > server.toolNames.length) && (
+                          <span>
+                            +{server.toolCountTruncated
+                              ? `${Math.max(0, server.toolCount - server.toolNames.length)}+`
+                              : server.toolCount - server.toolNames.length} more
+                          </span>
+                        )}
                       </div>
                     )}
                   </article>
@@ -264,8 +290,33 @@ export function McpServerDock() {
   );
 }
 
-function dedupeServers(servers: McpServerStatus[]): McpServerStatus[] {
-  const byName = new Map<string, McpServerStatus>();
+function projectServer(server: McpServerStatus): RetainedMcpServer {
+  const toolNames: string[] = [];
+  let toolCount = 0;
+  let toolCountTruncated = false;
+  const tools = server.tools ?? {};
+  for (const tool in tools) {
+    if (!Object.prototype.hasOwnProperty.call(tools, tool)) continue;
+    if (toolCount >= MAX_TOOL_SCAN) {
+      toolCountTruncated = true;
+      break;
+    }
+    toolCount += 1;
+    if (toolNames.length < MAX_VISIBLE_TOOL_NAMES) {
+      toolNames.push(limitPresentation(tool));
+    }
+  }
+  return {
+    name: server.name,
+    authStatus: server.authStatus,
+    toolNames,
+    toolCount,
+    toolCountTruncated,
+  };
+}
+
+function dedupeServers(servers: RetainedMcpServer[]): RetainedMcpServer[] {
+  const byName = new Map<string, RetainedMcpServer>();
   for (const server of servers) byName.set(server.name, server);
   return [...byName.values()];
 }
@@ -279,7 +330,7 @@ function parseStartupState(
   return {
     name: record.name,
     state: record.status,
-    error: typeof record.error === "string" ? record.error : null,
+    error: typeof record.error === "string" ? limitError(record.error) : null,
   };
 }
 
@@ -294,7 +345,7 @@ function parseOauthCompletion(value: unknown): { name: string; success: boolean;
   return {
     name: record.name,
     success: record.success,
-    error: typeof record.error === "string" ? record.error : null,
+    error: typeof record.error === "string" ? limitError(record.error) : null,
   };
 }
 
@@ -313,4 +364,16 @@ function authLabel(status: McpServerStatus["authStatus"]): string {
     case "notLoggedIn": return "Sign in";
     default: return "No auth";
   }
+}
+
+function limitPresentation(value: string): string {
+  return limitText(value, MAX_PRESENTATION_TEXT);
+}
+
+function limitError(value: string): string {
+  return limitText(value, MAX_ERROR_TEXT);
+}
+
+function limitText(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
