@@ -7,6 +7,7 @@ import "./diagnosticsDock.css";
 type DiagnosticsSnapshot = {
   connection: RuntimeConnectionSnapshot;
   environment: EnvironmentInfoResponse | null;
+  workspace: ReturnType<typeof useRuntimeWorkspace>;
   capturedAt: number;
 };
 
@@ -23,6 +24,7 @@ export function DiagnosticsDock() {
     if (loading) return;
     const requestGeneration = ++diagnosticGeneration.current;
     const connection = appServerClient.getSnapshot();
+    const capturedWorkspace = workspace;
     setLoading(true);
     setError(null);
     setCopied(false);
@@ -34,6 +36,7 @@ export function DiagnosticsDock() {
       setSnapshot({
         connection: appServerClient.getSnapshot(),
         environment,
+        workspace: capturedWorkspace,
         capturedAt: Date.now(),
       });
     } catch (cause) {
@@ -41,26 +44,27 @@ export function DiagnosticsDock() {
       setSnapshot({
         connection: appServerClient.getSnapshot(),
         environment: null,
+        workspace: capturedWorkspace,
         capturedAt: Date.now(),
       });
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       if (requestGeneration === diagnosticGeneration.current) setLoading(false);
     }
-  }, [loading]);
+  }, [loading, workspace]);
 
   const copySnapshot = useCallback(async () => {
     if (!snapshot || loading) return;
     setError(null);
     try {
       if (!navigator.clipboard) throw new Error("Clipboard access is unavailable in this environment.");
-      await navigator.clipboard.writeText(formatSnapshotForClipboard(snapshot, workspace));
+      await navigator.clipboard.writeText(formatSnapshotForClipboard(snapshot));
       setCopied(true);
     } catch (cause) {
       setCopied(false);
       setError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, [loading, snapshot, workspace]);
+  }, [loading, snapshot]);
 
   useEffect(() => {
     if (open) {
@@ -81,10 +85,11 @@ export function DiagnosticsDock() {
   const native = connection.native;
   const server = connection.server;
   const environment = snapshot?.environment;
+  const capturedWorkspace = snapshot?.workspace ?? null;
   const gitLabel = useMemo(() => {
-    if (!workspace?.git) return "Unavailable";
-    return workspace.git.branch || workspace.git.sha?.slice(0, 8) || "Repository detected";
-  }, [workspace?.git]);
+    if (!capturedWorkspace?.git) return "Unavailable";
+    return capturedWorkspace.git.branch || capturedWorkspace.git.sha?.slice(0, 8) || "Repository detected";
+  }, [capturedWorkspace?.git]);
 
   return (
     <aside className="diagnostics-dock" aria-label="Runtime diagnostics">
@@ -122,8 +127,8 @@ export function DiagnosticsDock() {
             <Diagnostic label="Native PID" value={native?.state === "running" ? String(native.pid) : "—"} />
             <Diagnostic label="Shell" value={environment ? `${environment.shell.name} · ${environment.shell.path}` : "Unavailable"} title={environment?.shell.path} />
             <Diagnostic label="Environment cwd" value={environment?.cwd || "Unavailable"} title={environment?.cwd ?? undefined} />
-            <Diagnostic label="Selected thread" value={workspace?.threadId ? shortId(workspace.threadId) : "None"} title={workspace?.threadId} />
-            <Diagnostic label="Workspace" value={workspace?.cwd || "None"} title={workspace?.cwd} />
+            <Diagnostic label="Selected thread" value={capturedWorkspace?.threadId ? shortId(capturedWorkspace.threadId) : "None"} title={capturedWorkspace?.threadId} />
+            <Diagnostic label="Workspace" value={capturedWorkspace?.cwd || "None"} title={capturedWorkspace?.cwd} />
             <Diagnostic label="Git" value={gitLabel} />
             <Diagnostic label="Captured" value={snapshot ? formatAge(snapshot.capturedAt) : "Not yet"} />
           </dl>
@@ -153,11 +158,8 @@ function formatNative(native: RuntimeConnectionSnapshot["native"]): string {
   return "Stopped";
 }
 
-function formatSnapshotForClipboard(
-  snapshot: DiagnosticsSnapshot,
-  workspace: ReturnType<typeof useRuntimeWorkspace>,
-): string {
-  const { connection, environment, capturedAt } = snapshot;
+function formatSnapshotForClipboard(snapshot: DiagnosticsSnapshot): string {
+  const { connection, environment, workspace, capturedAt } = snapshot;
   const native = connection.native;
   const server = connection.server;
   return JSON.stringify(
