@@ -6,12 +6,26 @@ import "./modelCatalogDock.css";
 const PAGE_SIZE = 80;
 const MAX_RETAINED_MODELS = 400;
 const MAX_RENDERED_MODELS = 160;
+const MAX_LABEL_CHARS = 8 * 1024;
+const MAX_DESCRIPTION_CHARS = 32 * 1024;
+const MAX_MODALITIES = 16;
+const MAX_MODALITY_CHARS = 512;
 const OPEN_EVENT = "syndrid:open-model-catalog";
+
+type RetainedModel = {
+  id: string;
+  model: string;
+  displayName: string;
+  description: string;
+  inputModalities: string[];
+  supportsPersonality: boolean;
+  isDefault: boolean;
+};
 
 export function ModelCatalogDock() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [models, setModels] = useState<ModelSummary[]>([]);
+  const [models, setModels] = useState<RetainedModel[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +50,9 @@ export function ModelCatalogDock() {
           includeHidden: false,
         });
         if (requestGeneration !== generation.current) return;
+        const projected = result.data.map(retainModel);
         setModels((current) =>
-          dedupeModels(append ? [...current, ...result.data] : result.data).slice(
+          dedupeModels(append ? [...current, ...projected] : projected).slice(
             0,
             MAX_RETAINED_MODELS,
           ),
@@ -197,15 +212,34 @@ export function ModelCatalogDock() {
         </div>
 
         <footer>
-          Runtime-discovered · 80 models/page · retains 400 while open · releases on close · mounts 160 · explicit pagination · no polling
+          Runtime-discovered · 80 models/page · retains 400 bounded summaries while open · releases on close · mounts 160 · explicit pagination · no polling
         </footer>
       </section>
     </div>
   );
 }
 
-function dedupeModels(models: ModelSummary[]): ModelSummary[] {
-  const byId = new Map<string, ModelSummary>();
+function retainModel(model: ModelSummary): RetainedModel {
+  return {
+    id: model.id,
+    model: model.model,
+    displayName: boundText(model.displayName, MAX_LABEL_CHARS),
+    description: boundText(model.description, MAX_DESCRIPTION_CHARS),
+    inputModalities: model.inputModalities
+      .slice(0, MAX_MODALITIES)
+      .map((value) => boundText(String(value), MAX_MODALITY_CHARS)),
+    supportsPersonality: model.supportsPersonality,
+    isDefault: model.isDefault,
+  };
+}
+
+function boundText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function dedupeModels(models: RetainedModel[]): RetainedModel[] {
+  const byId = new Map<string, RetainedModel>();
   for (const model of models) byId.set(model.id, model);
   return [...byId.values()];
 }
