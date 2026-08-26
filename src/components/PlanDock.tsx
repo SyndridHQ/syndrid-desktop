@@ -19,6 +19,9 @@ interface PlanSnapshot {
 }
 
 const MAX_STEPS = 80;
+const MAX_SCANNED_STEPS = 240;
+const MAX_STEP_TEXT = 8 * 1024;
+const MAX_EXPLANATION_TEXT = 32 * 1024;
 
 export function PlanDock() {
   const workspace = useRuntimeWorkspace();
@@ -46,24 +49,24 @@ export function PlanDock() {
       }
 
       const rawPlan = Array.isArray(params.plan) ? params.plan : [];
-      const plan = rawPlan.flatMap((value) => {
+      const plan: PlanStep[] = [];
+      for (const value of rawPlan.slice(0, MAX_SCANNED_STEPS)) {
         const record = toRecord(value);
         const step = record?.step;
         const status = record?.status;
-        if (
-          typeof step !== "string" ||
-          !isPlanStepStatus(status)
-        ) {
-          return [];
-        }
-        return [{ step, status } satisfies PlanStep];
-      });
+        if (typeof step !== "string" || !isPlanStepStatus(status)) continue;
+        plan.push({ step: boundText(step, MAX_STEP_TEXT), status });
+        if (plan.length >= MAX_STEPS) break;
+      }
 
       setSnapshot({
         threadId,
         turnId,
-        explanation: typeof params.explanation === "string" ? params.explanation : null,
-        plan: plan.slice(0, MAX_STEPS),
+        explanation:
+          typeof params.explanation === "string"
+            ? boundText(params.explanation, MAX_EXPLANATION_TEXT)
+            : null,
+        plan,
         updatedAt: Date.now(),
       });
     });
@@ -139,6 +142,11 @@ function summarize(plan: PlanStep[]): Record<PlanStepStatus, number> {
 
 function isPlanStepStatus(value: unknown): value is PlanStepStatus {
   return value === "pending" || value === "inProgress" || value === "completed";
+}
+
+function boundText(value: string, limit: number): string {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, Math.max(0, limit - 1))}…`;
 }
 
 function formatStatus(status: PlanStepStatus): string {
