@@ -387,13 +387,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_explicit_runtime_binary() {
+    fn rejects_invalid_runtime_binary_values() {
         for invalid in [
             format!("{}x", "x".repeat(MAX_RUNTIME_BINARY_CHARS)),
             "bad\0path".to_string(),
         ] {
-            let candidates = runtime_candidates(Some(invalid));
-            assert_eq!(candidates, vec!["syndrid".to_string()]);
+            assert_eq!(normalize_runtime_binary(invalid), None);
         }
     }
 }
