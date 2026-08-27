@@ -28,6 +28,7 @@ interface RuntimeWarningEntry {
   path: string | null;
   willRetry: boolean | null;
   receivedAt: number;
+  occurrences: number;
 }
 
 export function WarningsDock() {
@@ -41,7 +42,20 @@ export function WarningsDock() {
     return appServerClient.onNotification((notification) => {
       const parsed = parseWarningNotification(notification, nextId.current++);
       if (!parsed) return;
-      setEntries((current) => [parsed, ...current].slice(0, MAX_RETAINED_WARNINGS));
+      setEntries((current) => {
+        const latest = current[0];
+        if (latest && sameWarning(latest, parsed)) {
+          return [
+            {
+              ...latest,
+              receivedAt: parsed.receivedAt,
+              occurrences: latest.occurrences + 1,
+            },
+            ...current.slice(1),
+          ];
+        }
+        return [parsed, ...current].slice(0, MAX_RETAINED_WARNINGS);
+      });
     });
   }, []);
 
@@ -117,6 +131,7 @@ export function WarningsDock() {
                     <time dateTime={new Date(entry.receivedAt).toISOString()}>
                       {WARNING_TIME_FORMAT.format(new Date(entry.receivedAt))}
                     </time>
+                    {entry.occurrences > 1 && <span>{entry.occurrences.toLocaleString()} occurrences</span>}
                     {entry.threadId && <code title={entry.threadId}>{shortId(entry.threadId)}</code>}
                     {entry.path && <code title={entry.path}>{entry.path}</code>}
                     {entry.willRetry !== null && <span>{entry.willRetry ? "runtime will retry" : "no retry reported"}</span>}
@@ -160,6 +175,7 @@ function parseWarningNotification(
       path: null,
       willRetry: null,
       receivedAt,
+      occurrences: 1,
     };
   }
 
@@ -176,6 +192,7 @@ function parseWarningNotification(
       path: null,
       willRetry: null,
       receivedAt,
+      occurrences: 1,
     };
   }
 
@@ -191,6 +208,7 @@ function parseWarningNotification(
       path: boundedString(params.path, MAX_WARNING_PATH_CHARS),
       willRetry: null,
       receivedAt,
+      occurrences: 1,
     };
   }
 
@@ -206,6 +224,7 @@ function parseWarningNotification(
       path: null,
       willRetry: null,
       receivedAt,
+      occurrences: 1,
     };
   }
 
@@ -226,10 +245,20 @@ function parseWarningNotification(
       path: null,
       willRetry: typeof params.willRetry === "boolean" ? params.willRetry : null,
       receivedAt,
+      occurrences: 1,
     };
   }
 
   return null;
+}
+
+function sameWarning(left: RuntimeWarningEntry, right: RuntimeWarningEntry): boolean {
+  return left.kind === right.kind
+    && left.title === right.title
+    && left.details === right.details
+    && left.threadId === right.threadId
+    && left.path === right.path
+    && left.willRetry === right.willRetry;
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
