@@ -31,8 +31,13 @@ import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
 
 const bootStartedAt = performance.now();
+const rootElement = document.getElementById("root");
 
-createRoot(document.getElementById("root")!).render(
+if (!rootElement) {
+  throw new Error("Syndrid Desktop root mount element is missing.");
+}
+
+createRoot(rootElement).render(
   <StrictMode>
     <WorkbenchErrorBoundary>
       <App bootStartedAt={bootStartedAt} />
