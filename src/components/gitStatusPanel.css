@@ -52,6 +52,34 @@
   opacity: .45;
 }
 
+.git-status-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--border, #20262d);
+  padding: 7px 10px;
+}
+
+.git-status-filter input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--border, #20262d);
+  border-radius: 6px;
+  padding: 5px 7px;
+  outline: none;
+  background: rgba(7, 9, 12, .8);
+  color: var(--text, #e8edf2);
+  font: 8px/1.35 "SFMono-Regular", Consolas, monospace;
+}
+
+.git-status-filter input:focus {
+  border-color: #4b5968;
+}
+
+.git-status-filter input::placeholder {
+  color: var(--faint, #5d6670);
+}
+
 .git-status-state {
   border-top: 1px solid var(--border, #20262d);
   padding: 10px;
