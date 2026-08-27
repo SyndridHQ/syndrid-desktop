@@ -23,6 +23,7 @@ export function GitStatusPanel() {
   const [loaded, setLoaded] = useState(false);
   const [stale, setStale] = useState(false);
   const [entries, setEntries] = useState<GitStatusEntry[]>([]);
+  const [filter, setFilter] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -33,6 +34,7 @@ export function GitStatusPanel() {
     setLoaded(false);
     setStale(false);
     setEntries([]);
+    setFilter("");
     setTruncated(false);
     setError(null);
     return () => {
@@ -103,7 +105,18 @@ export function GitStatusPanel() {
     }
   }, [loading, workspace?.cwd, workspace?.threadId]);
 
-  const groups = useMemo(() => groupStatusEntries(entries), [entries]);
+  const normalizedFilter = filter.trim().toLocaleLowerCase();
+  const filteredEntries = useMemo(
+    () =>
+      normalizedFilter
+        ? entries.filter((entry) => {
+            const searchText = `${entry.path} ${entry.previousPath ?? ""}`.toLocaleLowerCase();
+            return searchText.includes(normalizedFilter);
+          })
+        : entries,
+    [entries, normalizedFilter],
+  );
+  const groups = useMemo(() => groupStatusEntries(filteredEntries), [filteredEntries]);
   const meaningfulCount =
     groups.conflicts.length +
     groups.untracked.length +
@@ -119,7 +132,9 @@ export function GitStatusPanel() {
             {stale
               ? "Runtime reports newer turn changes · refresh explicitly"
               : loaded
-                ? `${entries.length.toLocaleString()} runtime status records`
+                ? normalizedFilter
+                  ? `${filteredEntries.length.toLocaleString()} of ${entries.length.toLocaleString()} status records match`
+                  : `${entries.length.toLocaleString()} runtime status records`
                 : "Explicit runtime read · no polling"}
           </small>
         </span>
@@ -127,6 +142,23 @@ export function GitStatusPanel() {
           {loading ? "Loading…" : loaded ? (stale ? "Refresh · updated" : "Refresh") : "Load status"}
         </button>
       </header>
+
+      {loaded && entries.length > 0 && (
+        <div className="git-status-filter">
+          <input
+            aria-label="Filter working tree status by path"
+            onChange={(event) => setFilter(event.target.value)}
+            placeholder="Filter status paths…"
+            spellCheck={false}
+            value={filter}
+          />
+          {filter && (
+            <button onClick={() => setFilter("")} type="button">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {error ? (
         <div className="git-status-state error">{error}</div>
@@ -137,7 +169,9 @@ export function GitStatusPanel() {
           Status loading is explicit so opening Source Control performs no repository scan.
         </div>
       ) : meaningfulCount === 0 ? (
-        <div className="git-status-state compact">Working tree is clean.</div>
+        <div className="git-status-state compact">
+          {normalizedFilter ? "No status records match this path filter." : "Working tree is clean."}
+        </div>
       ) : (
         <div className="git-status-groups">
           <StatusGroup label="Conflicts" entries={groups.conflicts} side="conflict" />
