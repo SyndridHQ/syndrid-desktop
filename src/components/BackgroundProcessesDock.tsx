@@ -6,7 +6,18 @@ import "./backgroundProcessesDock.css";
 
 const PAGE_SIZE = 50;
 const MAX_RETAINED_PROCESSES = 200;
+const MAX_COMMAND_CHARS = 8_192;
+const MAX_CWD_CHARS = 16_384;
 type ProcessSort = "runtime" | "cpu" | "memory" | "command";
+
+type BackgroundProcessSummary = {
+  processId: string;
+  command: string;
+  cwd: string;
+  osPid: number | null;
+  cpuPercent: number | null;
+  rssKb: number | null;
+};
 
 export function BackgroundProcessesDock() {
   const workspace = useRuntimeWorkspace();
@@ -14,7 +25,7 @@ export function BackgroundProcessesDock() {
   const [loading, setLoading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [confirmClean, setConfirmClean] = useState(false);
-  const [processes, setProcesses] = useState<ThreadBackgroundTerminal[]>([]);
+  const [processes, setProcesses] = useState<BackgroundProcessSummary[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<ProcessSort>("runtime");
@@ -57,8 +68,9 @@ export function BackgroundProcessesDock() {
         ) {
           return;
         }
+        const page = projectProcessPage(result.data);
         setProcesses((current) =>
-          dedupeProcesses(append ? [...current, ...result.data] : result.data).slice(
+          dedupeProcesses(append ? [...current, ...page] : page).slice(
             0,
             MAX_RETAINED_PROCESSES,
           ),
@@ -116,7 +128,7 @@ export function BackgroundProcessesDock() {
   const normalizedQuery = query.trim();
 
   const terminate = useCallback(
-    async (process: ThreadBackgroundTerminal) => {
+    async (process: BackgroundProcessSummary) => {
       const threadId = workspace?.threadId;
       if (!threadId || cleaning || terminating.has(process.processId)) return;
 
@@ -342,9 +354,9 @@ function ProcessRow({
   stopping,
   terminate,
 }: {
-  process: ThreadBackgroundTerminal;
+  process: BackgroundProcessSummary;
   stopping: boolean;
-  terminate: (process: ThreadBackgroundTerminal) => Promise<void>;
+  terminate: (process: BackgroundProcessSummary) => Promise<void>;
 }) {
   return (
     <article className="background-process-row">
@@ -369,7 +381,27 @@ function ProcessRow({
   );
 }
 
-function dedupeProcesses(processes: ThreadBackgroundTerminal[]): ThreadBackgroundTerminal[] {
+function projectProcessPage(processes: ThreadBackgroundTerminal[]): BackgroundProcessSummary[] {
+  const projected: BackgroundProcessSummary[] = [];
+  for (const process of processes) {
+    projected.push({
+      processId: process.processId,
+      command: boundText(process.command, MAX_COMMAND_CHARS),
+      cwd: boundText(process.cwd, MAX_CWD_CHARS),
+      osPid: process.osPid,
+      cpuPercent: process.cpuPercent,
+      rssKb: process.rssKb,
+    });
+    if (projected.length >= PAGE_SIZE) break;
+  }
+  return projected;
+}
+
+function boundText(value: string, maxChars: number): string {
+  return value.length <= maxChars ? value : `${value.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function dedupeProcesses(processes: BackgroundProcessSummary[]): BackgroundProcessSummary[] {
   const seen = new Set<string>();
   return processes.filter((process) => {
     if (seen.has(process.processId)) return false;
@@ -379,9 +411,9 @@ function dedupeProcesses(processes: ThreadBackgroundTerminal[]): ThreadBackgroun
 }
 
 function filterProcesses(
-  processes: ThreadBackgroundTerminal[],
+  processes: BackgroundProcessSummary[],
   query: string,
-): ThreadBackgroundTerminal[] {
+): BackgroundProcessSummary[] {
   const normalized = query.trim().toLocaleLowerCase();
   if (!normalized) return processes;
   return processes.filter((process) => {
@@ -396,9 +428,9 @@ function filterProcesses(
 }
 
 function sortProcesses(
-  processes: ThreadBackgroundTerminal[],
+  processes: BackgroundProcessSummary[],
   sort: ProcessSort,
-): ThreadBackgroundTerminal[] {
+): BackgroundProcessSummary[] {
   if (sort === "runtime") return processes;
   const sorted = [...processes];
   if (sort === "cpu") {
@@ -420,7 +452,7 @@ function compareNullableNumberDescending(a: number | null, b: number | null): nu
   return b - a;
 }
 
-function summarize(processes: ThreadBackgroundTerminal[]): { cpuPercent: number | null; rssKb: number | null } {
+function summarize(processes: BackgroundProcessSummary[]): { cpuPercent: number | null; rssKb: number | null } {
   let cpuPercent = 0;
   let cpuKnown = false;
   let rssKb = 0;
