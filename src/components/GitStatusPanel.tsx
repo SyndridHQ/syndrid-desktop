@@ -123,6 +123,7 @@ export function GitStatusPanel() {
     groups.untracked.length +
     groups.staged.length +
     groups.unstaged.length;
+  const statusSummary = formatStatusSummary(groups, entries.length);
 
   return (
     <section className="git-status-panel" aria-label="Working tree status">
@@ -135,7 +136,7 @@ export function GitStatusPanel() {
               : loaded
                 ? normalizedFilter
                   ? `${filteredEntries.length.toLocaleString()} of ${entries.length.toLocaleString()} status records match`
-                  : `${entries.length.toLocaleString()} runtime status records`
+                  : statusSummary
                 : "Explicit runtime read · no polling"}
           </small>
         </span>
@@ -246,6 +247,15 @@ function groupStatusEntries(entries: GitStatusEntry[]): StatusGroups {
     if (isMeaningfulStatus(entry.worktreeStatus)) groups.unstaged.push(entry);
   }
   return groups;
+}
+
+function formatStatusSummary(groups: StatusGroups, recordCount: number): string {
+  const parts = [`${recordCount.toLocaleString()} records`];
+  if (groups.conflicts.length > 0) parts.push(`${groups.conflicts.length.toLocaleString()} conflicts`);
+  if (groups.staged.length > 0) parts.push(`${groups.staged.length.toLocaleString()} staged`);
+  if (groups.unstaged.length > 0) parts.push(`${groups.unstaged.length.toLocaleString()} unstaged`);
+  if (groups.untracked.length > 0) parts.push(`${groups.untracked.length.toLocaleString()} untracked`);
+  return parts.join(" · ");
 }
 
 function isMeaningfulStatus(status: GitStatusCode): boolean {
