@@ -473,7 +473,23 @@ export class SyndridAppServerClient {
   private setWorkspaceSnapshot(next: RuntimeWorkspaceSnapshot | null): void {
     if (sameWorkspaceSnapshot(this.workspaceSnapshot, next)) return;
     this.workspaceSnapshot = next;
-    for (const handler of this.workspaceHandlers) handler();
+    for (const handler of this.workspaceHandlers) {
+      try {
+        handler();
+      } catch (error) {
+        console.error("Syndrid Desktop workspace subscriber failed", error);
+      }
+    }
+  }
+
+  private emitLog(line: string): void {
+    for (const handler of this.logHandlers) {
+      try {
+        handler(line);
+      } catch (error) {
+        console.error("Syndrid Desktop log subscriber failed", error);
+      }
+    }
   }
 
   private async ensureListeners(): Promise<void> {
@@ -481,9 +497,7 @@ export class SyndridAppServerClient {
       this.unlistenMessage = await onNativeAppServerMessage((line) => this.handleLine(line));
     }
     if (!this.unlistenStderr) {
-      this.unlistenStderr = await onNativeAppServerStderr((line) => {
-        for (const handler of this.logHandlers) handler(line);
-      });
+      this.unlistenStderr = await onNativeAppServerStderr((line) => this.emitLog(line));
     }
   }
 
@@ -534,7 +548,7 @@ export class SyndridAppServerClient {
     try {
       message = JSON.parse(line);
     } catch {
-      for (const handler of this.logHandlers) handler(`unparsed stdout: ${line}`);
+      this.emitLog(`unparsed stdout: ${line}`);
       return;
     }
 
@@ -548,14 +562,16 @@ export class SyndridAppServerClient {
       };
       let handled = false;
       for (const handler of this.serverRequestHandlers) {
-        handled = handler(serverRequest) || handled;
+        try {
+          handled = handler(serverRequest) || handled;
+        } catch (error) {
+          console.error("Syndrid Desktop server-request subscriber failed", error);
+        }
       }
       if (!handled) {
-        for (const handler of this.logHandlers) {
-          handler(
-            `unhandled app-server request: ${serverRequest.method} (${String(serverRequest.id)})`,
-          );
-        }
+        this.emitLog(
+          `unhandled app-server request: ${serverRequest.method} (${String(serverRequest.id)})`,
+        );
       }
       return;
     }
@@ -563,9 +579,7 @@ export class SyndridAppServerClient {
     if (isRequestId(message.id)) {
       const pending = this.pending.get(message.id);
       if (!pending) {
-        for (const handler of this.logHandlers) {
-          handler(`orphan app-server response id: ${String(message.id)}`);
-        }
+        this.emitLog(`orphan app-server response id: ${String(message.id)}`);
         return;
       }
 
@@ -583,7 +597,13 @@ export class SyndridAppServerClient {
 
     if (typeof message.method === "string") {
       const notification = message as unknown as JsonRpcNotification;
-      for (const handler of this.notificationHandlers) handler(notification);
+      for (const handler of this.notificationHandlers) {
+        try {
+          handler(notification);
+        } catch (error) {
+          console.error("Syndrid Desktop notification subscriber failed", error);
+        }
+      }
     }
   }
 }
