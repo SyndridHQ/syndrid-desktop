@@ -7,15 +7,21 @@ import "./gitStatusPanel.css";
 
 const MAX_STATUS_ENTRIES = 2_500;
 const MAX_ROWS_PER_GROUP = 60;
+const MAX_EXACT_STATUS_PATH_CHARS = 32_768;
 const MAX_STATUS_PATH_CHARS = 4_096;
 const MAX_FILTER_CHARS = 512;
 const MAX_ERROR_CHARS = 8_192;
 
+interface RetainedGitStatusEntry extends GitStatusEntry {
+  displayPath: string;
+  displayPreviousPath: string | null;
+}
+
 interface StatusGroups {
-  conflicts: GitStatusEntry[];
-  untracked: GitStatusEntry[];
-  staged: GitStatusEntry[];
-  unstaged: GitStatusEntry[];
+  conflicts: RetainedGitStatusEntry[];
+  untracked: RetainedGitStatusEntry[];
+  staged: RetainedGitStatusEntry[];
+  unstaged: RetainedGitStatusEntry[];
 }
 
 export function GitStatusPanel() {
@@ -23,7 +29,7 @@ export function GitStatusPanel() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [stale, setStale] = useState(false);
-  const [entries, setEntries] = useState<GitStatusEntry[]>([]);
+  const [entries, setEntries] = useState<RetainedGitStatusEntry[]>([]);
   const [filter, setFilter] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +85,7 @@ export function GitStatusPanel() {
       const retained = sourceEntries
         .slice(0, MAX_STATUS_ENTRIES)
         .map(projectGitStatusEntry)
-        .filter((entry): entry is GitStatusEntry => entry !== null);
+        .filter((entry): entry is RetainedGitStatusEntry => entry !== null);
       setEntries(retained);
       setTruncated(result.truncated === true || sourceEntries.length > MAX_STATUS_ENTRIES);
       setStale(false);
@@ -111,8 +117,8 @@ export function GitStatusPanel() {
     () =>
       normalizedFilter
         ? entries.filter((entry) =>
-            entry.path.toLowerCase().includes(normalizedFilter) ||
-            (entry.previousPath?.toLowerCase().includes(normalizedFilter) ?? false),
+            entry.displayPath.toLowerCase().includes(normalizedFilter) ||
+            (entry.displayPreviousPath?.toLowerCase().includes(normalizedFilter) ?? false),
           )
         : entries,
     [entries, normalizedFilter],
@@ -199,7 +205,7 @@ function StatusGroup({
   side,
 }: {
   label: string;
-  entries: GitStatusEntry[];
+  entries: RetainedGitStatusEntry[];
   side: "conflict" | "untracked" | "index" | "worktree";
 }) {
   if (entries.length === 0) return null;
@@ -214,11 +220,17 @@ function StatusGroup({
       <div className="git-status-list">
         {visible.map((entry, index) => {
           const status = statusForSide(entry, side);
-          const title = entry.previousPath ? `${entry.previousPath} → ${entry.path}` : entry.path;
+          const title = entry.displayPreviousPath
+            ? `${entry.displayPreviousPath} → ${entry.displayPath}`
+            : entry.displayPath;
           return (
             <div className="git-status-row" key={`${index}:${entry.path}`} title={title}>
               <b aria-label={statusLabel(status)}>{statusShortLabel(status)}</b>
-              <span>{entry.previousPath ? `${entry.previousPath} → ${entry.path}` : entry.path}</span>
+              <span>
+                {entry.displayPreviousPath
+                  ? `${entry.displayPreviousPath} → ${entry.displayPath}`
+                  : entry.displayPath}
+              </span>
             </div>
           );
         })}
@@ -232,7 +244,7 @@ function StatusGroup({
   );
 }
 
-function groupStatusEntries(entries: GitStatusEntry[]): StatusGroups {
+function groupStatusEntries(entries: RetainedGitStatusEntry[]): StatusGroups {
   const groups: StatusGroups = { conflicts: [], untracked: [], staged: [], unstaged: [] };
   for (const entry of entries) {
     if (entry.indexStatus === "unmerged" || entry.worktreeStatus === "unmerged") {
@@ -299,11 +311,19 @@ function statusLabel(status: GitStatusCode): string {
   }
 }
 
-function projectGitStatusEntry(value: unknown): GitStatusEntry | null {
+function projectGitStatusEntry(value: unknown): RetainedGitStatusEntry | null {
   if (!isGitStatusEntry(value)) return null;
+  if (
+    value.path.length > MAX_EXACT_STATUS_PATH_CHARS ||
+    (value.previousPath?.length ?? 0) > MAX_EXACT_STATUS_PATH_CHARS
+  ) {
+    return null;
+  }
   return {
-    path: truncateText(value.path, MAX_STATUS_PATH_CHARS),
-    previousPath: value.previousPath === null
+    path: value.path,
+    previousPath: value.previousPath,
+    displayPath: truncateText(value.path, MAX_STATUS_PATH_CHARS),
+    displayPreviousPath: value.previousPath === null
       ? null
       : truncateText(value.previousPath, MAX_STATUS_PATH_CHARS),
     indexStatus: value.indexStatus,
