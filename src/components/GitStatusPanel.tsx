@@ -7,7 +7,8 @@ import "./gitStatusPanel.css";
 
 const MAX_STATUS_ENTRIES = 2_500;
 const MAX_ROWS_PER_GROUP = 60;
-const MAX_STATUS_PATH_CHARS = 32_768;
+const MAX_STATUS_PATH_CHARS = 4_096;
+const MAX_FILTER_CHARS = 512;
 const MAX_ERROR_CHARS = 8_192;
 
 interface StatusGroups {
@@ -105,14 +106,14 @@ export function GitStatusPanel() {
     }
   }, [loading, workspace?.cwd, workspace?.threadId]);
 
-  const normalizedFilter = filter.trim().toLocaleLowerCase();
+  const normalizedFilter = filter.trim().toLowerCase();
   const filteredEntries = useMemo(
     () =>
       normalizedFilter
-        ? entries.filter((entry) => {
-            const searchText = `${entry.path} ${entry.previousPath ?? ""}`.toLocaleLowerCase();
-            return searchText.includes(normalizedFilter);
-          })
+        ? entries.filter((entry) =>
+            entry.path.toLowerCase().includes(normalizedFilter) ||
+            (entry.previousPath?.toLowerCase().includes(normalizedFilter) ?? false),
+          )
         : entries,
     [entries, normalizedFilter],
   );
@@ -147,7 +148,8 @@ export function GitStatusPanel() {
         <div className="git-status-filter">
           <input
             aria-label="Filter working tree status by path"
-            onChange={(event) => setFilter(event.target.value)}
+            maxLength={MAX_FILTER_CHARS}
+            onChange={(event) => setFilter(event.target.value.slice(0, MAX_FILTER_CHARS))}
             placeholder="Filter status paths…"
             spellCheck={false}
             value={filter}
