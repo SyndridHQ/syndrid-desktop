@@ -7,6 +7,7 @@ import {
   type TurnDiffUpdatedNotification,
 } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
+import { GitStatusPanel } from "./GitStatusPanel";
 import "./gitDock.css";
 
 const MAX_DIFF_CHARS = 250_000;
@@ -217,6 +218,8 @@ export function GitDock() {
                   <dd title={gitInfo.originUrl ?? undefined}>{gitInfo.originUrl ?? "No origin reported"}</dd>
                 </div>
               </dl>
+
+              <GitStatusPanel />
 
               {error ? (
                 <div className="git-state error">{error}</div>

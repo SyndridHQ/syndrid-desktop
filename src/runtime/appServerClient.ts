@@ -70,6 +70,7 @@ import type {
   FsWatchParams,
   FsWatchResponse,
 } from "./fsWatchProtocol";
+import type { GitStatusParams, GitStatusResponse } from "./gitStatusProtocol";
 import type {
   PermissionProfileListParams,
   PermissionProfileListResponse,
@@ -361,6 +362,10 @@ export class SyndridAppServerClient {
 
   async gitDiffToRemote(params: GitDiffToRemoteParams): Promise<GitDiffToRemoteResponse> {
     return this.request<GitDiffToRemoteResponse>(methods.gitDiffToRemote, params);
+  }
+
+  async gitStatus(params: GitStatusParams): Promise<GitStatusResponse> {
+    return this.request<GitStatusResponse>("git/status", params);
   }
 
   async listMcpServerStatus(

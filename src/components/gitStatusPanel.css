@@ -1,0 +1,147 @@
+.git-status-panel {
+  border-top: 1px solid var(--border, #20262d);
+  border-bottom: 1px solid var(--border, #20262d);
+  background: rgba(12, 15, 18, .72);
+}
+
+.git-status-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.git-status-panel > header > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.git-status-panel > header strong {
+  font-size: 9px;
+}
+
+.git-status-panel > header small {
+  overflow: hidden;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-status-panel button {
+  border: 1px solid var(--border, #20262d);
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: transparent;
+  color: var(--muted, #87919c);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.git-status-panel button:hover:not(:disabled) {
+  border-color: #3a4450;
+  color: var(--text, #e8edf2);
+}
+
+.git-status-panel button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.git-status-state {
+  border-top: 1px solid var(--border, #20262d);
+  padding: 10px;
+  color: var(--muted, #87919c);
+  font-size: 9px;
+}
+
+.git-status-state.compact {
+  padding: 7px 10px;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+.git-status-state.error {
+  color: #e6a6a6;
+}
+
+.git-status-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--border, #20262d);
+}
+
+.git-status-group {
+  min-width: 0;
+  border-bottom: 1px solid var(--border, #20262d);
+}
+
+.git-status-group:nth-child(odd) {
+  border-right: 1px solid var(--border, #20262d);
+}
+
+.git-status-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--muted, #87919c);
+  font-size: 8px;
+}
+
+.git-status-group > header span {
+  color: var(--faint, #5d6670);
+  font: 8px/1.2 "SFMono-Regular", Consolas, monospace;
+}
+
+.git-status-list {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.git-status-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid rgba(32, 38, 45, .65);
+  padding: 4px 8px;
+  font: 8px/1.35 "SFMono-Regular", Consolas, monospace;
+}
+
+.git-status-row b {
+  width: 12px;
+  flex: 0 0 12px;
+  text-align: center;
+}
+
+.git-status-row span {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--text, #e8edf2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-status-limit {
+  display: block;
+  border-top: 1px solid rgba(32, 38, 45, .65);
+  padding: 5px 8px;
+  color: var(--faint, #5d6670);
+  font-size: 7px;
+}
+
+@media (max-width: 720px) {
+  .git-status-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .git-status-group:nth-child(odd) {
+    border-right: 0;
+  }
+}
