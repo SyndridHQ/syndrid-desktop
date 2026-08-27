@@ -13,6 +13,7 @@ const STDERR_EVENT: &str = "syndrid://app-server/stderr";
 const APP_SERVER_STOP_GRACE: Duration = Duration::from_millis(750);
 const MAX_FORWARDED_LINE_BYTES: usize = 32 * 1024 * 1024;
 const FORWARD_READ_BUFFER_BYTES: usize = 16 * 1024;
+const MAX_RUNTIME_BINARY_CHARS: usize = 32_768;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -213,7 +214,14 @@ fn normalize_runtime_binary(value: String) -> Option<String> {
         .and_then(|value| value.strip_suffix('"'))
         .map(str::trim)
         .unwrap_or(normalized);
-    (!normalized.is_empty()).then(|| normalized.to_string())
+    if normalized.is_empty()
+        || normalized.contains('\0')
+        || normalized.len() > MAX_RUNTIME_BINARY_CHARS.saturating_mul(4)
+        || normalized.chars().count() > MAX_RUNTIME_BINARY_CHARS
+    {
+        return None;
+    }
+    Some(normalized.to_string())
 }
 
 fn runtime_candidates(explicit: Option<String>) -> Vec<String> {
@@ -376,5 +384,16 @@ mod tests {
                 .iter()
                 .all(|candidate| !candidate.trim().is_empty())
         );
+    }
+
+    #[test]
+    fn rejects_invalid_explicit_runtime_binary() {
+        for invalid in [
+            format!("{}x", "x".repeat(MAX_RUNTIME_BINARY_CHARS)),
+            "bad\0path".to_string(),
+        ] {
+            let candidates = runtime_candidates(Some(invalid));
+            assert_eq!(candidates, vec!["syndrid".to_string()]);
+        }
     }
 }
