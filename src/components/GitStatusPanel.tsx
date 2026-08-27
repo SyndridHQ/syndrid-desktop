@@ -7,6 +7,8 @@ import "./gitStatusPanel.css";
 
 const MAX_STATUS_ENTRIES = 2_500;
 const MAX_ROWS_PER_GROUP = 60;
+const MAX_STATUS_PATH_CHARS = 32_768;
+const MAX_ERROR_CHARS = 8_192;
 
 interface StatusGroups {
   conflicts: GitStatusEntry[];
@@ -73,7 +75,8 @@ export function GitStatusPanel() {
       const sourceEntries = Array.isArray(result.entries) ? result.entries : [];
       const retained = sourceEntries
         .slice(0, MAX_STATUS_ENTRIES)
-        .filter(isGitStatusEntry);
+        .map(projectGitStatusEntry)
+        .filter((entry): entry is GitStatusEntry => entry !== null);
       setEntries(retained);
       setTruncated(result.truncated === true || sourceEntries.length > MAX_STATUS_ENTRIES);
       setStale(false);
@@ -85,7 +88,8 @@ export function GitStatusPanel() {
         selected?.threadId === threadId &&
         selected?.cwd === cwd
       ) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setError(truncateText(message, MAX_ERROR_CHARS));
       }
     } finally {
       const selected = appServerClient.getWorkspaceSnapshot();
@@ -249,6 +253,18 @@ function statusLabel(status: GitStatusCode): string {
   }
 }
 
+function projectGitStatusEntry(value: unknown): GitStatusEntry | null {
+  if (!isGitStatusEntry(value)) return null;
+  return {
+    path: truncateText(value.path, MAX_STATUS_PATH_CHARS),
+    previousPath: value.previousPath === null
+      ? null
+      : truncateText(value.previousPath, MAX_STATUS_PATH_CHARS),
+    indexStatus: value.indexStatus,
+    worktreeStatus: value.worktreeStatus,
+  };
+}
+
 function isGitStatusEntry(value: unknown): value is GitStatusEntry {
   if (!value || typeof value !== "object") return false;
   const entry = value as Partial<GitStatusEntry>;
@@ -272,4 +288,9 @@ function isGitStatusCode(value: unknown): value is GitStatusCode {
     value === "untracked" ||
     value === "ignored"
   );
+}
+
+function truncateText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
 }
