@@ -13,11 +13,13 @@ export type GitPathMutationMethod =
 export type GitPathMutationOperation = "stage" | "unstage";
 
 /**
- * UX-side selection ceiling matching the focused runtime contract from PR #115.
- * SyndridCLI still validates every request authoritatively; Desktop uses this only
+ * UX-side payload ceilings matching the focused runtime contract from PR #115.
+ * SyndridCLI still validates every request authoritatively; Desktop uses these only
  * to keep explicit user actions bounded before they cross the protocol boundary.
  */
 export const MAX_GIT_PATH_MUTATION_SELECTION = 256;
+export const MAX_GIT_PATH_MUTATION_PATH_CHARS = 32_768;
+export const MAX_GIT_PATH_MUTATION_TOTAL_CHARS = 1_048_576;
 
 export const gitPathMutationOperations: Readonly<
   Record<GitPathMutationOperation, { method: GitPathMutationMethod; label: string }>
@@ -93,6 +95,22 @@ export function makeGitPathMutationParams(
       `Select at most ${MAX_GIT_PATH_MUTATION_SELECTION.toLocaleString()} paths per Git action.`,
     );
   }
+
+  let totalChars = 0;
+  for (const path of paths) {
+    if (path.length > MAX_GIT_PATH_MUTATION_PATH_CHARS) {
+      throw new Error(
+        `Git mutation paths must be at most ${MAX_GIT_PATH_MUTATION_PATH_CHARS.toLocaleString()} characters.`,
+      );
+    }
+    totalChars += path.length;
+    if (totalChars > MAX_GIT_PATH_MUTATION_TOTAL_CHARS) {
+      throw new Error(
+        `Git mutation paths must total at most ${MAX_GIT_PATH_MUTATION_TOTAL_CHARS.toLocaleString()} characters.`,
+      );
+    }
+  }
+
   return { cwd, paths: [...paths] };
 }
 
