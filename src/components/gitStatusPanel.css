@@ -171,8 +171,14 @@
   font-size: 7px;
 }
 
-.git-status-limit button {
+.git-status-page-controls {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.git-status-limit button {
   padding: 2px 5px;
   font-size: 7px;
 }
