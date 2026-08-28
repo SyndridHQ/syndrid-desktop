@@ -35,10 +35,12 @@ export function GitStatusPanel() {
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
   const invalidationVersion = useRef(0);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     generation.current += 1;
     invalidationVersion.current = 0;
+    loadingRef.current = false;
     setLoading(false);
     setLoaded(false);
     setStale(false);
@@ -66,12 +68,13 @@ export function GitStatusPanel() {
   const loadStatus = useCallback(async () => {
     const cwd = workspace?.cwd;
     const threadId = workspace?.threadId;
-    if (!cwd || !threadId || loading) return;
+    if (!cwd || !threadId || loadingRef.current) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before loading repository status.");
       return;
     }
 
+    loadingRef.current = true;
     const requestGeneration = ++generation.current;
     const requestInvalidationVersion = invalidationVersion.current;
     setLoading(true);
@@ -121,10 +124,11 @@ export function GitStatusPanel() {
         selected?.threadId === threadId &&
         selected?.cwd === cwd
       ) {
+        loadingRef.current = false;
         setLoading(false);
       }
     }
-  }, [loading, workspace?.cwd, workspace?.threadId]);
+  }, [workspace?.cwd, workspace?.threadId]);
 
   const normalizedFilter = filter.trim().toLowerCase();
   const filteredEntries = useMemo(
