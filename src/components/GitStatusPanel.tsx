@@ -208,8 +208,16 @@ function StatusGroup({
   entries: RetainedGitStatusEntry[];
   side: "conflict" | "untracked" | "index" | "worktree";
 }) {
+  const [visibleLimit, setVisibleLimit] = useState(MAX_ROWS_PER_GROUP);
+
+  useEffect(() => {
+    setVisibleLimit(MAX_ROWS_PER_GROUP);
+  }, [entries]);
+
   if (entries.length === 0) return null;
-  const visible = entries.slice(0, MAX_ROWS_PER_GROUP);
+  const visible = entries.slice(0, visibleLimit);
+  const remaining = Math.max(0, entries.length - visible.length);
+  const nextBatch = Math.min(MAX_ROWS_PER_GROUP, remaining);
 
   return (
     <section className="git-status-group" aria-label={`${label} files`}>
@@ -235,10 +243,18 @@ function StatusGroup({
           );
         })}
       </div>
-      {entries.length > MAX_ROWS_PER_GROUP && (
-        <small className="git-status-limit">
-          Showing {MAX_ROWS_PER_GROUP} of {entries.length.toLocaleString()}.
-        </small>
+      {remaining > 0 && (
+        <div className="git-status-limit">
+          <small>
+            Showing {visible.length.toLocaleString()} of {entries.length.toLocaleString()}.
+          </small>
+          <button
+            onClick={() => setVisibleLimit((current) => Math.min(entries.length, current + MAX_ROWS_PER_GROUP))}
+            type="button"
+          >
+            Show {nextBatch.toLocaleString()} more
+          </button>
+        </div>
       )}
     </section>
   );
