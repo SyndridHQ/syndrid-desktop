@@ -70,7 +70,13 @@ import type {
   FsWatchParams,
   FsWatchResponse,
 } from "./fsWatchProtocol";
-import type { GitStatusParams, GitStatusResponse } from "./gitStatusProtocol";
+import type {
+  GitPathMutationMethod,
+  GitPathMutationParams,
+  GitPathMutationResponse,
+  GitStatusParams,
+  GitStatusResponse,
+} from "./gitStatusProtocol";
 import type {
   PermissionProfileListParams,
   PermissionProfileListResponse,
@@ -366,6 +372,13 @@ export class SyndridAppServerClient {
 
   async gitStatus(params: GitStatusParams): Promise<GitStatusResponse> {
     return this.request<GitStatusResponse>("git/status", params);
+  }
+
+  async mutateGitPaths(
+    method: GitPathMutationMethod,
+    params: GitPathMutationParams,
+  ): Promise<GitPathMutationResponse> {
+    return this.request<GitPathMutationResponse>(method, params);
   }
 
   async listMcpServerStatus(
