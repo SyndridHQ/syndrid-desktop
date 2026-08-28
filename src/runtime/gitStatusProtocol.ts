@@ -67,3 +67,23 @@ export interface GitPathMutationParams {
 export interface GitPathMutationResponse {
   updated: number;
 }
+
+/**
+ * Builds the narrow Desktop mutation payload without trimming, resolving, sorting,
+ * de-duplicating, or otherwise rewriting runtime-provided paths. SyndridCLI remains
+ * authoritative for repository-relative path validation and Git behavior.
+ */
+export function makeGitPathMutationParams(
+  cwd: string,
+  paths: readonly string[],
+): GitPathMutationParams {
+  if (paths.length === 0) {
+    throw new Error("Select at least one path before changing Git index state.");
+  }
+  if (paths.length > MAX_GIT_PATH_MUTATION_SELECTION) {
+    throw new Error(
+      `Select at most ${MAX_GIT_PATH_MUTATION_SELECTION.toLocaleString()} paths per Git action.`,
+    );
+  }
+  return { cwd, paths: [...paths] };
+}
