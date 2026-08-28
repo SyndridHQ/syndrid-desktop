@@ -81,13 +81,21 @@ export function GitStatusPanel() {
         return;
       }
 
-      const sourceEntries = Array.isArray(result.entries) ? result.entries : [];
-      const retained = sourceEntries
+      if (!Array.isArray(result.entries) || typeof result.truncated !== "boolean") {
+        throw new Error("Syndrid runtime returned an invalid git/status response.");
+      }
+      const sourceEntries = result.entries;
+      const projectedEntries = sourceEntries
         .slice(0, MAX_STATUS_ENTRIES)
-        .map(projectGitStatusEntry)
-        .filter((entry): entry is RetainedGitStatusEntry => entry !== null);
+        .map(projectGitStatusEntry);
+      if (projectedEntries.some((entry) => entry === null)) {
+        throw new Error("Syndrid runtime returned an invalid git/status entry.");
+      }
+      const retained = projectedEntries.filter(
+        (entry): entry is RetainedGitStatusEntry => entry !== null,
+      );
       setEntries(retained);
-      setTruncated(result.truncated === true || sourceEntries.length > MAX_STATUS_ENTRIES);
+      setTruncated(result.truncated || sourceEntries.length > MAX_STATUS_ENTRIES);
       setStale(false);
       setLoaded(true);
     } catch (cause) {
