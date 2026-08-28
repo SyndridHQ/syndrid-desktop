@@ -68,6 +68,11 @@ export interface GitPathMutationResponse {
   updated: number;
 }
 
+export interface GitPathMutationRequest {
+  method: GitPathMutationMethod;
+  params: GitPathMutationParams;
+}
+
 /**
  * Builds the narrow Desktop mutation payload without trimming, resolving, sorting,
  * de-duplicating, or otherwise rewriting runtime-provided paths. SyndridCLI remains
@@ -86,4 +91,44 @@ export function makeGitPathMutationParams(
     );
   }
   return { cwd, paths: [...paths] };
+}
+
+/**
+ * Resolves an explicit user intent to the exact runtime wire method and bounded
+ * payload. Keeping this in the protocol facade prevents UI surfaces from growing
+ * their own Stage/Unstage wire-name or path-rewriting logic.
+ */
+export function makeGitPathMutationRequest(
+  operation: GitPathMutationOperation,
+  cwd: string,
+  paths: readonly string[],
+): GitPathMutationRequest {
+  return {
+    method: gitPathMutationOperations[operation].method,
+    params: makeGitPathMutationParams(cwd, paths),
+  };
+}
+
+/**
+ * Fails closed on malformed mutation results. A successful runtime response may
+ * update fewer paths than requested, but it cannot report a negative, fractional,
+ * non-finite, or larger-than-requested count.
+ */
+export function parseGitPathMutationResponse(
+  value: unknown,
+  requestedPathCount: number,
+): GitPathMutationResponse {
+  if (!value || typeof value !== "object") {
+    throw new Error("Syndrid runtime returned an invalid Git mutation response.");
+  }
+  const updated = (value as Partial<GitPathMutationResponse>).updated;
+  if (
+    typeof updated !== "number" ||
+    !Number.isSafeInteger(updated) ||
+    updated < 0 ||
+    updated > requestedPathCount
+  ) {
+    throw new Error("Syndrid runtime returned an invalid Git mutation count.");
+  }
+  return { updated };
 }
