@@ -82,6 +82,9 @@ export function makeGitPathMutationParams(
   cwd: string,
   paths: readonly string[],
 ): GitPathMutationParams {
+  if (cwd.length === 0) {
+    throw new Error("Select a workspace before changing Git index state.");
+  }
   if (paths.length === 0) {
     throw new Error("Select at least one path before changing Git index state.");
   }
@@ -118,6 +121,13 @@ export function parseGitPathMutationResponse(
   value: unknown,
   requestedPathCount: number,
 ): GitPathMutationResponse {
+  if (
+    !Number.isSafeInteger(requestedPathCount) ||
+    requestedPathCount < 1 ||
+    requestedPathCount > MAX_GIT_PATH_MUTATION_SELECTION
+  ) {
+    throw new Error("Syndrid Desktop supplied an invalid Git mutation request bound.");
+  }
   if (!value || typeof value !== "object") {
     throw new Error("Syndrid runtime returned an invalid Git mutation response.");
   }
