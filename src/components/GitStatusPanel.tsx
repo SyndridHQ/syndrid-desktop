@@ -224,6 +224,8 @@ function StatusGroup({
   const visible = entries.slice(safePageStart, pageEnd);
   const hasPrevious = safePageStart > 0;
   const hasNext = pageEnd < entries.length;
+  const pageNumber = Math.floor(safePageStart / MAX_ROWS_PER_GROUP) + 1;
+  const pageCount = Math.ceil(entries.length / MAX_ROWS_PER_GROUP);
 
   return (
     <section className="git-status-group" aria-label={`${label} files`}>
@@ -251,12 +253,22 @@ function StatusGroup({
       </div>
       {entries.length > MAX_ROWS_PER_GROUP && (
         <div className="git-status-limit">
-          <small>
-            Showing {(safePageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of{" "}
+          <small aria-live="polite">
+            Page {pageNumber.toLocaleString()} of {pageCount.toLocaleString()} · showing{" "}
+            {(safePageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of{" "}
             {entries.length.toLocaleString()}.
           </small>
-          <span className="git-status-page-controls">
+          <span className="git-status-page-controls" aria-label={`${label} status pagination`} role="group">
             <button
+              aria-label={`First ${label.toLowerCase()} page`}
+              disabled={!hasPrevious}
+              onClick={() => setPageStart(0)}
+              type="button"
+            >
+              First
+            </button>
+            <button
+              aria-label={`Previous ${label.toLowerCase()} page`}
               disabled={!hasPrevious}
               onClick={() => setPageStart(Math.max(0, safePageStart - MAX_ROWS_PER_GROUP))}
               type="button"
@@ -264,11 +276,20 @@ function StatusGroup({
               Previous
             </button>
             <button
+              aria-label={`Next ${label.toLowerCase()} page`}
               disabled={!hasNext}
               onClick={() => setPageStart(Math.min(lastPageStart, safePageStart + MAX_ROWS_PER_GROUP))}
               type="button"
             >
               Next
+            </button>
+            <button
+              aria-label={`Last ${label.toLowerCase()} page`}
+              disabled={!hasNext}
+              onClick={() => setPageStart(lastPageStart)}
+              type="button"
+            >
+              Last
             </button>
           </span>
         </div>
