@@ -33,7 +33,7 @@ interface StatusGroups {
 
 interface ActiveGitMutation {
   operation: GitPathMutationOperation;
-  path: string;
+  paths: readonly string[];
 }
 
 export function GitStatusPanel() {
@@ -153,10 +153,13 @@ export function GitStatusPanel() {
     }
   }, [workspace?.cwd, workspace?.threadId]);
 
-  const mutatePath = useCallback(async (operation: GitPathMutationOperation, path: string) => {
+  const mutatePaths = useCallback(async (
+    operation: GitPathMutationOperation,
+    paths: readonly string[],
+  ) => {
     const cwd = workspace?.cwd;
     const threadId = workspace?.threadId;
-    if (!cwd || !threadId || loadingRef.current || mutationRef.current) return;
+    if (!cwd || !threadId || loadingRef.current || mutationRef.current || paths.length === 0) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before changing Git index state.");
       return;
@@ -164,7 +167,7 @@ export function GitStatusPanel() {
 
     let request;
     try {
-      request = makeGitPathMutationRequest(operation, cwd, [path]);
+      request = makeGitPathMutationRequest(operation, cwd, [...paths]);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setError(truncateText(message, MAX_ERROR_CHARS));
@@ -172,7 +175,7 @@ export function GitStatusPanel() {
     }
 
     mutationRef.current = true;
-    setMutating({ operation, path });
+    setMutating({ operation, paths: [...request.params.paths] });
     setError(null);
     try {
       const result = await appServerClient.mutateGitPaths(request.method, request.params);
@@ -275,7 +278,7 @@ export function GitStatusPanel() {
             mutationOperation="stage"
             mutating={mutating}
             mutationsDisabled={actionsDisabled}
-            onMutate={mutatePath}
+            onMutate={mutatePaths}
           />
           <StatusGroup
             label="Untracked"
@@ -284,7 +287,7 @@ export function GitStatusPanel() {
             mutationOperation="stage"
             mutating={mutating}
             mutationsDisabled={actionsDisabled}
-            onMutate={mutatePath}
+            onMutate={mutatePaths}
           />
           <StatusGroup
             label="Staged"
@@ -293,7 +296,7 @@ export function GitStatusPanel() {
             mutationOperation="unstage"
             mutating={mutating}
             mutationsDisabled={actionsDisabled}
-            onMutate={mutatePath}
+            onMutate={mutatePaths}
           />
           <StatusGroup
             label="Unstaged"
@@ -302,7 +305,7 @@ export function GitStatusPanel() {
             mutationOperation="stage"
             mutating={mutating}
             mutationsDisabled={actionsDisabled}
-            onMutate={mutatePath}
+            onMutate={mutatePaths}
           />
         </div>
       )}
@@ -331,7 +334,7 @@ function StatusGroup({
   mutationOperation: GitPathMutationOperation;
   mutating: ActiveGitMutation | null;
   mutationsDisabled: boolean;
-  onMutate: (operation: GitPathMutationOperation, path: string) => Promise<void>;
+  onMutate: (operation: GitPathMutationOperation, paths: readonly string[]) => Promise<void>;
 }) {
   const [pageStart, setPageStart] = useState(0);
 
@@ -347,17 +350,28 @@ function StatusGroup({
   const safePageStart = Math.min(pageStart, lastPageStart);
   const pageEnd = Math.min(entries.length, safePageStart + MAX_ROWS_PER_GROUP);
   const visible = entries.slice(safePageStart, pageEnd);
+  const visiblePaths = visible.map((entry) => entry.path);
   const hasPrevious = safePageStart > 0;
   const hasNext = pageEnd < entries.length;
   const pageNumber = Math.floor(safePageStart / MAX_ROWS_PER_GROUP) + 1;
   const pageCount = Math.ceil(entries.length / MAX_ROWS_PER_GROUP);
   const actionLabel = gitPathMutationOperations[mutationOperation].label;
+  const bulkMutationActive =
+    mutating?.operation === mutationOperation && mutating.paths.length > 1;
 
   return (
     <section className="git-status-group" aria-label={`${label} files`}>
       <header>
         <strong>{label}</strong>
         <span>{entries.length.toLocaleString()}</span>
+        <button
+          aria-label={`${actionLabel} ${visible.length.toLocaleString()} shown ${label.toLowerCase()} files`}
+          disabled={mutationsDisabled}
+          onClick={() => void onMutate(mutationOperation, visiblePaths)}
+          type="button"
+        >
+          {bulkMutationActive ? `${actionLabel} shown…` : `${actionLabel} shown`}
+        </button>
       </header>
       <div className="git-status-list">
         {visible.map((entry, index) => {
@@ -366,7 +380,9 @@ function StatusGroup({
             ? `${entry.displayPreviousPath} → ${entry.displayPath}`
             : entry.displayPath;
           const mutationActive =
-            mutating?.operation === mutationOperation && mutating.path === entry.path;
+            mutating?.operation === mutationOperation &&
+            mutating.paths.length === 1 &&
+            mutating.paths[0] === entry.path;
           return (
             <div className="git-status-row" key={`${safePageStart + index}:${entry.path}`} title={title}>
               <b aria-label={statusLabel(status)}>{statusShortLabel(status)}</b>
@@ -378,7 +394,7 @@ function StatusGroup({
               <button
                 aria-label={`${actionLabel} ${entry.displayPath}`}
                 disabled={mutationsDisabled}
-                onClick={() => void onMutate(mutationOperation, entry.path)}
+                onClick={() => void onMutate(mutationOperation, [entry.path])}
                 type="button"
               >
                 {mutationActive ? `${actionLabel}…` : actionLabel}
