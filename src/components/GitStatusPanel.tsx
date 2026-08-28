@@ -34,9 +34,11 @@ export function GitStatusPanel() {
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
+  const invalidationVersion = useRef(0);
 
   useEffect(() => {
     generation.current += 1;
+    invalidationVersion.current = 0;
     setLoading(false);
     setLoaded(false);
     setStale(false);
@@ -54,7 +56,10 @@ export function GitStatusPanel() {
     return appServerClient.onNotification((notification) => {
       if (notification.method !== notifications.turnDiffUpdated) return;
       const event = notification.params as TurnDiffUpdatedNotification | undefined;
-      if (event?.threadId === workspace.threadId) setStale(true);
+      if (event?.threadId === workspace.threadId) {
+        invalidationVersion.current += 1;
+        setStale(true);
+      }
     });
   }, [loaded, workspace?.threadId]);
 
@@ -68,6 +73,7 @@ export function GitStatusPanel() {
     }
 
     const requestGeneration = ++generation.current;
+    const requestInvalidationVersion = invalidationVersion.current;
     setLoading(true);
     setError(null);
     try {
@@ -96,7 +102,7 @@ export function GitStatusPanel() {
       );
       setEntries(retained);
       setTruncated(result.truncated || sourceEntries.length > MAX_STATUS_ENTRIES);
-      setStale(false);
+      setStale(invalidationVersion.current !== requestInvalidationVersion);
       setLoaded(true);
     } catch (cause) {
       const selected = appServerClient.getWorkspaceSnapshot();
