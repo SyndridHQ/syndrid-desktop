@@ -6,6 +6,26 @@ export const gitStatusMethods = {
   unstage: "git/unstage",
 } as const;
 
+export type GitStatusMethod = (typeof gitStatusMethods)[keyof typeof gitStatusMethods];
+export type GitPathMutationMethod =
+  | typeof gitStatusMethods.stage
+  | typeof gitStatusMethods.unstage;
+export type GitPathMutationOperation = "stage" | "unstage";
+
+/**
+ * UX-side selection ceiling matching the focused runtime contract from PR #115.
+ * SyndridCLI still validates every request authoritatively; Desktop uses this only
+ * to keep explicit user actions bounded before they cross the protocol boundary.
+ */
+export const MAX_GIT_PATH_MUTATION_SELECTION = 256;
+
+export const gitPathMutationOperations: Readonly<
+  Record<GitPathMutationOperation, { method: GitPathMutationMethod; label: string }>
+> = {
+  stage: { method: gitStatusMethods.stage, label: "Stage" },
+  unstage: { method: gitStatusMethods.unstage, label: "Unstage" },
+};
+
 export type GitStatusCode =
   | "unmodified"
   | "modified"
