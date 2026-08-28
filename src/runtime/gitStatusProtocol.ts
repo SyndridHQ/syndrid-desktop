@@ -1,5 +1,11 @@
 // Mirrors the generated SyndridCLI v2 git/status and path-mutation contracts from PR #115.
 // SyndridCLI remains authoritative for Git execution, validation, and status semantics.
+export const gitStatusMethods = {
+  status: "git/status",
+  stage: "git/stage",
+  unstage: "git/unstage",
+} as const;
+
 export type GitStatusCode =
   | "unmodified"
   | "modified"
