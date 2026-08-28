@@ -208,16 +208,22 @@ function StatusGroup({
   entries: RetainedGitStatusEntry[];
   side: "conflict" | "untracked" | "index" | "worktree";
 }) {
-  const [visibleLimit, setVisibleLimit] = useState(MAX_ROWS_PER_GROUP);
+  const [pageStart, setPageStart] = useState(0);
 
   useEffect(() => {
-    setVisibleLimit(MAX_ROWS_PER_GROUP);
+    setPageStart(0);
   }, [entries]);
 
   if (entries.length === 0) return null;
-  const visible = entries.slice(0, visibleLimit);
-  const remaining = Math.max(0, entries.length - visible.length);
-  const nextBatch = Math.min(MAX_ROWS_PER_GROUP, remaining);
+  const lastPageStart = Math.max(
+    0,
+    Math.floor((entries.length - 1) / MAX_ROWS_PER_GROUP) * MAX_ROWS_PER_GROUP,
+  );
+  const safePageStart = Math.min(pageStart, lastPageStart);
+  const pageEnd = Math.min(entries.length, safePageStart + MAX_ROWS_PER_GROUP);
+  const visible = entries.slice(safePageStart, pageEnd);
+  const hasPrevious = safePageStart > 0;
+  const hasNext = pageEnd < entries.length;
 
   return (
     <section className="git-status-group" aria-label={`${label} files`}>
@@ -232,7 +238,7 @@ function StatusGroup({
             ? `${entry.displayPreviousPath} → ${entry.displayPath}`
             : entry.displayPath;
           return (
-            <div className="git-status-row" key={`${index}:${entry.path}`} title={title}>
+            <div className="git-status-row" key={`${safePageStart + index}:${entry.path}`} title={title}>
               <b aria-label={statusLabel(status)}>{statusShortLabel(status)}</b>
               <span>
                 {entry.displayPreviousPath
@@ -243,17 +249,28 @@ function StatusGroup({
           );
         })}
       </div>
-      {remaining > 0 && (
+      {entries.length > MAX_ROWS_PER_GROUP && (
         <div className="git-status-limit">
           <small>
-            Showing {visible.length.toLocaleString()} of {entries.length.toLocaleString()}.
+            Showing {(safePageStart + 1).toLocaleString()}–{pageEnd.toLocaleString()} of{" "}
+            {entries.length.toLocaleString()}.
           </small>
-          <button
-            onClick={() => setVisibleLimit((current) => Math.min(entries.length, current + MAX_ROWS_PER_GROUP))}
-            type="button"
-          >
-            Show {nextBatch.toLocaleString()} more
-          </button>
+          <span className="git-status-page-controls">
+            <button
+              disabled={!hasPrevious}
+              onClick={() => setPageStart(Math.max(0, safePageStart - MAX_ROWS_PER_GROUP))}
+              type="button"
+            >
+              Previous
+            </button>
+            <button
+              disabled={!hasNext}
+              onClick={() => setPageStart(Math.min(lastPageStart, safePageStart + MAX_ROWS_PER_GROUP))}
+              type="button"
+            >
+              Next
+            </button>
+          </span>
         </div>
       )}
     </section>
