@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appServerClient } from "../runtime/appServerClient";
-import type { GitStatusCode, GitStatusEntry } from "../runtime/gitStatusProtocol";
+import {
+  gitPathMutationOperations,
+  makeGitPathMutationRequest,
+  parseGitPathMutationResponse,
+  type GitPathMutationOperation,
+  type GitStatusCode,
+  type GitStatusEntry,
+} from "../runtime/gitStatusProtocol";
 import { notifications, type TurnDiffUpdatedNotification } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./gitStatusPanel.css";
@@ -24,6 +31,11 @@ interface StatusGroups {
   unstaged: RetainedGitStatusEntry[];
 }
 
+interface ActiveGitMutation {
+  operation: GitPathMutationOperation;
+  path: string;
+}
+
 export function GitStatusPanel() {
   const workspace = useRuntimeWorkspace();
   const [loading, setLoading] = useState(false);
@@ -33,14 +45,17 @@ export function GitStatusPanel() {
   const [filter, setFilter] = useState("");
   const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mutating, setMutating] = useState<ActiveGitMutation | null>(null);
   const generation = useRef(0);
   const invalidationVersion = useRef(0);
   const loadingRef = useRef(false);
+  const mutationRef = useRef(false);
 
   useEffect(() => {
     generation.current += 1;
     invalidationVersion.current = 0;
     loadingRef.current = false;
+    mutationRef.current = false;
     setLoading(false);
     setLoaded(false);
     setStale(false);
@@ -48,6 +63,7 @@ export function GitStatusPanel() {
     setFilter("");
     setTruncated(false);
     setError(null);
+    setMutating(null);
     return () => {
       generation.current += 1;
     };
@@ -65,10 +81,17 @@ export function GitStatusPanel() {
     });
   }, [loaded, workspace?.threadId]);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (allowDuringMutation = false) => {
     const cwd = workspace?.cwd;
     const threadId = workspace?.threadId;
-    if (!cwd || !threadId || loadingRef.current) return;
+    if (
+      !cwd ||
+      !threadId ||
+      loadingRef.current ||
+      (!allowDuringMutation && mutationRef.current)
+    ) {
+      return;
+    }
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before loading repository status.");
       return;
@@ -130,6 +153,49 @@ export function GitStatusPanel() {
     }
   }, [workspace?.cwd, workspace?.threadId]);
 
+  const mutatePath = useCallback(async (operation: GitPathMutationOperation, path: string) => {
+    const cwd = workspace?.cwd;
+    const threadId = workspace?.threadId;
+    if (!cwd || !threadId || loadingRef.current || mutationRef.current) return;
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setError("Connect the Syndrid runtime before changing Git index state.");
+      return;
+    }
+
+    let request;
+    try {
+      request = makeGitPathMutationRequest(operation, cwd, [path]);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(truncateText(message, MAX_ERROR_CHARS));
+      return;
+    }
+
+    mutationRef.current = true;
+    setMutating({ operation, path });
+    setError(null);
+    try {
+      const result = await appServerClient.mutateGitPaths(request.method, request.params);
+      const selected = appServerClient.getWorkspaceSnapshot();
+      if (selected?.threadId !== threadId || selected?.cwd !== cwd) return;
+
+      parseGitPathMutationResponse(result, request.params.paths.length);
+      await loadStatus(true);
+    } catch (cause) {
+      const selected = appServerClient.getWorkspaceSnapshot();
+      if (selected?.threadId === threadId && selected?.cwd === cwd) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setError(truncateText(message, MAX_ERROR_CHARS));
+      }
+    } finally {
+      mutationRef.current = false;
+      const selected = appServerClient.getWorkspaceSnapshot();
+      if (selected?.threadId === threadId && selected?.cwd === cwd) {
+        setMutating(null);
+      }
+    }
+  }, [loadStatus, workspace?.cwd, workspace?.threadId]);
+
   const normalizedFilter = filter.trim().toLowerCase();
   const filteredEntries = useMemo(
     () =>
@@ -148,6 +214,7 @@ export function GitStatusPanel() {
     groups.staged.length +
     groups.unstaged.length;
   const statusSummary = formatStatusSummary(groups, entries.length);
+  const actionsDisabled = loading || mutating !== null;
 
   return (
     <section className="git-status-panel" aria-label="Working tree status">
@@ -164,7 +231,7 @@ export function GitStatusPanel() {
                 : "Explicit runtime read · no polling"}
           </small>
         </span>
-        <button disabled={loading} onClick={() => void loadStatus()} type="button">
+        <button disabled={actionsDisabled} onClick={() => void loadStatus()} type="button">
           {loading ? "Loading…" : loaded ? (stale ? "Refresh · updated" : "Refresh") : "Load status"}
         </button>
       </header>
@@ -180,7 +247,7 @@ export function GitStatusPanel() {
             value={filter}
           />
           {filter && (
-            <button onClick={() => setFilter("")} type="button">
+            <button disabled={actionsDisabled} onClick={() => setFilter("")} type="button">
               Clear
             </button>
           )}
@@ -201,10 +268,42 @@ export function GitStatusPanel() {
         </div>
       ) : (
         <div className="git-status-groups">
-          <StatusGroup label="Conflicts" entries={groups.conflicts} side="conflict" />
-          <StatusGroup label="Untracked" entries={groups.untracked} side="untracked" />
-          <StatusGroup label="Staged" entries={groups.staged} side="index" />
-          <StatusGroup label="Unstaged" entries={groups.unstaged} side="worktree" />
+          <StatusGroup
+            label="Conflicts"
+            entries={groups.conflicts}
+            side="conflict"
+            mutationOperation="stage"
+            mutating={mutating}
+            mutationsDisabled={actionsDisabled}
+            onMutate={mutatePath}
+          />
+          <StatusGroup
+            label="Untracked"
+            entries={groups.untracked}
+            side="untracked"
+            mutationOperation="stage"
+            mutating={mutating}
+            mutationsDisabled={actionsDisabled}
+            onMutate={mutatePath}
+          />
+          <StatusGroup
+            label="Staged"
+            entries={groups.staged}
+            side="index"
+            mutationOperation="unstage"
+            mutating={mutating}
+            mutationsDisabled={actionsDisabled}
+            onMutate={mutatePath}
+          />
+          <StatusGroup
+            label="Unstaged"
+            entries={groups.unstaged}
+            side="worktree"
+            mutationOperation="stage"
+            mutating={mutating}
+            mutationsDisabled={actionsDisabled}
+            onMutate={mutatePath}
+          />
         </div>
       )}
 
@@ -221,10 +320,18 @@ function StatusGroup({
   label,
   entries,
   side,
+  mutationOperation,
+  mutating,
+  mutationsDisabled,
+  onMutate,
 }: {
   label: string;
   entries: RetainedGitStatusEntry[];
   side: "conflict" | "untracked" | "index" | "worktree";
+  mutationOperation: GitPathMutationOperation;
+  mutating: ActiveGitMutation | null;
+  mutationsDisabled: boolean;
+  onMutate: (operation: GitPathMutationOperation, path: string) => Promise<void>;
 }) {
   const [pageStart, setPageStart] = useState(0);
 
@@ -244,6 +351,7 @@ function StatusGroup({
   const hasNext = pageEnd < entries.length;
   const pageNumber = Math.floor(safePageStart / MAX_ROWS_PER_GROUP) + 1;
   const pageCount = Math.ceil(entries.length / MAX_ROWS_PER_GROUP);
+  const actionLabel = gitPathMutationOperations[mutationOperation].label;
 
   return (
     <section className="git-status-group" aria-label={`${label} files`}>
@@ -257,6 +365,8 @@ function StatusGroup({
           const title = entry.displayPreviousPath
             ? `${entry.displayPreviousPath} → ${entry.displayPath}`
             : entry.displayPath;
+          const mutationActive =
+            mutating?.operation === mutationOperation && mutating.path === entry.path;
           return (
             <div className="git-status-row" key={`${safePageStart + index}:${entry.path}`} title={title}>
               <b aria-label={statusLabel(status)}>{statusShortLabel(status)}</b>
@@ -265,6 +375,14 @@ function StatusGroup({
                   ? `${entry.displayPreviousPath} → ${entry.displayPath}`
                   : entry.displayPath}
               </span>
+              <button
+                aria-label={`${actionLabel} ${entry.displayPath}`}
+                disabled={mutationsDisabled}
+                onClick={() => void onMutate(mutationOperation, entry.path)}
+                type="button"
+              >
+                {mutationActive ? `${actionLabel}…` : actionLabel}
+              </button>
             </div>
           );
         })}
@@ -279,7 +397,7 @@ function StatusGroup({
           <span className="git-status-page-controls" aria-label={`${label} status pagination`} role="group">
             <button
               aria-label={`First ${label.toLowerCase()} page`}
-              disabled={!hasPrevious}
+              disabled={!hasPrevious || mutationsDisabled}
               onClick={() => setPageStart(0)}
               type="button"
             >
@@ -287,7 +405,7 @@ function StatusGroup({
             </button>
             <button
               aria-label={`Previous ${label.toLowerCase()} page`}
-              disabled={!hasPrevious}
+              disabled={!hasPrevious || mutationsDisabled}
               onClick={() => setPageStart(Math.max(0, safePageStart - MAX_ROWS_PER_GROUP))}
               type="button"
             >
@@ -295,7 +413,7 @@ function StatusGroup({
             </button>
             <button
               aria-label={`Next ${label.toLowerCase()} page`}
-              disabled={!hasNext}
+              disabled={!hasNext || mutationsDisabled}
               onClick={() => setPageStart(Math.min(lastPageStart, safePageStart + MAX_ROWS_PER_GROUP))}
               type="button"
             >
@@ -303,7 +421,7 @@ function StatusGroup({
             </button>
             <button
               aria-label={`Last ${label.toLowerCase()} page`}
-              disabled={!hasNext}
+              disabled={!hasNext || mutationsDisabled}
               onClick={() => setPageStart(lastPageStart)}
               type="button"
             >
