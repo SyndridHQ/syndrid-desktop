@@ -77,8 +77,10 @@ export interface GitPathMutationRequest {
 
 /**
  * Builds the narrow Desktop mutation payload without trimming, resolving, sorting,
- * de-duplicating, or otherwise rewriting runtime-provided paths. SyndridCLI remains
- * authoritative for repository-relative path validation and Git behavior.
+ * de-duplicating, or otherwise rewriting runtime-provided paths. Exact duplicate
+ * selections are rejected rather than rewritten so one UI action cannot spend
+ * payload budget on redundant work before SyndridCLI applies its own authoritative
+ * validation and Git semantics.
  */
 export function makeGitPathMutationParams(
   cwd: string,
@@ -97,10 +99,16 @@ export function makeGitPathMutationParams(
   }
 
   let totalChars = 0;
+  const seenPaths = new Set<string>();
   for (const path of paths) {
     if (path.length === 0 || path.includes("\0")) {
       throw new Error("Git mutation paths must be non-empty and cannot contain NUL characters.");
     }
+    if (seenPaths.has(path)) {
+      throw new Error("Git mutation selections cannot contain duplicate exact paths.");
+    }
+    seenPaths.add(path);
+
     const charCount = countUnicodeScalarValues(path);
     if (charCount > MAX_GIT_PATH_MUTATION_PATH_CHARS) {
       throw new Error(
