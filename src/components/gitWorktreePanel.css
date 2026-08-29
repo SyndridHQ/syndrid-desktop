@@ -1,0 +1,124 @@
+.git-worktrees {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  min-width: 0;
+}
+
+.git-worktrees-heading,
+.git-worktrees-filter,
+.git-worktree-row {
+  display: flex;
+  align-items: center;
+}
+
+.git-worktrees-heading {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.git-worktrees-heading > span,
+.git-worktree-primary {
+  display: grid;
+  min-width: 0;
+}
+
+.git-worktrees-heading small,
+.git-worktree-primary small,
+.git-worktrees-filter small {
+  color: var(--text-muted);
+}
+
+.git-worktrees-heading button,
+.git-worktrees-filter button {
+  flex: 0 0 auto;
+}
+
+.git-worktrees-state {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  color: var(--text-muted);
+  padding: 0.75rem;
+}
+
+.git-worktrees-state.compact {
+  padding: 0.55rem 0.65rem;
+}
+
+.git-worktrees-state.error {
+  color: var(--danger-text);
+}
+
+.git-worktrees-filter {
+  gap: 0.5rem;
+}
+
+.git-worktrees-filter input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.git-worktrees-list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: min(38vh, 26rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.git-worktree-row {
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.git-worktree-row.current {
+  border-color: var(--border-strong);
+}
+
+.git-worktree-primary {
+  gap: 0.15rem;
+  flex: 1 1 auto;
+}
+
+.git-worktree-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-worktree-primary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-worktree-badges {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+
+.git-worktree-badges span {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0.08rem 0.38rem;
+}
+
+@media (max-width: 720px) {
+  .git-worktree-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .git-worktree-badges {
+    justify-content: flex-start;
+  }
+}
