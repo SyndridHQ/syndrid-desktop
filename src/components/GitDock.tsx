@@ -19,7 +19,7 @@ interface DiffSection {
   key: string;
   path: string;
   previousPath: string | null;
-  kind: GitDiffChangeKind | null;
+  kind: GitDiffChangeKind;
   text: string;
   added: number;
   removed: number;
@@ -49,7 +49,7 @@ export function GitDock() {
   const [diffStale, setDiffStale] = useState(false);
   const [baseSha, setBaseSha] = useState<string | null>(null);
   const [diff, setDiff] = useState("");
-  const [runtimeChanges, setRuntimeChanges] = useState<GitDiffChange[] | null>(null);
+  const [runtimeChanges, setRuntimeChanges] = useState<GitDiffChange[]>([]);
   const [runtimeChangeSummary, setRuntimeChangeSummary] = useState<RuntimeChangeSummary | null>(null);
   const [diffTruncated, setDiffTruncated] = useState(false);
   const [fileFilter, setFileFilter] = useState("");
@@ -65,7 +65,7 @@ export function GitDock() {
     setDiffStale(false);
     setBaseSha(null);
     setDiff("");
-    setRuntimeChanges(null);
+    setRuntimeChanges([]);
     setRuntimeChangeSummary(null);
     setDiffTruncated(false);
     setFileFilter("");
@@ -101,19 +101,17 @@ export function GitDock() {
       ) {
         return;
       }
+      if (!Array.isArray(result.changes)) {
+        throw new Error("The connected Syndrid runtime does not expose typed Git change metadata. Update SyndridCLI before loading diffs.");
+      }
 
       const isTruncated = result.diff.length > MAX_DIFF_CHARS;
       const retainedDiff = isTruncated ? result.diff.slice(0, MAX_DIFF_CHARS) : result.diff;
-      const allTypedChanges = Array.isArray(result.changes) ? result.changes : null;
-      const retainedTypedChanges = allTypedChanges?.slice(0, MAX_TYPED_DIFF_CHANGES) ?? null;
+      const retainedTypedChanges = result.changes.slice(0, MAX_TYPED_DIFF_CHANGES);
       setBaseSha(result.sha);
       setDiff(retainedDiff);
       setRuntimeChanges(retainedTypedChanges);
-      setRuntimeChangeSummary(
-        allTypedChanges && retainedTypedChanges
-          ? summarizeRuntimeChanges(retainedTypedChanges, allTypedChanges.length)
-          : null,
-      );
+      setRuntimeChangeSummary(summarizeRuntimeChanges(retainedTypedChanges, result.changes.length));
       setDiffTruncated(isTruncated);
       setDiffStale(false);
       setFileFilter("");
@@ -136,13 +134,12 @@ export function GitDock() {
     }
   }, [loadingDiff, open, workspace?.cwd]);
 
-  const fallbackDiffStats = useMemo(() => summarizeDiff(diff), [diff]);
-  const diffStats = runtimeChangeSummary ?? fallbackDiffStats;
+  const diffStats = runtimeChangeSummary ?? { added: 0, removed: 0 };
   const allDiffSections = useMemo(
     () => splitUnifiedDiff(diff, runtimeChanges),
     [diff, runtimeChanges],
   );
-  const totalChangedFiles = runtimeChangeSummary?.files ?? allDiffSections.length;
+  const totalChangedFiles = runtimeChangeSummary?.files ?? 0;
   const normalizedFileFilter = fileFilter.trim().toLocaleLowerCase();
   const matchingDiffSections = useMemo(
     () =>
@@ -279,11 +276,9 @@ export function GitDock() {
                                 type="button"
                               >
                                 <span>
-                                  {section.kind && (
-                                    <b aria-label={changeKindLabel(section.kind)}>
-                                      {changeKindShortLabel(section.kind)}
-                                    </b>
-                                  )}
+                                  <b aria-label={changeKindLabel(section.kind)}>
+                                    {changeKindShortLabel(section.kind)}
+                                  </b>
                                   {section.path}
                                 </span>
                                 <small>+{section.added} −{section.removed}</small>
@@ -333,7 +328,7 @@ export function GitDock() {
           )}
 
           <footer>
-            Runtime-owned Git · {runtimeChangeSummary ? "typed file metadata" : "compatible diff fallback"} · event-invalidated · no polling
+            Runtime-owned Git · typed file metadata · event-invalidated · no polling
           </footer>
         </section>
       )}
@@ -409,12 +404,12 @@ function parseRenderedDiffLines(text: string): RenderedDiffLine[] {
   return rendered;
 }
 
-function firstDiffSectionKey(diff: string, runtimeChanges: GitDiffChange[] | null): string | null {
+function firstDiffSectionKey(diff: string, runtimeChanges: GitDiffChange[]): string | null {
   return splitUnifiedDiff(diff, runtimeChanges)[0]?.key ?? null;
 }
 
-function splitUnifiedDiff(diff: string, runtimeChanges: GitDiffChange[] | null): DiffSection[] {
-  if (!diff) return [];
+function splitUnifiedDiff(diff: string, runtimeChanges: GitDiffChange[]): DiffSection[] {
+  if (!diff || runtimeChanges.length === 0) return [];
 
   const lines = diff.split("\n");
   const sections: DiffSection[] = [];
@@ -422,19 +417,17 @@ function splitUnifiedDiff(diff: string, runtimeChanges: GitDiffChange[] | null):
 
   const pushSection = (end: number) => {
     if (start < 0 || end <= start) return;
-    const sectionLines = lines.slice(start, end);
-    const text = sectionLines.join("\n");
-    const runtimeChange = runtimeChanges?.[sections.length];
-    const fallbackStats = runtimeChange ? null : summarizeDiff(text);
-    const path = runtimeChange?.path ?? inferDiffPath(sectionLines, sections.length);
+    const runtimeChange = runtimeChanges[sections.length];
+    if (!runtimeChange) return;
+    const text = lines.slice(start, end).join("\n");
     sections.push({
-      key: `${sections.length}:${path}`,
-      path,
-      previousPath: runtimeChange?.previousPath ?? null,
-      kind: runtimeChange?.kind ?? null,
+      key: `${sections.length}:${runtimeChange.path}`,
+      path: runtimeChange.path,
+      previousPath: runtimeChange.previousPath,
+      kind: runtimeChange.kind,
       text,
-      added: runtimeChange?.addedLines ?? fallbackStats?.added ?? 0,
-      removed: runtimeChange?.removedLines ?? fallbackStats?.removed ?? 0,
+      added: runtimeChange.addedLines,
+      removed: runtimeChange.removedLines,
     });
   };
 
@@ -446,40 +439,6 @@ function splitUnifiedDiff(diff: string, runtimeChanges: GitDiffChange[] | null):
   if (start >= 0) pushSection(lines.length);
 
   return sections;
-}
-
-function inferDiffPath(lines: string[], fallbackIndex: number): string {
-  const addedPath = lines.find((line) => line.startsWith("+++ "))?.slice(4).trim();
-  if (addedPath && addedPath !== "/dev/null") return cleanDiffPath(addedPath);
-
-  const renameTo = lines.find((line) => line.startsWith("rename to "))?.slice(10).trim();
-  if (renameTo) return cleanDiffPath(renameTo);
-
-  const removedPath = lines.find((line) => line.startsWith("--- "))?.slice(4).trim();
-  if (removedPath && removedPath !== "/dev/null") return cleanDiffPath(removedPath);
-
-  return `Changed file ${fallbackIndex + 1}`;
-}
-
-function cleanDiffPath(path: string): string {
-  const unquoted = path.startsWith('"') && path.endsWith('"') ? path.slice(1, -1) : path;
-  return unquoted.replace(/^[ab]\//, "");
-}
-
-function summarizeDiff(diff: string): { added: number; removed: number } {
-  let inHunk = false;
-  let added = 0;
-  let removed = 0;
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("@@")) {
-      inHunk = true;
-      continue;
-    }
-    if (!inHunk) continue;
-    if (line.startsWith("+")) added += 1;
-    else if (line.startsWith("-")) removed += 1;
-  }
-  return { added, removed };
 }
 
 function summarizeRuntimeChanges(
@@ -522,5 +481,5 @@ function diffSectionTitle(section: DiffSection): string {
   if (section.kind === "renamed" && section.previousPath) {
     return `${changeKindLabel(section.kind)} · ${section.previousPath} → ${section.path}`;
   }
-  return section.kind ? `${changeKindLabel(section.kind)} · ${section.path}` : section.path;
+  return `${changeKindLabel(section.kind)} · ${section.path}`;
 }
