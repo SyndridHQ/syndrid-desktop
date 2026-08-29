@@ -183,6 +183,8 @@ export function GitStatusPanel() {
       if (selected?.threadId !== threadId || selected?.cwd !== cwd) return;
 
       parseGitPathMutationResponse(result, request.params.paths.length);
+      invalidationVersion.current += 1;
+      setStale(true);
       await loadStatus(true);
     } catch (cause) {
       const selected = appServerClient.getWorkspaceSnapshot();
