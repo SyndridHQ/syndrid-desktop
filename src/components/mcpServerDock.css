@@ -1,10 +1,10 @@
 .mcp-server-dock {
   position: fixed;
   right: 384px;
-  bottom: 34px;
+  bottom: 30px;
   z-index: 41;
-  width: min(360px, calc(100vw - 24px));
-  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  width: min(390px, calc(100vw - 24px));
+  font: 12px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text, #e8edf2);
 }
 
@@ -13,27 +13,27 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  border: 1px solid var(--border-strong, #2b333c);
-  border-radius: 9px;
-  padding: 6px 9px;
-  background: rgba(13, 16, 20, 0.96);
+  min-height: 30px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: rgba(20,22,25,.94);
   color: var(--muted, #87919c);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
   cursor: pointer;
 }
 
-.mcp-server-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
-.mcp-server-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent, #7f95ff); }
-.mcp-server-count { color: var(--faint, #5d6670); font-size: 9px; }
+.mcp-server-toggle:hover { color: var(--text, #e8edf2); background: rgba(28,31,35,.96); }
+.mcp-server-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent, #7f95ff); }
+.mcp-server-count { color: var(--faint, #666f79); font-size: 9px; }
 
 .mcp-server-panel {
   margin-top: 7px;
   overflow: hidden;
-  border: 1px solid var(--border-strong, #2b333c);
-  border-radius: 11px;
-  background: rgba(13, 16, 20, 0.98);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 12px;
+  background: rgba(18,20,23,.99);
+  box-shadow: 0 24px 64px rgba(0,0,0,.34);
 }
 
 .mcp-server-panel > header,
@@ -46,63 +46,54 @@
   gap: 10px;
 }
 
-.mcp-server-panel > header { border-bottom: 1px solid var(--border, #20262d); padding: 10px 11px; }
+.mcp-server-panel > header { border-bottom: 1px solid rgba(255,255,255,.055); padding: 12px 14px; }
 .mcp-server-panel > header div { display: flex; flex-direction: column; gap: 2px; }
-.mcp-server-panel > header strong { font-size: 10px; }
-.mcp-server-panel > header small { color: var(--faint, #5d6670); font-size: 8px; }
+.mcp-server-panel > header strong { font-size: 11px; font-weight: 600; }
+.mcp-server-panel > header small { color: var(--faint, #666f79); font-size: 9px; }
 .mcp-server-panel button,
-.mcp-oauth-banner a { border: 1px solid var(--border, #20262d); border-radius: 6px; padding: 4px 7px; background: transparent; color: var(--muted, #87919c); font-size: 9px; cursor: pointer; text-decoration: none; }
+.mcp-oauth-banner a { border: 0; border-radius: 6px; padding: 5px 8px; background: transparent; color: var(--muted, #9099a3); font-size: 9px; cursor: pointer; text-decoration: none; }
 .mcp-server-panel button:hover,
-.mcp-oauth-banner a:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
-.mcp-server-panel button:disabled { opacity: .45; cursor: not-allowed; }
+.mcp-oauth-banner a:hover { color: var(--text, #e8edf2); background: rgba(255,255,255,.05); }
+.mcp-server-panel button:disabled { opacity: .4; cursor: not-allowed; }
 
 .mcp-oauth-banner {
   align-items: flex-start;
-  border-bottom: 1px solid var(--border, #20262d);
-  padding: 8px 10px;
-  background: rgba(127,149,255,.08);
+  border-bottom: 1px solid rgba(255,255,255,.045);
+  padding: 9px 12px;
+  background: rgba(127,149,255,.055);
 }
 .mcp-oauth-banner > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
-.mcp-oauth-banner strong { font-size: 9px; }
-.mcp-oauth-banner small { overflow: hidden; color: var(--faint, #5d6670); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.mcp-oauth-banner a { color: var(--accent, #7f95ff); }
-.mcp-server-updated {
-  border-bottom: 1px solid var(--border, #20262d);
-  padding: 7px 10px;
-  background: rgba(223,179,111,.06);
-  color: #dfb36f;
-  font-size: 8px;
-}
+.mcp-oauth-banner strong { font-size: 10px; font-weight: 600; }
+.mcp-oauth-banner small { overflow: hidden; color: var(--faint, #666f79); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-oauth-banner a { color: #b9c4ff; }
+.mcp-server-updated { border-bottom: 1px solid rgba(255,255,255,.045); padding: 8px 12px; background: rgba(223,179,111,.045); color: #dfb36f; font-size: 8px; }
 
-.mcp-server-list { display: flex; max-height: min(440px, 56vh); flex-direction: column; gap: 6px; overflow: auto; padding: 8px; }
-.mcp-server-state { padding: 18px 10px; color: var(--faint, #5d6670); text-align: center; }
+.mcp-server-list { display: flex; max-height: min(460px, 58vh); flex-direction: column; gap: 2px; overflow: auto; padding: 6px; }
+.mcp-server-state { padding: 20px 12px; color: var(--faint, #666f79); text-align: center; }
 .mcp-server-state.error { color: #e6a6a6; }
-.mcp-server-card { display: grid; gap: 6px; border: 1px solid var(--border, #20262d); border-radius: 8px; padding: 8px 9px; background: var(--panel-2, #11151a); }
-.mcp-server-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.mcp-server-card { display: grid; gap: 7px; border: 0; border-radius: 8px; padding: 9px 10px; background: transparent; }
+.mcp-server-card:hover { background: rgba(255,255,255,.028); }
+.mcp-server-card + .mcp-server-card { border-top: 1px solid rgba(255,255,255,.035); border-top-left-radius: 0; border-top-right-radius: 0; }
+.mcp-server-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 600; }
 .mcp-server-card-head > span { display: flex; align-items: center; gap: 5px; }
 .mcp-server-card > small,
-.mcp-server-summary small { color: var(--faint, #5d6670); font-size: 8px; }
+.mcp-server-summary small { color: var(--faint, #666f79); font-size: 8px; }
 .mcp-server-summary button { padding: 3px 6px; color: #dfb36f; }
 .auth,
 .startup { border-radius: 999px; padding: 2px 6px; font-size: 8px; }
-.auth { color: var(--muted, #87919c); background: rgba(135,145,156,.1); }
-.auth-oAuth, .auth-bearerToken { color: var(--success, #65c995); background: rgba(101,201,149,.1); }
-.auth-notLoggedIn { color: #dfb36f; background: rgba(223,179,111,.1); }
-.startup { color: var(--muted, #87919c); background: rgba(135,145,156,.08); font-style: normal; }
-.startup-ready { color: var(--success, #65c995); background: rgba(101,201,149,.08); }
-.startup-starting { color: var(--accent, #7f95ff); background: rgba(127,149,255,.08); }
-.startup-failed { color: #e6a6a6; background: rgba(230,166,166,.08); }
-.startup-cancelled { color: var(--faint, #5d6670); }
+.auth { color: var(--muted, #9099a3); background: rgba(255,255,255,.035); }
+.auth-oAuth, .auth-bearerToken { color: var(--success, #65c995); background: rgba(101,201,149,.08); }
+.auth-notLoggedIn { color: #dfb36f; background: rgba(223,179,111,.08); }
+.startup { color: var(--muted, #9099a3); background: rgba(255,255,255,.03); font-style: normal; }
+.startup-ready { color: var(--success, #65c995); background: rgba(101,201,149,.07); }
+.startup-starting { color: #b9c4ff; background: rgba(127,149,255,.07); }
+.startup-failed { color: #e6a6a6; background: rgba(230,166,166,.07); }
+.startup-cancelled { color: var(--faint, #666f79); }
 .mcp-startup-error { overflow: hidden; color: #e6a6a6 !important; text-overflow: ellipsis; white-space: nowrap; }
 .mcp-tool-list { display: flex; flex-wrap: wrap; gap: 4px; }
-.mcp-tool-list code, .mcp-tool-list span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 5px; padding: 2px 5px; background: rgba(127,149,255,.08); color: var(--muted, #87919c); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; }
+.mcp-tool-list code, .mcp-tool-list span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; border-radius: 5px; padding: 2px 5px; background: rgba(255,255,255,.03); color: var(--muted, #9099a3); font: 8px/1.4 "SFMono-Regular", Consolas, monospace; }
 .mcp-server-more { display: block; width: 100%; }
-.mcp-server-panel > footer {
-  border-top: 1px solid var(--border, #20262d);
-  padding: 7px 9px;
-  color: var(--faint, #5d6670);
-  font-size: 8px;
-}
+.mcp-server-panel > footer { border-top: 1px solid rgba(255,255,255,.05); padding: 7px 12px; color: var(--faint, #626b75); font-size: 8px; }
 
 @media (max-width: 900px) {
   .mcp-server-dock { right: 8px; bottom: 72px; width: calc(100vw - 16px); }
