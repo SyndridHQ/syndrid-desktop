@@ -46,7 +46,6 @@ export function WorkspaceFilesDock() {
   const [error, setError] = useState<string | null>(null);
 
   const currentPath = pathStack.at(-1) ?? rootPath;
-  const supportsResolvedPaths = entries.some((entry) => Boolean(entry.path));
 
   const clearPreview = useCallback(() => {
     previewRequestRef.current += 1;
@@ -187,7 +186,7 @@ export function WorkspaceFilesDock() {
 
   const openDirectory = useCallback(
     (entry: FsReadDirectoryEntry) => {
-      if (!entry.isDirectory || !entry.path || loading) return;
+      if (!entry.isDirectory || loading) return;
       void navigateTo(entry.path, [...pathStack, entry.path]);
     },
     [loading, navigateTo, pathStack],
@@ -214,17 +213,6 @@ export function WorkspaceFilesDock() {
           status: "unavailable",
           workspaceThreadId: requestedThreadId,
           message: "The selected path is no longer a regular file.",
-        });
-        return;
-      }
-
-      if (typeof metadata.sizeBytes !== "number") {
-        setPreview({
-          path,
-          name,
-          status: "unavailable",
-          workspaceThreadId: requestedThreadId,
-          message: "This runtime cannot size-gate file previews yet.",
         });
         return;
       }
@@ -307,7 +295,7 @@ export function WorkspaceFilesDock() {
 
   const previewFile = useCallback(
     (entry: FsReadDirectoryEntry) => {
-      if (!entry.isFile || !entry.path) return;
+      if (!entry.isFile) return;
       void previewPath(entry.path, entry.fileName);
     },
     [previewPath],
@@ -441,19 +429,19 @@ export function WorkspaceFilesDock() {
           ) : (
             <div className="workspace-files-list">
               {sortedEntries.slice(0, MAX_DIRECTORY_ENTRIES).map((entry) => {
-                const navigable = entry.isDirectory && Boolean(entry.path);
-                const previewable = entry.isFile && Boolean(entry.path);
+                const navigable = entry.isDirectory;
+                const previewable = entry.isFile;
                 const interactive = navigable || previewable;
                 return (
                   <button
                     className={`workspace-file-row ${interactive ? "navigable" : ""}`}
                     disabled={!interactive}
-                    key={entry.path ?? entry.fileName}
+                    key={entry.path}
                     onClick={() => {
                       if (entry.isDirectory) openDirectory(entry);
                       else if (entry.isFile) previewFile(entry);
                     }}
-                    title={entry.path ?? entry.fileName}
+                    title={entry.path}
                     type="button"
                   >
                     <span aria-hidden="true">{entry.isDirectory ? "▸" : entry.isFile ? "·" : "?"}</span>
@@ -488,7 +476,7 @@ export function WorkspaceFilesDock() {
           )}
 
           <footer>
-            Runtime-backed · selected session · explicit reads/writes only · {supportsResolvedPaths ? "lazy navigation + bounded editor" : "root-only on this runtime"} · {watching ? "event-invalidated" : "watch unavailable"} · no polling
+            Runtime-backed · selected session · explicit reads/writes only · lazy navigation + bounded editor · {watching ? "event-invalidated" : "watch unavailable"} · no polling
           </footer>
         </section>
       )}
@@ -590,8 +578,7 @@ function FilePreviewPanel({
       if (appServerClient.getWorkspaceSnapshot()?.threadId !== preview.workspaceThreadId) {
         throw new Error("The selected session changed after the save completed. Reopen the file to continue editing.");
       }
-      const nextSizeBytes = typeof after.sizeBytes === "number" ? after.sizeBytes : encoded.byteLength;
-      onSaved(draft, nextSizeBytes, after.modifiedAtMs);
+      onSaved(draft, after.sizeBytes, after.modifiedAtMs);
       setEditing(false);
       setSaveMessage("Saved through Syndrid runtime.");
     } catch (cause) {
