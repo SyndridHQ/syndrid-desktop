@@ -98,12 +98,13 @@ export function makeGitPathMutationParams(
 
   let totalChars = 0;
   for (const path of paths) {
-    if (path.length > MAX_GIT_PATH_MUTATION_PATH_CHARS) {
+    const charCount = countUnicodeScalarValues(path);
+    if (charCount > MAX_GIT_PATH_MUTATION_PATH_CHARS) {
       throw new Error(
         `Git mutation paths must be at most ${MAX_GIT_PATH_MUTATION_PATH_CHARS.toLocaleString()} characters.`,
       );
     }
-    totalChars += path.length;
+    totalChars += charCount;
     if (totalChars > MAX_GIT_PATH_MUTATION_TOTAL_CHARS) {
       throw new Error(
         `Git mutation paths must total at most ${MAX_GIT_PATH_MUTATION_TOTAL_CHARS.toLocaleString()} characters.`,
@@ -159,4 +160,15 @@ export function parseGitPathMutationResponse(
     throw new Error("Syndrid runtime returned an invalid Git mutation count.");
   }
   return { updated };
+}
+
+/**
+ * Rust `str::chars()` counts Unicode scalar values, whereas JavaScript `length`
+ * counts UTF-16 code units. Iterate code points so Desktop's transport ceiling
+ * matches SyndridCLI for filenames containing supplementary-plane characters.
+ */
+function countUnicodeScalarValues(value: string): number {
+  let count = 0;
+  for (const _codePoint of value) count += 1;
+  return count;
 }
