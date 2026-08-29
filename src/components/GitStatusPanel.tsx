@@ -337,9 +337,11 @@ function StatusGroup({
   onMutate: (operation: GitPathMutationOperation, paths: readonly string[]) => Promise<void>;
 }) {
   const [pageStart, setPageStart] = useState(0);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setPageStart(0);
+    setSelectedPaths(new Set());
   }, [entries]);
 
   if (entries.length === 0) return null;
@@ -351,6 +353,9 @@ function StatusGroup({
   const pageEnd = Math.min(entries.length, safePageStart + MAX_ROWS_PER_GROUP);
   const visible = entries.slice(safePageStart, pageEnd);
   const visiblePaths = visible.map((entry) => entry.path);
+  const visiblePathSet = new Set(visiblePaths);
+  const selectedVisiblePaths = visiblePaths.filter((path) => selectedPaths.has(path));
+  const allVisibleSelected = visiblePaths.length > 0 && selectedVisiblePaths.length === visiblePaths.length;
   const hasPrevious = safePageStart > 0;
   const hasNext = pageEnd < entries.length;
   const pageNumber = Math.floor(safePageStart / MAX_ROWS_PER_GROUP) + 1;
@@ -359,18 +364,47 @@ function StatusGroup({
   const bulkMutationActive =
     mutating?.operation === mutationOperation && mutating.paths.length > 1;
 
+  const changePage = (nextPageStart: number) => {
+    setPageStart(nextPageStart);
+    setSelectedPaths(new Set());
+  };
+
+  const toggleVisibleSelection = () => {
+    setSelectedPaths(allVisibleSelected ? new Set() : new Set(visiblePaths));
+  };
+
+  const togglePath = (path: string) => {
+    if (!visiblePathSet.has(path)) return;
+    setSelectedPaths((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
   return (
     <section className="git-status-group" aria-label={`${label} files`}>
       <header>
         <strong>{label}</strong>
         <span>{entries.length.toLocaleString()}</span>
         <button
-          aria-label={`${actionLabel} ${visible.length.toLocaleString()} shown ${label.toLowerCase()} files`}
+          aria-label={`${allVisibleSelected ? "Clear" : "Select"} ${visible.length.toLocaleString()} shown ${label.toLowerCase()} files`}
           disabled={mutationsDisabled}
-          onClick={() => void onMutate(mutationOperation, visiblePaths)}
+          onClick={toggleVisibleSelection}
           type="button"
         >
-          {bulkMutationActive ? `${actionLabel} shown…` : `${actionLabel} shown`}
+          {allVisibleSelected ? "Clear shown" : "Select shown"}
+        </button>
+        <button
+          aria-label={`${actionLabel} ${selectedVisiblePaths.length.toLocaleString()} selected ${label.toLowerCase()} files`}
+          disabled={mutationsDisabled || selectedVisiblePaths.length === 0}
+          onClick={() => void onMutate(mutationOperation, selectedVisiblePaths)}
+          type="button"
+        >
+          {bulkMutationActive
+            ? `${actionLabel} selected…`
+            : `${actionLabel} selected (${selectedVisiblePaths.length.toLocaleString()})`}
         </button>
       </header>
       <div className="git-status-list">
@@ -383,8 +417,16 @@ function StatusGroup({
             mutating?.operation === mutationOperation &&
             mutating.paths.length === 1 &&
             mutating.paths[0] === entry.path;
+          const selected = selectedPaths.has(entry.path);
           return (
             <div className="git-status-row" key={`${safePageStart + index}:${entry.path}`} title={title}>
+              <input
+                aria-label={`Select ${entry.displayPath}`}
+                checked={selected}
+                disabled={mutationsDisabled}
+                onChange={() => togglePath(entry.path)}
+                type="checkbox"
+              />
               <b aria-label={statusLabel(status)}>{statusShortLabel(status)}</b>
               <span>
                 {entry.displayPreviousPath
@@ -414,7 +456,7 @@ function StatusGroup({
             <button
               aria-label={`First ${label.toLowerCase()} page`}
               disabled={!hasPrevious || mutationsDisabled}
-              onClick={() => setPageStart(0)}
+              onClick={() => changePage(0)}
               type="button"
             >
               First
@@ -422,7 +464,7 @@ function StatusGroup({
             <button
               aria-label={`Previous ${label.toLowerCase()} page`}
               disabled={!hasPrevious || mutationsDisabled}
-              onClick={() => setPageStart(Math.max(0, safePageStart - MAX_ROWS_PER_GROUP))}
+              onClick={() => changePage(Math.max(0, safePageStart - MAX_ROWS_PER_GROUP))}
               type="button"
             >
               Previous
@@ -430,7 +472,7 @@ function StatusGroup({
             <button
               aria-label={`Next ${label.toLowerCase()} page`}
               disabled={!hasNext || mutationsDisabled}
-              onClick={() => setPageStart(Math.min(lastPageStart, safePageStart + MAX_ROWS_PER_GROUP))}
+              onClick={() => changePage(Math.min(lastPageStart, safePageStart + MAX_ROWS_PER_GROUP))}
               type="button"
             >
               Next
@@ -438,7 +480,7 @@ function StatusGroup({
             <button
               aria-label={`Last ${label.toLowerCase()} page`}
               disabled={!hasNext || mutationsDisabled}
-              onClick={() => setPageStart(lastPageStart)}
+              onClick={() => changePage(lastPageStart)}
               type="button"
             >
               Last
