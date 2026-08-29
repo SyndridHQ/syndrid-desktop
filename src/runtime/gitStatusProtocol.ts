@@ -89,6 +89,9 @@ export function makeGitPathMutationParams(
   if (cwd.length === 0) {
     throw new Error("Select a workspace before changing Git index state.");
   }
+  if (cwd.includes("\0") || hasUnpairedUtf16Surrogate(cwd)) {
+    throw new Error("The selected workspace path cannot be represented by the Syndrid runtime protocol.");
+  }
   if (paths.length === 0) {
     throw new Error("Select at least one path before changing Git index state.");
   }
