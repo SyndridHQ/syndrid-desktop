@@ -104,6 +104,9 @@ export function makeGitPathMutationParams(
     if (path.length === 0 || path.includes("\0")) {
       throw new Error("Git mutation paths must be non-empty and cannot contain NUL characters.");
     }
+    if (hasUnpairedUtf16Surrogate(path)) {
+      throw new Error("Git mutation paths must contain valid Unicode scalar values.");
+    }
     if (seenPaths.has(path)) {
       throw new Error("Git mutation selections cannot contain duplicate exact paths.");
     }
@@ -172,6 +175,26 @@ export function parseGitPathMutationResponse(
     throw new Error("Syndrid runtime returned an incomplete Git mutation acknowledgement.");
   }
   return { updated };
+}
+
+/**
+ * Rust strings contain only Unicode scalar values. JavaScript strings can also
+ * contain isolated UTF-16 surrogate code units, which cannot round-trip as a Rust
+ * path string. Reject them before JSON transport so malformed client state cannot
+ * turn an explicit Stage/Unstage action into a generic runtime parse failure.
+ */
+function hasUnpairedUtf16Surrogate(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1;
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
