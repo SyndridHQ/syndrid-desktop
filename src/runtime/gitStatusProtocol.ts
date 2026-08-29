@@ -143,9 +143,11 @@ export function makeGitPathMutationRequest(
 }
 
 /**
- * Fails closed on malformed mutation results. A successful runtime response may
- * update fewer paths than requested, but it cannot report a negative, fractional,
- * non-finite, or larger-than-requested count.
+ * Fails closed on malformed mutation results. SyndridCLI's bounded path mutations
+ * execute one Git command over the complete accepted path set and return the unique
+ * accepted-path count only after that command succeeds. Desktop rejects a smaller
+ * acknowledgement so it cannot treat an impossible partial-success shape as a
+ * completed Stage/Unstage action and refresh away evidence of a protocol mismatch.
  */
 export function parseGitPathMutationResponse(
   value: unknown,
@@ -165,10 +167,9 @@ export function parseGitPathMutationResponse(
   if (
     typeof updated !== "number" ||
     !Number.isSafeInteger(updated) ||
-    updated < 0 ||
-    updated > requestedPathCount
+    updated !== requestedPathCount
   ) {
-    throw new Error("Syndrid runtime returned an invalid Git mutation count.");
+    throw new Error("Syndrid runtime returned an incomplete Git mutation acknowledgement.");
   }
   return { updated };
 }
