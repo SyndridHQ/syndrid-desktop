@@ -98,6 +98,9 @@ export function makeGitPathMutationParams(
 
   let totalChars = 0;
   for (const path of paths) {
+    if (path.length === 0 || path.includes("\0")) {
+      throw new Error("Git mutation paths must be non-empty and cannot contain NUL characters.");
+    }
     const charCount = countUnicodeScalarValues(path);
     if (charCount > MAX_GIT_PATH_MUTATION_PATH_CHARS) {
       throw new Error(
