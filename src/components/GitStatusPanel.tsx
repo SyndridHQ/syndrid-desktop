@@ -50,12 +50,14 @@ export function GitStatusPanel() {
   const invalidationVersion = useRef(0);
   const loadingRef = useRef(false);
   const mutationRef = useRef(false);
+  const staleRef = useRef(false);
 
   useEffect(() => {
     generation.current += 1;
     invalidationVersion.current = 0;
     loadingRef.current = false;
     mutationRef.current = false;
+    staleRef.current = false;
     setLoading(false);
     setLoaded(false);
     setStale(false);
@@ -76,6 +78,7 @@ export function GitStatusPanel() {
       const event = notification.params as TurnDiffUpdatedNotification | undefined;
       if (event?.threadId === workspace.threadId) {
         invalidationVersion.current += 1;
+        staleRef.current = true;
         setStale(true);
       }
     });
@@ -126,9 +129,11 @@ export function GitStatusPanel() {
       const retained = projectedEntries.filter(
         (entry): entry is RetainedGitStatusEntry => entry !== null,
       );
+      const snapshotStale = invalidationVersion.current !== requestInvalidationVersion;
       setEntries(retained);
       setTruncated(result.truncated || sourceEntries.length > MAX_STATUS_ENTRIES);
-      setStale(invalidationVersion.current !== requestInvalidationVersion);
+      staleRef.current = snapshotStale;
+      setStale(snapshotStale);
       setLoaded(true);
     } catch (cause) {
       const selected = appServerClient.getWorkspaceSnapshot();
@@ -160,6 +165,10 @@ export function GitStatusPanel() {
     const cwd = workspace?.cwd;
     const threadId = workspace?.threadId;
     if (!cwd || !threadId || loadingRef.current || mutationRef.current || paths.length === 0) return;
+    if (staleRef.current) {
+      setError("Refresh repository status before changing Git index state.");
+      return;
+    }
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before changing Git index state.");
       return;
@@ -184,6 +193,7 @@ export function GitStatusPanel() {
 
       parseGitPathMutationResponse(result, request.params.paths.length);
       invalidationVersion.current += 1;
+      staleRef.current = true;
       setStale(true);
       await loadStatus(true);
     } catch (cause) {
@@ -220,6 +230,7 @@ export function GitStatusPanel() {
     groups.unstaged.length;
   const statusSummary = formatStatusSummary(groups, entries.length);
   const actionsDisabled = loading || mutating !== null;
+  const mutationsDisabled = actionsDisabled || stale;
 
   return (
     <section className="git-status-panel" aria-label="Working tree status">
@@ -279,7 +290,8 @@ export function GitStatusPanel() {
             side="conflict"
             mutationOperation="stage"
             mutating={mutating}
-            mutationsDisabled={actionsDisabled}
+            mutationsDisabled={mutationsDisabled}
+            navigationDisabled={actionsDisabled}
             onMutate={mutatePaths}
           />
           <StatusGroup
@@ -288,7 +300,8 @@ export function GitStatusPanel() {
             side="untracked"
             mutationOperation="stage"
             mutating={mutating}
-            mutationsDisabled={actionsDisabled}
+            mutationsDisabled={mutationsDisabled}
+            navigationDisabled={actionsDisabled}
             onMutate={mutatePaths}
           />
           <StatusGroup
@@ -297,7 +310,8 @@ export function GitStatusPanel() {
             side="index"
             mutationOperation="unstage"
             mutating={mutating}
-            mutationsDisabled={actionsDisabled}
+            mutationsDisabled={mutationsDisabled}
+            navigationDisabled={actionsDisabled}
             onMutate={mutatePaths}
           />
           <StatusGroup
@@ -306,7 +320,8 @@ export function GitStatusPanel() {
             side="worktree"
             mutationOperation="stage"
             mutating={mutating}
-            mutationsDisabled={actionsDisabled}
+            mutationsDisabled={mutationsDisabled}
+            navigationDisabled={actionsDisabled}
             onMutate={mutatePaths}
           />
         </div>
@@ -328,6 +343,7 @@ function StatusGroup({
   mutationOperation,
   mutating,
   mutationsDisabled,
+  navigationDisabled,
   onMutate,
 }: {
   label: string;
@@ -336,6 +352,7 @@ function StatusGroup({
   mutationOperation: GitPathMutationOperation;
   mutating: ActiveGitMutation | null;
   mutationsDisabled: boolean;
+  navigationDisabled: boolean;
   onMutate: (operation: GitPathMutationOperation, paths: readonly string[]) => Promise<void>;
 }) {
   const [pageStart, setPageStart] = useState(0);
@@ -457,7 +474,7 @@ function StatusGroup({
           <span className="git-status-page-controls" aria-label={`${label} status pagination`} role="group">
             <button
               aria-label={`First ${label.toLowerCase()} page`}
-              disabled={!hasPrevious || mutationsDisabled}
+              disabled={!hasPrevious || navigationDisabled}
               onClick={() => changePage(0)}
               type="button"
             >
@@ -465,7 +482,7 @@ function StatusGroup({
             </button>
             <button
               aria-label={`Previous ${label.toLowerCase()} page`}
-              disabled={!hasPrevious || mutationsDisabled}
+              disabled={!hasPrevious || navigationDisabled}
               onClick={() => changePage(Math.max(0, safePageStart - MAX_ROWS_PER_GROUP))}
               type="button"
             >
@@ -473,7 +490,7 @@ function StatusGroup({
             </button>
             <button
               aria-label={`Next ${label.toLowerCase()} page`}
-              disabled={!hasNext || mutationsDisabled}
+              disabled={!hasNext || navigationDisabled}
               onClick={() => changePage(Math.min(lastPageStart, safePageStart + MAX_ROWS_PER_GROUP))}
               type="button"
             >
@@ -481,7 +498,7 @@ function StatusGroup({
             </button>
             <button
               aria-label={`Last ${label.toLowerCase()} page`}
-              disabled={!hasNext || mutationsDisabled}
+              disabled={!hasNext || navigationDisabled}
               onClick={() => changePage(lastPageStart)}
               type="button"
             >
