@@ -2,12 +2,12 @@
  * Narrow desktop-side protocol facade for the current vertical slice.
  *
  * Method names and shapes are verified against SyndridHQ/syndridcli main at
- * 5a83a6b21e7f7e4287be9ef20a33f50262c771f2. The authoritative generated
+ * c0f1b30eceb71035f76f28e57c87c223c4c25392. The authoritative generated
  * TypeScript schema lives in codex-rs/app-server-protocol/schema/typescript.
  * Keep this facade deliberately small until generated schema sync is wired in.
  */
 
-export const PROTOCOL_SOURCE_SHA = "5a83a6b21e7f7e4287be9ef20a33f50262c771f2";
+export const PROTOCOL_SOURCE_SHA = "c0f1b30eceb71035f76f28e57c87c223c4c25392";
 export const PROTOCOL_SOURCE_SHORT_SHA = PROTOCOL_SOURCE_SHA.slice(0, 7);
 
 export type RequestId = string | number;
@@ -148,10 +148,10 @@ export interface McpServerOauthLoginParams { name: string; threadId?: string | n
 export interface McpServerOauthLoginResponse { authorizationUrl: string; }
 
 export interface FsReadDirectoryParams { path: string; }
-export interface FsReadDirectoryEntry { fileName: string; path?: string; isDirectory: boolean; isFile: boolean; }
+export interface FsReadDirectoryEntry { fileName: string; path: string; isDirectory: boolean; isFile: boolean; }
 export interface FsReadDirectoryResponse { entries: FsReadDirectoryEntry[]; }
 export interface FsGetMetadataParams { path: string; }
-export interface FsGetMetadataResponse { isDirectory: boolean; isFile: boolean; isSymlink: boolean; sizeBytes?: number; createdAtMs: number; modifiedAtMs: number; }
+export interface FsGetMetadataResponse { isDirectory: boolean; isFile: boolean; isSymlink: boolean; sizeBytes: number; createdAtMs: number; modifiedAtMs: number; }
 export interface FsReadFileParams { path: string; }
 export interface FsReadFileResponse { dataBase64: string; }
 export interface FsWriteFileParams { path: string; dataBase64: string; }
