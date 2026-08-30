@@ -3,9 +3,6 @@
   right: 28px;
   bottom: 104px;
   z-index: 38;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   padding: 7px 10px;
@@ -18,16 +15,9 @@
 
 .conversation-follow-button:hover {
   background: #303030;
-  color: #f0f0f0;
 }
 
 .conversation-follow-button span {
+  margin-right: 7px;
   color: var(--success);
-}
-
-@media (max-width: 760px) {
-  .conversation-follow-button {
-    right: 18px;
-    bottom: 92px;
-  }
 }
