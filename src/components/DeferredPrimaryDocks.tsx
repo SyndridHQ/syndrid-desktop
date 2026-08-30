@@ -8,6 +8,7 @@ type SurfaceDefinition = {
   id: SurfaceId;
   toggleClass: string;
   label: string;
+  railTitles: readonly string[];
   load: () => Promise<ComponentType>;
 };
 
@@ -16,24 +17,28 @@ const surfaces: readonly SurfaceDefinition[] = [
     id: "workspace",
     toggleClass: "workspace-files-toggle",
     label: "Files",
+    railTitles: ["Workspace"],
     load: () => import("./WorkspaceFilesDock").then((module) => module.WorkspaceFilesDock),
   },
   {
     id: "git",
     toggleClass: "git-toggle",
     label: "Git",
+    railTitles: ["Changes", "Git"],
     load: () => import("./GitDock").then((module) => module.GitDock),
   },
   {
     id: "skills",
     toggleClass: "skills-toggle",
     label: "Skills",
+    railTitles: ["Extensions"],
     load: () => import("./SkillsDock").then((module) => module.SkillsDock),
   },
   {
     id: "settings",
     toggleClass: "settings-toggle",
     label: "Settings",
+    railTitles: ["Settings"],
     load: () => import("./SettingsDock").then((module) => module.SettingsDock),
   },
 ] as const;
@@ -59,21 +64,30 @@ export function DeferredPrimaryDocks() {
       const pending = existing ?? surface.load();
       loadingRef.current[surface.id] = pending;
 
-      void pending.then((Component) => {
-        setLoaded((current) =>
-          current[surface.id] ? current : { ...current, [surface.id]: Component },
-        );
+      void pending
+        .then((Component) => {
+          setLoaded((current) =>
+            current[surface.id] ? current : { ...current, [surface.id]: Component },
+          );
 
-        // Wait until React has committed the newly loaded dock. Only honor the
-        // original open request if navigation has not moved to another surface
-        // while the chunk was in flight.
-        requestAnimationFrame(() => {
-          if (requestedSurfaceRef.current !== surface.id) return;
-          const toggle = document.querySelector<HTMLButtonElement>(`.${surface.toggleClass}`);
-          if (!toggle || toggle.dataset.deferredPlaceholder === "true") return;
-          if (!document.querySelector(surfacePanelSelector(surface.id))) toggle.click();
+          // Wait until React has committed the newly loaded dock. Do not open a
+          // stale request if the user navigated elsewhere while its chunk loaded.
+          requestAnimationFrame(() => {
+            if (requestedSurfaceRef.current !== surface.id) return;
+            const activeRail = document.querySelector<HTMLButtonElement>(
+              ".activity-rail .rail-button.active",
+            );
+            if (!activeRail || !surface.railTitles.includes(activeRail.title)) return;
+
+            const toggle = document.querySelector<HTMLButtonElement>(`.${surface.toggleClass}`);
+            if (!toggle || toggle.dataset.deferredPlaceholder === "true") return;
+            if (!document.querySelector(surfacePanelSelector(surface.id))) toggle.click();
+          });
+        })
+        .catch((error: unknown) => {
+          delete loadingRef.current[surface.id];
+          console.error(`Failed to load deferred ${surface.id} surface`, error);
         });
-      });
     },
     [],
   );
