@@ -12,6 +12,13 @@ type Shortcut = {
 
 const shortcutDefinitions: Omit<Shortcut, "keys">[] = [
   {
+    id: "agent",
+    label: "Agent workspace",
+    detail: "Close primary tool surfaces and return focus to the Syndrid composer",
+    matches: (event) => isPrimaryMod(event) && event.shiftKey && event.key.toLowerCase() === "a",
+    run: () => clickRailButton("Agent"),
+  },
+  {
     id: "files",
     label: "Workspace files",
     detail: "Toggle the runtime-backed workspace browser",
@@ -50,18 +57,22 @@ export function KeyboardShortcuts() {
     () => [
       {
         ...shortcutDefinitions[0]!,
-        keys: [modLabel, "Shift", "E"],
+        keys: [modLabel, "Shift", "A"],
       },
       {
         ...shortcutDefinitions[1]!,
-        keys: [modLabel, "Shift", "G"],
+        keys: [modLabel, "Shift", "E"],
       },
       {
         ...shortcutDefinitions[2]!,
-        keys: [modLabel, "`"],
+        keys: [modLabel, "Shift", "G"],
       },
       {
         ...shortcutDefinitions[3]!,
+        keys: [modLabel, "`"],
+      },
+      {
+        ...shortcutDefinitions[4]!,
         keys: [modLabel, ","],
       },
     ],
@@ -219,4 +230,11 @@ function isEditableTarget(target: EventTarget | null): boolean {
 function clickElement(selector: string): void {
   const element = document.querySelector<HTMLElement>(selector);
   if (element && !element.hasAttribute("disabled")) element.click();
+}
+
+function clickRailButton(title: string): void {
+  const button = document.querySelector<HTMLButtonElement>(
+    `.activity-rail .rail-button[title="${title}"]`,
+  );
+  if (button && !button.disabled) button.click();
 }
