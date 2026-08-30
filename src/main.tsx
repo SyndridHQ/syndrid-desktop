@@ -6,7 +6,6 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
-import { HooksDock } from "./components/HooksDock";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { ModelCatalogDock } from "./components/ModelCatalogDock";
@@ -39,7 +38,6 @@ createRoot(rootElement).render(
       <RuntimeInputDock />
       <McpElicitationDock />
       <ModelCatalogDock />
-      <HooksDock />
       <WarningsDock />
       <RuntimeActivityDock />
     </WorkbenchErrorBoundary>
