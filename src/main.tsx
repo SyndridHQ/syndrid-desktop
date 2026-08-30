@@ -29,6 +29,7 @@ import { WarningsDock } from "./components/WarningsDock";
 import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
 import { WorkspaceFilesDock } from "./components/WorkspaceFilesDock";
 import "./styles.css";
+import "./connectedWorkflow.css";
 
 const bootStartedAt = performance.now();
 const rootElement = document.getElementById("root");
