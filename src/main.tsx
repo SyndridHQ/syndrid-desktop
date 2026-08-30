@@ -10,7 +10,7 @@ import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredRuntimeInputDock } from "./components/DeferredRuntimeInputDock";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
 import { DeferredWarningsDock } from "./components/DeferredWarningsDock";
-import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
+import { KeyboardShortcutBridge } from "./components/KeyboardShortcutBridge";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
 import "./styles.css";
@@ -33,7 +33,7 @@ createRoot(rootElement).render(
       <PrimaryNavigationBridge />
       <ConversationFollowBridge />
       <DeferredCommandPalette />
-      <KeyboardShortcuts />
+      <KeyboardShortcutBridge />
       <DeferredApprovalDock />
       <DeferredRuntimeInputDock />
       <DeferredMcpElicitationDock />
