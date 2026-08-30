@@ -9,6 +9,9 @@ export function ConversationFollowBridge() {
   const [unreadLiveOutput, setUnreadLiveOutput] = useState(false);
   const followsLatestRef = useRef(true);
   const frameRef = useRef<number | null>(null);
+  const selectedThreadIdRef = useRef(
+    appServerClient.getWorkspaceSnapshot()?.threadId ?? null,
+  );
 
   const scrollToLatest = useCallback((behavior: ScrollBehavior = "auto") => {
     const conversation = conversationElement();
@@ -40,13 +43,11 @@ export function ConversationFollowBridge() {
   }, []);
 
   useEffect(() => {
-    const offNotification = appServerClient.onNotification((notification) => {
-      if (notification.method !== notifications.agentMessageDelta) return;
-
-      if (!followsLatestRef.current) {
-        setUnreadLiveOutput(true);
-        return;
-      }
+    const offWorkspaceChange = appServerClient.onWorkspaceChange(() => {
+      selectedThreadIdRef.current =
+        appServerClient.getWorkspaceSnapshot()?.threadId ?? null;
+      followsLatestRef.current = true;
+      setUnreadLiveOutput(false);
 
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       frameRef.current = requestAnimationFrame(() => {
@@ -55,7 +56,31 @@ export function ConversationFollowBridge() {
       });
     });
 
+    const offNotification = appServerClient.onNotification((notification) => {
+      if (notification.method !== notifications.agentMessageDelta) return;
+
+      const notificationThreadId = threadIdFromParams(notification.params);
+      if (
+        notificationThreadId === null ||
+        notificationThreadId !== selectedThreadIdRef.current
+      ) {
+        return;
+      }
+
+      if (!followsLatestRef.current) {
+        setUnreadLiveOutput(true);
+        return;
+      }
+
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        scrollToLatest("auto");
+      });
+    });
+
     return () => {
+      offWorkspaceChange();
       offNotification();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     };
@@ -79,6 +104,13 @@ export function ConversationFollowBridge() {
 
 function conversationElement(): HTMLElement | null {
   return document.querySelector<HTMLElement>(".conversation");
+}
+
+function threadIdFromParams(params: unknown): string | null {
+  if (params === null || typeof params !== "object") return null;
+  if (!("threadId" in params)) return null;
+  const threadId = (params as { threadId?: unknown }).threadId;
+  return typeof threadId === "string" ? threadId : null;
 }
 
 function prefersReducedMotion(): boolean {
