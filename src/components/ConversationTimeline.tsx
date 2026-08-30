@@ -46,7 +46,14 @@ export function ConversationTimeline({
   if (selectedMessages.length === 0) return null;
 
   return (
-    <section className="message-list" aria-live="polite">
+    <section
+      className="message-list"
+      role="log"
+      aria-label="Conversation"
+      aria-live="polite"
+      aria-relevant="additions"
+      aria-atomic="false"
+    >
       {selectedMessages.map((message) => (
         <ConversationMessageCard key={message.id} message={message} />
       ))}
