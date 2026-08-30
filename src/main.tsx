@@ -2,7 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
-import { BackgroundProcessesDock } from "./components/BackgroundProcessesDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { ContextDock } from "./components/ContextDock";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
@@ -45,7 +44,6 @@ createRoot(rootElement).render(
       <RuntimeInputDock />
       <McpElicitationDock />
       <ModelCatalogDock />
-      <BackgroundProcessesDock />
       <SubagentsDock />
       <SessionHistoryDock />
       <ContextDock />
