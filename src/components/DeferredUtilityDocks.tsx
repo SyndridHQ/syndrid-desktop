@@ -11,7 +11,8 @@ type SurfaceId =
   | "history"
   | "subagents"
   | "context"
-  | "goal";
+  | "goal"
+  | "plan";
 
 type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
 
@@ -101,6 +102,13 @@ const surfaces: readonly SurfaceDefinition[] = [
     panelSelector: ".goal-panel",
     label: "Objective",
     load: () => import("./GoalDock").then((module) => module.GoalDock),
+  },
+  {
+    id: "plan",
+    toggleClass: "plan-toggle",
+    panelSelector: ".plan-panel",
+    label: "Plan",
+    load: () => import("./PlanDock").then((module) => module.PlanDock),
   },
 ] as const;
 
