@@ -10,7 +10,8 @@ type SurfaceId =
   | "processes"
   | "history"
   | "subagents"
-  | "context";
+  | "context"
+  | "goal";
 
 type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
 
@@ -93,6 +94,13 @@ const surfaces: readonly SurfaceDefinition[] = [
     panelSelector: ".context-panel",
     label: "Context",
     load: () => import("./ContextDock").then((module) => module.ContextDock),
+  },
+  {
+    id: "goal",
+    toggleClass: "goal-toggle",
+    panelSelector: ".goal-panel",
+    label: "Objective",
+    load: () => import("./GoalDock").then((module) => module.GoalDock),
   },
 ] as const;
 
