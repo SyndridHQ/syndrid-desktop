@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 const deferredChunkGroups: ReadonlyArray<readonly [string, readonly string[]]> = [
   [
     "deferred-execution",
-    ["TerminalDock", "ReviewDock", "DiagnosticsDock"],
+    ["TerminalDock", "ReviewDock", "DiagnosticsDock", "RuntimeActivityDock"],
   ],
   [
     "deferred-runtime-management",
