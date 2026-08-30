@@ -27,11 +27,13 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
   const generation = useRef(0);
   const requestInFlight = useRef(false);
   const diffRevision = useRef(0);
+  const hasInventory = useRef(false);
 
   useEffect(() => {
     generation.current += 1;
     requestInFlight.current = false;
     diffRevision.current = 0;
+    hasInventory.current = false;
     setInventory(null);
     setLoading(false);
     setStale(false);
@@ -45,9 +47,9 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
         const event = notification.params as TurnDiffUpdatedNotification | undefined;
         if (event?.threadId !== threadId) return;
         diffRevision.current += 1;
-        setStale((current) => current || inventory !== null);
+        if (hasInventory.current) setStale(true);
       }),
-    [inventory, threadId],
+    [threadId],
   );
 
   const load = useCallback(async () => {
@@ -72,6 +74,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
       ) {
         return;
       }
+      hasInventory.current = true;
       setInventory(result);
       setStale(diffRevision.current !== requestDiffRevision);
     } catch (cause) {
