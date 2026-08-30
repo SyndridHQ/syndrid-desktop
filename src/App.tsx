@@ -8,10 +8,12 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { ConversationTimeline } from "./components/ConversationTimeline";
 import {
   appServerClient,
   type RuntimeConnectionSnapshot,
 } from "./runtime/appServerClient";
+import { conversationStore } from "./runtime/conversationStore";
 import {
   PROTOCOL_SOURCE_SHORT_SHA,
   notifications,
@@ -25,15 +27,6 @@ import {
 
 interface AppProps {
   bootStartedAt: number;
-}
-
-interface ConversationMessage {
-  id: string;
-  threadId: string;
-  turnId: string | null;
-  role: "user" | "assistant";
-  text: string;
-  streaming: boolean;
 }
 
 const initialRuntime: RuntimeConnectionSnapshot = {
@@ -61,7 +54,6 @@ export function App({ bootStartedAt }: AppProps) {
   const [sendingTurn, setSendingTurn] = useState(false);
   const [interruptingTurn, setInterruptingTurn] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ConversationMessage[]>([]);
 
   useEffect(() => {
     activeThreadIdRef.current = activeThreadId;
@@ -86,7 +78,7 @@ export function App({ bootStartedAt }: AppProps) {
         setNotificationCount((count) => count + notificationDelta);
       }
       if (deltas.length > 0) {
-        setMessages((current) => applyAgentDeltas(current, deltas));
+        conversationStore.applyAgentDeltas(deltas);
       }
     };
 
@@ -108,13 +100,10 @@ export function App({ bootStartedAt }: AppProps) {
       if (notificationDelta > 0) {
         setNotificationCount((count) => count + notificationDelta);
       }
-      setMessages((current) =>
-        markTurnComplete(
-          deltas.length > 0 ? applyAgentDeltas(current, deltas) : current,
-          event.threadId,
-          event.turn.id,
-        ),
-      );
+      if (deltas.length > 0) {
+        conversationStore.applyAgentDeltas(deltas);
+      }
+      conversationStore.markTurnComplete(event.threadId, event.turn.id);
     };
 
     const offNotification = appServerClient.onNotification((notification) => {
@@ -145,7 +134,10 @@ export function App({ bootStartedAt }: AppProps) {
       setRuntimeLogs((logs) => [...logs.slice(-39), line]);
     });
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && (pendingDeltas.length > 0 || pendingNotifications > 0)) {
+      if (
+        document.visibilityState === "visible" &&
+        (pendingDeltas.length > 0 || pendingNotifications > 0)
+      ) {
         scheduleRuntimeProjection();
       }
     };
@@ -179,13 +171,7 @@ export function App({ bootStartedAt }: AppProps) {
       includeTurns: true,
     });
     setSelectedThread(result.thread);
-    setMessages((current) =>
-      mergeThreadHistory(
-        current,
-        messagesFromThread(result.thread),
-        result.thread.id,
-      ),
-    );
+    conversationStore.mergeThread(result.thread);
     return result.thread;
   }, []);
 
@@ -286,13 +272,7 @@ export function App({ bootStartedAt }: AppProps) {
       activeThreadIdRef.current = result.thread.id;
       setActiveThreadId(result.thread.id);
       setActiveModel(`${result.modelProvider} / ${result.model}`);
-      setMessages((current) =>
-        mergeThreadHistory(
-          current,
-          messagesFromThread(result.thread),
-          result.thread.id,
-        ),
-      );
+      conversationStore.mergeThread(result.thread);
     } catch (error) {
       appendRuntimeError(error, setRuntimeLogs);
     }
@@ -313,19 +293,14 @@ export function App({ bootStartedAt }: AppProps) {
     const clientMessageId = `desktop-${Date.now()}`;
     setSendingTurn(true);
     setDraft("");
-    setMessages((current) =>
-      trimConversation([
-        ...current,
-        {
-          id: clientMessageId,
-          threadId: selectedThread.id,
-          turnId: null,
-          role: "user",
-          text,
-          streaming: false,
-        },
-      ]),
-    );
+    conversationStore.addUserMessage({
+      id: clientMessageId,
+      threadId: selectedThread.id,
+      turnId: null,
+      role: "user",
+      text,
+      streaming: false,
+    });
 
     try {
       const result = await appServerClient.startTurn({
@@ -355,14 +330,6 @@ export function App({ bootStartedAt }: AppProps) {
       appendRuntimeError(error, setRuntimeLogs);
     }
   }, [activeTurnId, interruptingTurn, selectedThread]);
-
-  const selectedMessages = useMemo(
-    () =>
-      selectedThread
-        ? messages.filter((message) => message.threadId === selectedThread.id)
-        : [],
-    [messages, selectedThread],
-  );
 
   const canSend = Boolean(
     runtime.phase === "ready" &&
@@ -589,24 +556,7 @@ export function App({ bootStartedAt }: AppProps) {
             </section>
           )}
 
-          {selectedMessages.length > 0 && (
-            <section className="message-list" aria-live="polite">
-              {selectedMessages.map((message) => (
-                <article
-                  className={`message-card message-${message.role}`}
-                  key={message.id}
-                >
-                  <div className="message-meta">
-                    <span>{message.role === "user" ? "You" : "Syndrid"}</span>
-                    {message.streaming && (
-                      <span className="streaming-badge">Streaming</span>
-                    )}
-                  </div>
-                  <p>{message.text || (message.streaming ? "…" : "")}</p>
-                </article>
-              ))}
-            </section>
-          )}
+          <ConversationTimeline threadId={selectedThread?.id ?? null} />
         </div>
 
         <form
@@ -817,124 +767,8 @@ function isTurnLifecycle(value: unknown): value is TurnLifecycleNotification {
   );
 }
 
-function messagesFromThread(thread: ThreadSummary): ConversationMessage[] {
-  const history: ConversationMessage[] = [];
-
-  for (const rawTurn of thread.turns) {
-    if (!isRecord(rawTurn) || typeof rawTurn.id !== "string") continue;
-    if (!Array.isArray(rawTurn.items)) continue;
-
-    for (const rawItem of rawTurn.items) {
-      if (!isRecord(rawItem) || typeof rawItem.id !== "string") continue;
-
-      if (rawItem.type === "userMessage" && Array.isArray(rawItem.content)) {
-        const text = rawItem.content
-          .filter(isTextUserInput)
-          .map((item) => item.text)
-          .join("\n");
-        if (!text) continue;
-
-        history.push({
-          id: typeof rawItem.clientId === "string" ? rawItem.clientId : `user-${rawItem.id}`,
-          threadId: thread.id,
-          turnId: rawTurn.id,
-          role: "user",
-          text,
-          streaming: false,
-        });
-        continue;
-      }
-
-      if (rawItem.type === "agentMessage" && typeof rawItem.text === "string") {
-        history.push({
-          id: `assistant-${rawItem.id}`,
-          threadId: thread.id,
-          turnId: rawTurn.id,
-          role: "assistant",
-          text: rawItem.text,
-          streaming: false,
-        });
-      }
-    }
-  }
-
-  return trimConversation(history);
-}
-
-function isTextUserInput(value: unknown): value is { type: "text"; text: string } {
-  return isRecord(value) && value.type === "text" && typeof value.text === "string";
-}
-
-function mergeThreadHistory(
-  current: ConversationMessage[],
-  history: ConversationMessage[],
-  threadId: string,
-): ConversationMessage[] {
-  const otherThreads = current.filter((message) => message.threadId !== threadId);
-  const liveThreadMessages = current.filter((message) => message.threadId === threadId);
-  const merged = new Map<string, ConversationMessage>();
-
-  for (const message of history) merged.set(message.id, message);
-  for (const message of liveThreadMessages) merged.set(message.id, message);
-
-  return trimConversation([...otherThreads, ...merged.values()]);
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function applyAgentDeltas(
-  current: ConversationMessage[],
-  deltas: readonly AgentMessageDeltaNotification[],
-): ConversationMessage[] {
-  if (deltas.length === 0) return current;
-
-  const next = [...current];
-  const indexById = new Map(next.map((message, index) => [message.id, index]));
-
-  for (const delta of deltas) {
-    const id = `assistant-${delta.itemId}`;
-    const index = indexById.get(id);
-    if (index === undefined) {
-      indexById.set(id, next.length);
-      next.push({
-        id,
-        threadId: delta.threadId,
-        turnId: delta.turnId,
-        role: "assistant",
-        text: delta.delta,
-        streaming: true,
-      });
-      continue;
-    }
-
-    const existing = next[index];
-    if (!existing) continue;
-    next[index] = {
-      ...existing,
-      text: `${existing.text}${delta.delta}`,
-      streaming: true,
-    };
-  }
-
-  return trimConversation(next);
-}
-
-function markTurnComplete(
-  current: ConversationMessage[],
-  threadId: string,
-  turnId: string,
-): ConversationMessage[] {
-  return current.map((message) =>
-    message.threadId === threadId && message.turnId === turnId
-      ? { ...message, streaming: false }
-      : message,
-  );
-}
-
-function trimConversation(messages: ConversationMessage[]): ConversationMessage[] {
-  return messages.length > 200 ? messages.slice(-200) : messages;
 }
 
 function appendRuntimeError(
