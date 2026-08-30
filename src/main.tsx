@@ -6,7 +6,6 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
-import { GoalDock } from "./components/GoalDock";
 import { HooksDock } from "./components/HooksDock";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
@@ -42,7 +41,6 @@ createRoot(rootElement).render(
       <McpElicitationDock />
       <ModelCatalogDock />
       <PlanDock />
-      <GoalDock />
       <HooksDock />
       <WarningsDock />
       <RuntimeActivityDock />
