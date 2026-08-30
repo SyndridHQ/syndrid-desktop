@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   appServerClient,
   type RuntimeServerRequest,
 } from "../runtime/appServerClient";
+import {
+  getRuntimeApprovalsSnapshot,
+  removeRuntimeApproval,
+  subscribeRuntimeApprovals,
+  type RuntimeApprovalEntry,
+} from "../runtime/runtimeApprovalsStore";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./approvalDock.css";
 
 const COMMAND_APPROVAL = "item/commandExecution/requestApproval";
 const FILE_APPROVAL = "item/fileChange/requestApproval";
 const PERMISSIONS_APPROVAL = "item/permissions/requestApproval";
-const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
 const MAX_PERMISSION_SUMMARY_ITEMS = 32;
 const MAX_PERMISSION_PATHS_PER_KIND = 12;
 const MAX_PERMISSION_PATH_SCAN = 128;
@@ -34,42 +39,22 @@ interface PendingApproval {
 }
 
 export function ApprovalDock() {
-  const [approvals, setApprovals] = useState<PendingApproval[]>([]);
+  const approvals = useSyncExternalStore(
+    subscribeRuntimeApprovals,
+    getRuntimeApprovalsSnapshot,
+    getRuntimeApprovalsSnapshot,
+  );
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const workspace = useRuntimeWorkspace();
 
-  useEffect(() => {
-    const offRequest = appServerClient.onServerRequest((request) => {
-      const approval = normalizeApproval(request);
-      if (!approval) return false;
-
-      setApprovals((current) => {
-        if (current.some((entry) => entry.request.id === request.id)) return current;
-        return [...current, approval];
-      });
-      return true;
-    });
-    const offNotification = appServerClient.onNotification((notification) => {
-      if (notification.method !== SERVER_REQUEST_RESOLVED || !isRecord(notification.params)) {
-        return;
-      }
-      const requestId = notification.params.requestId;
-      if (!isRequestId(requestId)) return;
-      setApprovals((current) =>
-        current.filter((entry) => entry.request.id !== requestId),
-      );
-    });
-
-    return () => {
-      offRequest();
-      offNotification();
-    };
-  }, []);
-
-  const current = useMemo(
+  const currentEntry = useMemo(
     () => approvalForThread(approvals, workspace?.threadId ?? null),
     [approvals, workspace?.threadId],
+  );
+  const current = useMemo(
+    () => currentEntry ? normalizeApproval(currentEntry.request) : null,
+    [currentEntry],
   );
   const queueLabel = useMemo(() => {
     if (approvals.length <= 1) return "Approval required";
@@ -79,12 +64,6 @@ export function ApprovalDock() {
       : `${approvals.length} pending`;
   }, [approvals.length, current, workspace?.threadId]);
 
-  const finishCurrent = (requestId: RuntimeServerRequest["id"]) => {
-    setApprovals((entries) =>
-      entries.filter((entry) => entry.request.id !== requestId),
-    );
-  };
-
   const respondDecision = async (decision: ApprovalDecision) => {
     if (!current || current.kind === "permissions" || respondingId !== null) return;
     const responseKey = String(current.request.id);
@@ -93,7 +72,7 @@ export function ApprovalDock() {
 
     try {
       await appServerClient.respondToServerRequest(current.request.id, { decision });
-      finishCurrent(current.request.id);
+      removeRuntimeApproval(current.request.id);
     } catch (responseError) {
       setError(errorMessage(responseError));
     } finally {
@@ -115,7 +94,7 @@ export function ApprovalDock() {
         permissions: grantRequested ? current.requestedPermissions ?? {} : {},
         scope,
       });
-      finishCurrent(current.request.id);
+      removeRuntimeApproval(current.request.id);
     } catch (responseError) {
       setError(errorMessage(responseError));
     } finally {
@@ -216,9 +195,9 @@ export function ApprovalDock() {
 }
 
 function approvalForThread(
-  approvals: PendingApproval[],
+  approvals: RuntimeApprovalEntry[],
   threadId: string | null,
-): PendingApproval | null {
+): RuntimeApprovalEntry | null {
   if (threadId !== null) {
     const activeApproval = approvals.find((approval) => approval.threadId === threadId);
     if (activeApproval) return activeApproval;
@@ -349,10 +328,6 @@ function boundedLabel(value: string, maxLength: number): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function isRequestId(value: unknown): value is RuntimeServerRequest["id"] {
-  return typeof value === "string" || typeof value === "number";
 }
 
 function stringValue(value: unknown): string | null {
