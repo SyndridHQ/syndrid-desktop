@@ -1,0 +1,122 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { appServerClient } from "../runtime/appServerClient";
+import type { GitWorktreeListResponse } from "../runtime/gitWorktreeProtocol";
+import {
+  notifications,
+  type TurnDiffUpdatedNotification,
+} from "../runtime/protocol";
+import { GitWorktreePanel } from "./GitWorktreePanel";
+
+const MAX_ERROR_CHARS = 8_192;
+
+interface GitWorktreeRuntimePanelProps {
+  cwd: string;
+  threadId: string;
+}
+
+/**
+ * Explicit, runtime-backed controller for linked-worktree inventory.
+ *
+ * SyndridCLI owns Git discovery, path semantics, subprocess lifetime, and response
+ * bounds. Desktop retains only the last explicitly requested presentation snapshot
+ * and marks it stale when the selected runtime thread reports Git-affecting changes.
+ */
+export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePanelProps) {
+  const [inventory, setInventory] = useState<GitWorktreeListResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const requestInFlight = useRef(false);
+  const diffRevision = useRef(0);
+  const hasInventory = useRef(false);
+
+  useEffect(() => {
+    generation.current += 1;
+    requestInFlight.current = false;
+    diffRevision.current = 0;
+    hasInventory.current = false;
+    setInventory(null);
+    setLoading(false);
+    setStale(false);
+    setError(null);
+
+    return () => {
+      generation.current += 1;
+      requestInFlight.current = false;
+    };
+  }, [cwd, threadId]);
+
+  useEffect(
+    () =>
+      appServerClient.onNotification((notification) => {
+        if (notification.method !== notifications.turnDiffUpdated) return;
+        const event = notification.params as TurnDiffUpdatedNotification | undefined;
+        if (event?.threadId !== threadId) return;
+        diffRevision.current += 1;
+        if (hasInventory.current) setStale(true);
+      }),
+    [threadId],
+  );
+
+  const load = useCallback(async () => {
+    if (requestInFlight.current) return;
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setError("Connect the Syndrid runtime before loading linked worktrees.");
+      return;
+    }
+
+    requestInFlight.current = true;
+    const requestGeneration = ++generation.current;
+    const requestDiffRevision = diffRevision.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await appServerClient.listGitWorktrees(cwd);
+      const selectedWorkspace = appServerClient.getWorkspaceSnapshot();
+      if (
+        requestGeneration !== generation.current ||
+        selectedWorkspace?.threadId !== threadId ||
+        selectedWorkspace?.cwd !== cwd
+      ) {
+        return;
+      }
+      hasInventory.current = true;
+      setInventory(result);
+      setStale(diffRevision.current !== requestDiffRevision);
+    } catch (cause) {
+      const selectedWorkspace = appServerClient.getWorkspaceSnapshot();
+      if (
+        requestGeneration === generation.current &&
+        selectedWorkspace?.threadId === threadId &&
+        selectedWorkspace?.cwd === cwd
+      ) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setError(message.slice(0, MAX_ERROR_CHARS));
+      }
+    } finally {
+      if (requestGeneration === generation.current) {
+        requestInFlight.current = false;
+      }
+      const selectedWorkspace = appServerClient.getWorkspaceSnapshot();
+      if (
+        requestGeneration === generation.current &&
+        selectedWorkspace?.threadId === threadId &&
+        selectedWorkspace?.cwd === cwd
+      ) {
+        setLoading(false);
+      }
+    }
+  }, [cwd, threadId]);
+
+  return (
+    <GitWorktreePanel
+      cwd={cwd}
+      error={error}
+      inventory={inventory}
+      loading={loading}
+      onLoad={() => void load()}
+      stale={stale}
+    />
+  );
+}

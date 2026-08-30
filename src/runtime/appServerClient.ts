@@ -77,6 +77,12 @@ import type {
   GitStatusParams,
   GitStatusResponse,
 } from "./gitStatusProtocol";
+import {
+  gitWorktreeMethod,
+  makeGitWorktreeListParams,
+  parseGitWorktreeListResponse,
+  type GitWorktreeListResponse,
+} from "./gitWorktreeProtocol";
 import type {
   PermissionProfileListParams,
   PermissionProfileListResponse,
@@ -228,14 +234,10 @@ export class SyndridAppServerClient {
   }
 
   async forkThread(params: ThreadForkParams): Promise<ThreadForkResponse> {
-    // Forking is additive and deliberately does not change Desktop's selected
-    // workspace projection. Selection remains an explicit user action.
     return this.request<ThreadForkResponse>("thread/fork", params);
   }
 
   async startReview(params: ReviewStartParams): Promise<ReviewStartResponse> {
-    // Detached review execution is runtime-owned and must not implicitly change
-    // the selected Desktop workspace/thread projection.
     return this.request<ReviewStartResponse>("review/start", params);
   }
 
@@ -252,8 +254,6 @@ export class SyndridAppServerClient {
   }
 
   async inspectThread(params: ThreadReadParams): Promise<ThreadReadResponse> {
-    // Read-only docks may inspect a thread without changing Desktop's selected
-    // workspace projection. Foreground selection remains owned by App/session flows.
     return this.request<ThreadReadResponse>(methods.threadRead, params);
   }
 
@@ -372,6 +372,12 @@ export class SyndridAppServerClient {
 
   async gitStatus(params: GitStatusParams): Promise<GitStatusResponse> {
     return this.request<GitStatusResponse>("git/status", params);
+  }
+
+  async listGitWorktrees(cwd: string): Promise<GitWorktreeListResponse> {
+    const params = makeGitWorktreeListParams(cwd);
+    const response = await this.request<unknown>(gitWorktreeMethod, params);
+    return parseGitWorktreeListResponse(response);
   }
 
   async mutateGitPaths(

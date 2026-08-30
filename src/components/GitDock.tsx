@@ -8,6 +8,7 @@ import {
 } from "../runtime/protocol";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import { GitStatusPanel } from "./GitStatusPanel";
+import { GitWorktreeRuntimePanel } from "./GitWorktreeRuntimePanel";
 import "./gitDock.css";
 
 const MAX_DIFF_CHARS = 250_000;
@@ -217,6 +218,7 @@ export function GitDock() {
               </dl>
 
               <GitStatusPanel />
+              <GitWorktreeRuntimePanel cwd={workspace.cwd} threadId={workspace.threadId} />
 
               {error ? (
                 <div className="git-state error">{error}</div>
