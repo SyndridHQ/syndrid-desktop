@@ -19,6 +19,10 @@ const deferredChunkGroups: ReadonlyArray<readonly [string, readonly string[]]> =
     ],
   ],
   [
+    "deferred-runtime-requests",
+    ["ApprovalDock", "RuntimeInputDock", "McpElicitationDock"],
+  ],
+  [
     "deferred-session-inspection",
     ["SessionHistoryDock", "SubagentsDock", "ContextDock", "GoalDock", "PlanDock"],
   ],
