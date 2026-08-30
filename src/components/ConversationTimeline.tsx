@@ -1,9 +1,30 @@
-import { useMemo, useSyncExternalStore } from "react";
-import { conversationStore } from "../runtime/conversationStore";
+import { memo, useMemo, useSyncExternalStore } from "react";
+import {
+  conversationStore,
+  type ConversationMessage,
+} from "../runtime/conversationStore";
 
 interface ConversationTimelineProps {
   threadId: string | null;
 }
+
+const ConversationMessageCard = memo(function ConversationMessageCard({
+  message,
+}: {
+  message: ConversationMessage;
+}) {
+  return (
+    <article className={`message-card message-${message.role}`}>
+      <div className="message-meta">
+        <span>{message.role === "user" ? "You" : "Syndrid"}</span>
+        {message.streaming && (
+          <span className="streaming-badge">Streaming</span>
+        )}
+      </div>
+      <p>{message.text || (message.streaming ? "…" : "")}</p>
+    </article>
+  );
+});
 
 export function ConversationTimeline({
   threadId,
@@ -26,18 +47,7 @@ export function ConversationTimeline({
   return (
     <section className="message-list" aria-live="polite">
       {selectedMessages.map((message) => (
-        <article
-          className={`message-card message-${message.role}`}
-          key={message.id}
-        >
-          <div className="message-meta">
-            <span>{message.role === "user" ? "You" : "Syndrid"}</span>
-            {message.streaming && (
-              <span className="streaming-badge">Streaming</span>
-            )}
-          </div>
-          <p>{message.text || (message.streaming ? "…" : "")}</p>
-        </article>
+        <ConversationMessageCard key={message.id} message={message} />
       ))}
     </section>
   );
