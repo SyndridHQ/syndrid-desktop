@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
-import { ContextDock } from "./components/ContextDock";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
@@ -16,8 +15,6 @@ import { PlanDock } from "./components/PlanDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
-import { SessionHistoryDock } from "./components/SessionHistoryDock";
-import { SubagentsDock } from "./components/SubagentsDock";
 import { WarningsDock } from "./components/WarningsDock";
 import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
 import "./styles.css";
@@ -44,9 +41,6 @@ createRoot(rootElement).render(
       <RuntimeInputDock />
       <McpElicitationDock />
       <ModelCatalogDock />
-      <SubagentsDock />
-      <SessionHistoryDock />
-      <ContextDock />
       <PlanDock />
       <GoalDock />
       <HooksDock />
