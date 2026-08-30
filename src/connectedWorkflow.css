@@ -101,6 +101,16 @@
   padding-bottom: 12px;
 }
 
+/* WebView2 and modern WKWebView can skip layout/paint for historical messages
+   outside the viewport. The active streaming card stays fully rendered so token
+   updates and follow-to-latest behavior remain immediate. Unsupported engines
+   simply ignore these progressive-enhancement properties. */
+.app-shell:has(.runtime-pill.runtime-ready)
+  .message-card:not(:has(.streaming-badge)) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
+}
+
 .app-shell:has(.runtime-pill.runtime-ready) .message-assistant .message-meta {
   margin-bottom: 3px;
   color: #666;
