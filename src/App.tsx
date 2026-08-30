@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { ConversationTimeline } from "./components/ConversationTimeline";
+import { RuntimeNotificationCount } from "./components/RuntimeNotificationCount";
 import {
   appServerClient,
   type RuntimeConnectionSnapshot,
@@ -24,6 +25,7 @@ import {
   type ThreadSummary,
   type TurnLifecycleNotification,
 } from "./runtime/protocol";
+import { runtimeMetricsStore } from "./runtime/runtimeMetricsStore";
 
 interface AppProps {
   bootStartedAt: number;
@@ -43,7 +45,6 @@ export function App({ bootStartedAt }: AppProps) {
   const [providerCapabilities, setProviderCapabilities] =
     useState<ModelProviderCapabilities | null>(null);
   const [runtimeLogs, setRuntimeLogs] = useState<string[]>([]);
-  const [notificationCount, setNotificationCount] = useState(0);
   const [shellReadyMs, setShellReadyMs] = useState<number | null>(null);
   const [selectedThread, setSelectedThread] = useState<ThreadSummary | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -65,18 +66,12 @@ export function App({ bootStartedAt }: AppProps) {
     );
     let runtimeFrame: number | null = null;
     let pendingDeltas: AgentMessageDeltaNotification[] = [];
-    let pendingNotifications = 0;
 
     const flushRuntimeProjection = () => {
       runtimeFrame = null;
       const deltas = pendingDeltas;
-      const notificationDelta = pendingNotifications;
       pendingDeltas = [];
-      pendingNotifications = 0;
 
-      if (notificationDelta > 0) {
-        setNotificationCount((count) => count + notificationDelta);
-      }
       if (deltas.length > 0) {
         conversationStore.applyAgentDeltas(deltas);
       }
@@ -93,13 +88,8 @@ export function App({ bootStartedAt }: AppProps) {
         runtimeFrame = null;
       }
       const deltas = pendingDeltas;
-      const notificationDelta = pendingNotifications;
       pendingDeltas = [];
-      pendingNotifications = 0;
 
-      if (notificationDelta > 0) {
-        setNotificationCount((count) => count + notificationDelta);
-      }
       if (deltas.length > 0) {
         conversationStore.applyAgentDeltas(deltas);
       }
@@ -107,7 +97,7 @@ export function App({ bootStartedAt }: AppProps) {
     };
 
     const offNotification = appServerClient.onNotification((notification) => {
-      pendingNotifications += 1;
+      runtimeMetricsStore.addNotifications();
       handleRuntimeNotification(notification, {
         onAgentDelta: (delta) => {
           pendingDeltas.push(delta);
@@ -136,7 +126,7 @@ export function App({ bootStartedAt }: AppProps) {
     const onVisibilityChange = () => {
       if (
         document.visibilityState === "visible" &&
-        (pendingDeltas.length > 0 || pendingNotifications > 0)
+        pendingDeltas.length > 0
       ) {
         scheduleRuntimeProjection();
       }
@@ -629,7 +619,7 @@ export function App({ bootStartedAt }: AppProps) {
           </div>
           <div><dt>Sessions</dt><dd>{threads.length}</dd></div>
           <div><dt>Models</dt><dd>{models.length || "—"}</dd></div>
-          <div><dt>Notifications</dt><dd>{notificationCount}</dd></div>
+          <div><dt>Notifications</dt><dd><RuntimeNotificationCount /></dd></div>
           <div><dt>Active turn</dt><dd>{activeTurnId ? activeTurnId.slice(0, 8) : "—"}</dd></div>
           <div>
             <dt>Shell first frame</dt>
