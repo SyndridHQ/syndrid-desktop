@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ComponentType } from "react";
 
-type SurfaceId = "terminal" | "review" | "diagnostics" | "providers" | "mcp";
+type SurfaceId = "terminal" | "review" | "diagnostics" | "providers" | "mcp" | "permissions";
 
 type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
 
@@ -47,6 +47,13 @@ const surfaces: readonly SurfaceDefinition[] = [
     panelSelector: ".mcp-server-panel",
     label: "MCP",
     load: () => import("./McpServerDock").then((module) => module.McpServerDock),
+  },
+  {
+    id: "permissions",
+    toggleClass: "permissions-toggle",
+    panelSelector: ".permissions-panel",
+    label: "Permissions",
+    load: () => import("./PermissionsDock").then((module) => module.PermissionsDock),
   },
 ] as const;
 
