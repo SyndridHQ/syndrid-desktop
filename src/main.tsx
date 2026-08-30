@@ -4,11 +4,11 @@ import { App } from "./App";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
+import { DeferredModelCatalog } from "./components/DeferredModelCatalog";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
-import { ModelCatalogDock } from "./components/ModelCatalogDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { WarningsDock } from "./components/WarningsDock";
@@ -29,6 +29,7 @@ createRoot(rootElement).render(
       <App bootStartedAt={bootStartedAt} />
       <DeferredPrimaryDocks />
       <DeferredUtilityDocks />
+      <DeferredModelCatalog />
       <PrimaryNavigationBridge />
       <ConversationFollowBridge />
       <CommandPalette />
@@ -36,7 +37,6 @@ createRoot(rootElement).render(
       <ApprovalDock />
       <RuntimeInputDock />
       <McpElicitationDock />
-      <ModelCatalogDock />
       <WarningsDock />
     </WorkbenchErrorBoundary>
   </StrictMode>,
