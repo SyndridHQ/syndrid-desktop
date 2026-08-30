@@ -10,7 +10,6 @@ import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { ModelCatalogDock } from "./components/ModelCatalogDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
-import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { WarningsDock } from "./components/WarningsDock";
 import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
@@ -39,7 +38,6 @@ createRoot(rootElement).render(
       <McpElicitationDock />
       <ModelCatalogDock />
       <WarningsDock />
-      <RuntimeActivityDock />
     </WorkbenchErrorBoundary>
   </StrictMode>,
 );
