@@ -7,11 +7,11 @@ import { ConversationFollowBridge } from "./components/ConversationFollowBridge"
 import { DeferredModelCatalog } from "./components/DeferredModelCatalog";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
+import { DeferredWarningsDock } from "./components/DeferredWarningsDock";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
-import { WarningsDock } from "./components/WarningsDock";
 import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
 import "./styles.css";
 import "./connectedWorkflow.css";
@@ -37,7 +37,7 @@ createRoot(rootElement).render(
       <ApprovalDock />
       <RuntimeInputDock />
       <McpElicitationDock />
-      <WarningsDock />
+      <DeferredWarningsDock />
     </WorkbenchErrorBoundary>
   </StrictMode>,
 );

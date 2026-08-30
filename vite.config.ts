@@ -15,6 +15,7 @@ const deferredChunkGroups: ReadonlyArray<readonly [string, readonly string[]]> =
       "BackgroundProcessesDock",
       "HooksDock",
       "ModelCatalogDock",
+      "WarningsDock",
     ],
   ],
   [
