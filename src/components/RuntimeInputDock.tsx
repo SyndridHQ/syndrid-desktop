@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   appServerClient,
   type RuntimeServerRequest,
 } from "../runtime/appServerClient";
+import {
+  getRuntimeInputSnapshot,
+  removeRuntimeInput,
+  subscribeRuntimeInput,
+  type RuntimeInputEntry,
+} from "../runtime/runtimeInputStore";
 import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./runtimeInputDock.css";
 
 const TOOL_USER_INPUT = "item/tool/requestUserInput";
-const SERVER_REQUEST_RESOLVED = "serverRequest/resolved";
 
 interface RuntimeInputOption {
   label: string;
@@ -33,44 +38,25 @@ interface RuntimeInputRequest {
 }
 
 export function RuntimeInputDock() {
-  const [queue, setQueue] = useState<RuntimeInputRequest[]>([]);
+  const queue = useSyncExternalStore(
+    subscribeRuntimeInput,
+    getRuntimeInputSnapshot,
+    getRuntimeInputSnapshot,
+  );
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState<RuntimeServerRequest["id"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const workspace = useRuntimeWorkspace();
-  const current = useMemo(
+  const currentEntry = useMemo(
     () => inputForThread(queue, workspace?.threadId ?? null),
     [queue, workspace?.threadId],
   );
+  const current = useMemo(
+    () => currentEntry ? normalizeInputRequest(currentEntry.request) : null,
+    [currentEntry],
+  );
   const currentRequestIdRef = useRef<RuntimeServerRequest["id"] | null>(null);
   currentRequestIdRef.current = current?.request.id ?? null;
-
-  useEffect(() => {
-    const offRequest = appServerClient.onServerRequest((request) => {
-      const inputRequest = normalizeInputRequest(request);
-      if (!inputRequest) return false;
-      setQueue((current) => {
-        if (current.some((entry) => entry.request.id === request.id)) return current;
-        return [...current, inputRequest];
-      });
-      return true;
-    });
-    const offNotification = appServerClient.onNotification((notification) => {
-      if (notification.method !== SERVER_REQUEST_RESOLVED || !isRecord(notification.params)) {
-        return;
-      }
-      const requestId = notification.params.requestId;
-      if (!isRequestId(requestId)) return;
-      setQueue((current) =>
-        current.filter((entry) => entry.request.id !== requestId),
-      );
-    });
-
-    return () => {
-      offRequest();
-      offNotification();
-    };
-  }, []);
 
   const canSubmit = useMemo(
     () => current !== null && current.questions.every((question) => Boolean(answers[question.id]?.trim())),
@@ -104,9 +90,7 @@ export function RuntimeInputDock() {
       await appServerClient.respondToServerRequest(requestId, {
         answers: responseAnswers,
       });
-      setQueue((entries) =>
-        entries.filter((entry) => entry.request.id !== requestId),
-      );
+      removeRuntimeInput(requestId);
     } catch (responseError) {
       if (currentRequestIdRef.current === requestId) {
         setError(
@@ -190,9 +174,9 @@ export function RuntimeInputDock() {
 }
 
 function inputForThread(
-  queue: RuntimeInputRequest[],
+  queue: RuntimeInputEntry[],
   threadId: string | null,
-): RuntimeInputRequest | null {
+): RuntimeInputEntry | null {
   if (threadId !== null) {
     const activeInput = queue.find((request) => request.threadId === threadId);
     if (activeInput) return activeInput;
@@ -259,10 +243,6 @@ function normalizeOption(value: unknown): RuntimeInputOption | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function isRequestId(value: unknown): value is RuntimeServerRequest["id"] {
-  return typeof value === "string" || typeof value === "number";
 }
 
 function stringValue(value: unknown): string | null {
