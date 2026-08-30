@@ -13,7 +13,8 @@ type SurfaceId =
   | "context"
   | "goal"
   | "plan"
-  | "hooks";
+  | "hooks"
+  | "activity";
 
 type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
 
@@ -117,6 +118,13 @@ const surfaces: readonly SurfaceDefinition[] = [
     panelSelector: ".hooks-panel",
     label: "Hooks",
     load: () => import("./HooksDock").then((module) => module.HooksDock),
+  },
+  {
+    id: "activity",
+    toggleClass: "runtime-activity-toggle",
+    panelSelector: ".runtime-activity-panel",
+    label: "Runtime activity",
+    load: () => import("./RuntimeActivityDock").then((module) => module.RuntimeActivityDock),
   },
 ] as const;
 
