@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 const KeyboardShortcuts = lazy(async () => {
   const module = await import("./KeyboardShortcuts");
@@ -36,9 +36,11 @@ const shortcuts: Shortcut[] = [
 export function KeyboardShortcutBridge() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpLoaded, setHelpLoaded] = useState(false);
+  const helpOpenRef = useRef(false);
 
   useEffect(() => {
     const openHelp = () => {
+      helpOpenRef.current = true;
       setHelpLoaded(true);
       setHelpOpen(true);
     };
@@ -48,13 +50,19 @@ export function KeyboardShortcutBridge() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && helpOpen) {
+      if (event.key === "Escape" && helpOpenRef.current) {
         event.preventDefault();
+        helpOpenRef.current = false;
         setHelpOpen(false);
         return;
       }
 
-      if (helpOpen && isPrimaryMod(event) && event.key.toLowerCase() === "k") {
+      if (
+        helpOpenRef.current &&
+        isPrimaryMod(event) &&
+        event.key.toLowerCase() === "k"
+      ) {
+        helpOpenRef.current = false;
         setHelpOpen(false);
         return;
       }
@@ -66,12 +74,14 @@ export function KeyboardShortcutBridge() {
         !isEditableTarget(event.target)
       ) {
         event.preventDefault();
-        setHelpLoaded(true);
-        setHelpOpen((current) => !current);
+        const nextOpen = !helpOpenRef.current;
+        helpOpenRef.current = nextOpen;
+        if (nextOpen) setHelpLoaded(true);
+        setHelpOpen(nextOpen);
         return;
       }
 
-      if (helpOpen || isEditableTarget(event.target)) return;
+      if (helpOpenRef.current || isEditableTarget(event.target)) return;
       const shortcut = shortcuts.find((entry) => entry.matches(event));
       if (!shortcut) return;
       event.preventDefault();
@@ -80,13 +90,18 @@ export function KeyboardShortcutBridge() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [helpOpen]);
+  }, []);
 
   if (!helpLoaded || !helpOpen) return null;
 
   return (
     <Suspense fallback={null}>
-      <KeyboardShortcuts onClose={() => setHelpOpen(false)} />
+      <KeyboardShortcuts
+        onClose={() => {
+          helpOpenRef.current = false;
+          setHelpOpen(false);
+        }}
+      />
     </Suspense>
   );
 }
