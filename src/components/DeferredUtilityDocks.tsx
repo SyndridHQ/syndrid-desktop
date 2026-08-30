@@ -1,0 +1,102 @@
+import { useCallback, useRef, useState, type ComponentType } from "react";
+
+type SurfaceId = "terminal" | "review" | "diagnostics";
+
+type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
+
+type SurfaceDefinition = {
+  id: SurfaceId;
+  toggleClass: string;
+  panelSelector: string;
+  label: string;
+  load: () => Promise<ComponentType>;
+};
+
+const surfaces: readonly SurfaceDefinition[] = [
+  {
+    id: "terminal",
+    toggleClass: "terminal-toggle",
+    panelSelector: ".terminal-panel",
+    label: "Terminal",
+    load: () => import("./TerminalDock").then((module) => module.TerminalDock),
+  },
+  {
+    id: "review",
+    toggleClass: "review-toggle",
+    panelSelector: ".review-panel",
+    label: "Review",
+    load: () => import("./ReviewDock").then((module) => module.ReviewDock),
+  },
+  {
+    id: "diagnostics",
+    toggleClass: "diagnostics-toggle",
+    panelSelector: ".diagnostics-panel",
+    label: "Diagnostics",
+    load: () => import("./DiagnosticsDock").then((module) => module.DiagnosticsDock),
+  },
+] as const;
+
+/**
+ * Defers user-invoked utility surfaces whose runtime work begins only after the
+ * user opens them. The hidden placeholders preserve existing command-palette and
+ * keyboard selectors without pulling the implementation into the startup graph.
+ *
+ * Once loaded, a dock stays mounted so terminal/review UI state survives ordinary
+ * open/close cycles. Runtime-request surfaces remain eager elsewhere because they
+ * must be able to react immediately to server requests.
+ */
+export function DeferredUtilityDocks() {
+  const [loaded, setLoaded] = useState<LoadedSurfaces>({});
+  const loadingRef = useRef<Partial<Record<SurfaceId, Promise<ComponentType>>>>({});
+  const requestedSurfaceRef = useRef<SurfaceId | null>(null);
+
+  const requestSurface = useCallback((surface: SurfaceDefinition) => {
+    requestedSurfaceRef.current = surface.id;
+
+    const existing = loadingRef.current[surface.id];
+    const pending = existing ?? surface.load();
+    loadingRef.current[surface.id] = pending;
+
+    void pending
+      .then((Component) => {
+        setLoaded((current) =>
+          current[surface.id] ? current : { ...current, [surface.id]: Component },
+        );
+
+        requestAnimationFrame(() => {
+          if (requestedSurfaceRef.current !== surface.id) return;
+          const toggle = document.querySelector<HTMLButtonElement>(`.${surface.toggleClass}`);
+          if (!toggle || toggle.dataset.deferredPlaceholder === "true") return;
+          if (!document.querySelector(surface.panelSelector)) toggle.click();
+        });
+      })
+      .catch((error: unknown) => {
+        delete loadingRef.current[surface.id];
+        console.error(`Failed to load deferred ${surface.id} surface`, error);
+      });
+  }, []);
+
+  return (
+    <>
+      {surfaces.map((surface) => {
+        const Component = loaded[surface.id];
+        if (Component) return <Component key={surface.id} />;
+
+        return (
+          <button
+            aria-hidden="true"
+            className={surface.toggleClass}
+            data-deferred-placeholder="true"
+            key={surface.id}
+            onClick={() => requestSurface(surface)}
+            style={{ display: "none" }}
+            tabIndex={-1}
+            type="button"
+          >
+            {surface.label}
+          </button>
+        );
+      })}
+    </>
+  );
+}
