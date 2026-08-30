@@ -7,6 +7,8 @@ import {
 } from "../runtime/protocol";
 import { GitWorktreePanel } from "./GitWorktreePanel";
 
+const MAX_ERROR_CHARS = 8_192;
+
 interface GitWorktreeRuntimePanelProps {
   cwd: string;
   threadId: string;
@@ -38,6 +40,11 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
     setLoading(false);
     setStale(false);
     setError(null);
+
+    return () => {
+      generation.current += 1;
+      requestInFlight.current = false;
+    };
   }, [cwd, threadId]);
 
   useEffect(
@@ -84,7 +91,8 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
         selectedWorkspace?.threadId === threadId &&
         selectedWorkspace?.cwd === cwd
       ) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        const message = cause instanceof Error ? cause.message : String(cause);
+        setError(message.slice(0, MAX_ERROR_CHARS));
       }
     } finally {
       if (requestGeneration === generation.current) {
