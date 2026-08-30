@@ -26,24 +26,29 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
   const requestInFlight = useRef(false);
+  const diffRevision = useRef(0);
 
   useEffect(() => {
     generation.current += 1;
     requestInFlight.current = false;
+    diffRevision.current = 0;
     setInventory(null);
     setLoading(false);
     setStale(false);
     setError(null);
   }, [cwd, threadId]);
 
-  useEffect(() => {
-    if (!inventory) return;
-    return appServerClient.onNotification((notification) => {
-      if (notification.method !== notifications.turnDiffUpdated) return;
-      const event = notification.params as TurnDiffUpdatedNotification | undefined;
-      if (event?.threadId === threadId) setStale(true);
-    });
-  }, [inventory, threadId]);
+  useEffect(
+    () =>
+      appServerClient.onNotification((notification) => {
+        if (notification.method !== notifications.turnDiffUpdated) return;
+        const event = notification.params as TurnDiffUpdatedNotification | undefined;
+        if (event?.threadId !== threadId) return;
+        diffRevision.current += 1;
+        setStale((current) => current || inventory !== null);
+      }),
+    [inventory, threadId],
+  );
 
   const load = useCallback(async () => {
     if (requestInFlight.current) return;
@@ -54,6 +59,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
 
     requestInFlight.current = true;
     const requestGeneration = ++generation.current;
+    const requestDiffRevision = diffRevision.current;
     setLoading(true);
     setError(null);
     try {
@@ -67,7 +73,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
         return;
       }
       setInventory(result);
-      setStale(false);
+      setStale(diffRevision.current !== requestDiffRevision);
     } catch (cause) {
       const selectedWorkspace = appServerClient.getWorkspaceSnapshot();
       if (
