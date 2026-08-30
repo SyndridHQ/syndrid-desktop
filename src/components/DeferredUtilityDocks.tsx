@@ -1,6 +1,13 @@
 import { useCallback, useRef, useState, type ComponentType } from "react";
 
-type SurfaceId = "terminal" | "review" | "diagnostics" | "providers" | "mcp" | "permissions";
+type SurfaceId =
+  | "terminal"
+  | "review"
+  | "diagnostics"
+  | "providers"
+  | "mcp"
+  | "permissions"
+  | "processes";
 
 type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
 
@@ -54,6 +61,14 @@ const surfaces: readonly SurfaceDefinition[] = [
     panelSelector: ".permissions-panel",
     label: "Permissions",
     load: () => import("./PermissionsDock").then((module) => module.PermissionsDock),
+  },
+  {
+    id: "processes",
+    toggleClass: "background-processes-toggle",
+    panelSelector: ".background-processes-panel",
+    label: "Processes",
+    load: () =>
+      import("./BackgroundProcessesDock").then((module) => module.BackgroundProcessesDock),
   },
 ] as const;
 
