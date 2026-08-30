@@ -3,6 +3,7 @@ import {
   appServerClient,
   type RuntimeServerRequest,
 } from "../runtime/appServerClient";
+import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./approvalDock.css";
 
 const COMMAND_APPROVAL = "item/commandExecution/requestApproval";
@@ -36,6 +37,7 @@ export function ApprovalDock() {
   const [approvals, setApprovals] = useState<PendingApproval[]>([]);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const workspace = useRuntimeWorkspace();
 
   useEffect(() => {
     const offRequest = appServerClient.onServerRequest((request) => {
@@ -65,11 +67,17 @@ export function ApprovalDock() {
     };
   }, []);
 
-  const current = approvals[0] ?? null;
-  const queueLabel = useMemo(
-    () => approvals.length > 1 ? `${approvals.length} pending` : "Approval required",
-    [approvals.length],
+  const current = useMemo(
+    () => approvalForThread(approvals, workspace?.threadId ?? null),
+    [approvals, workspace?.threadId],
   );
+  const queueLabel = useMemo(() => {
+    if (approvals.length <= 1) return "Approval required";
+    const activeFirst = current !== null && current.threadId === workspace?.threadId;
+    return activeFirst
+      ? `${approvals.length} pending · active session first`
+      : `${approvals.length} pending`;
+  }, [approvals.length, current, workspace?.threadId]);
 
   const finishCurrent = (requestId: RuntimeServerRequest["id"]) => {
     setApprovals((entries) =>
@@ -205,6 +213,17 @@ export function ApprovalDock() {
       )}
     </section>
   );
+}
+
+function approvalForThread(
+  approvals: PendingApproval[],
+  threadId: string | null,
+): PendingApproval | null {
+  if (threadId !== null) {
+    const activeApproval = approvals.find((approval) => approval.threadId === threadId);
+    if (activeApproval) return activeApproval;
+  }
+  return approvals[0] ?? null;
 }
 
 function normalizeApproval(request: RuntimeServerRequest): PendingApproval | null {
