@@ -7,7 +7,10 @@ type SurfaceId =
   | "providers"
   | "mcp"
   | "permissions"
-  | "processes";
+  | "processes"
+  | "history"
+  | "subagents"
+  | "context";
 
 type LoadedSurfaces = Partial<Record<SurfaceId, ComponentType>>;
 
@@ -70,6 +73,27 @@ const surfaces: readonly SurfaceDefinition[] = [
     load: () =>
       import("./BackgroundProcessesDock").then((module) => module.BackgroundProcessesDock),
   },
+  {
+    id: "history",
+    toggleClass: "session-history-toggle",
+    panelSelector: ".session-history-panel",
+    label: "History",
+    load: () => import("./SessionHistoryDock").then((module) => module.SessionHistoryDock),
+  },
+  {
+    id: "subagents",
+    toggleClass: "subagents-toggle",
+    panelSelector: ".subagents-panel",
+    label: "Agents",
+    load: () => import("./SubagentsDock").then((module) => module.SubagentsDock),
+  },
+  {
+    id: "context",
+    toggleClass: "context-toggle",
+    panelSelector: ".context-panel",
+    label: "Context",
+    load: () => import("./ContextDock").then((module) => module.ContextDock),
+  },
 ] as const;
 
 /**
@@ -77,9 +101,10 @@ const surfaces: readonly SurfaceDefinition[] = [
  * user opens them. The hidden placeholders preserve existing command-palette and
  * keyboard selectors without pulling the implementation into the startup graph.
  *
- * Once loaded, a dock stays mounted so terminal/review UI state survives ordinary
- * open/close cycles. Runtime-request surfaces remain eager elsewhere because they
- * must be able to react immediately to server requests.
+ * Once loaded, a dock stays mounted so user-launched work and any explicit runtime
+ * completion tracking can survive ordinary open/close cycles. Runtime-request
+ * surfaces remain eager elsewhere because they must react immediately to server
+ * requests.
  */
 export function DeferredUtilityDocks() {
   const [loaded, setLoaded] = useState<LoadedSurfaces>({});
