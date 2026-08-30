@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 
 const deferredChunkGroups: ReadonlyArray<readonly [string, readonly string[]]> = [
   [
+    "deferred-shell-utilities",
+    ["CommandPalette", "KeyboardShortcuts", "SettingsDock", "SkillsDock"],
+  ],
+  [
     "deferred-execution",
     ["TerminalDock", "ReviewDock", "DiagnosticsDock", "RuntimeActivityDock"],
   ],
