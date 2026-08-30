@@ -35,13 +35,11 @@ const shortcuts: Shortcut[] = [
 
 export function KeyboardShortcutBridge() {
   const [helpOpen, setHelpOpen] = useState(false);
-  const [helpLoaded, setHelpLoaded] = useState(false);
   const helpOpenRef = useRef(false);
 
   useEffect(() => {
     const openHelp = () => {
       helpOpenRef.current = true;
-      setHelpLoaded(true);
       setHelpOpen(true);
     };
     window.addEventListener("syndrid:open-shortcuts", openHelp);
@@ -76,7 +74,6 @@ export function KeyboardShortcutBridge() {
         event.preventDefault();
         const nextOpen = !helpOpenRef.current;
         helpOpenRef.current = nextOpen;
-        if (nextOpen) setHelpLoaded(true);
         setHelpOpen(nextOpen);
         return;
       }
@@ -92,7 +89,7 @@ export function KeyboardShortcutBridge() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  if (!helpLoaded || !helpOpen) return null;
+  if (!helpOpen) return null;
 
   return (
     <Suspense fallback={null}>
