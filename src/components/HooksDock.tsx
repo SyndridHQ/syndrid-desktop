@@ -1,0 +1,454 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { appServerClient } from "../runtime/appServerClient";
+import type { HookMetadata, HooksListEntry } from "../runtime/protocol";
+import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
+import "./hooksDock.css";
+
+const HOOK_STARTED = "hook/started";
+const HOOK_COMPLETED = "hook/completed";
+const MAX_RETAINED_RUNS = 80;
+const MAX_VISIBLE_RUNS = 16;
+const MAX_VISIBLE_HOOKS = 120;
+const MAX_RETAINED_HOOKS = 240;
+const MAX_RETAINED_ENTRIES_PER_RUN = 12;
+const MAX_HOOK_LABEL_CHARS = 8 * 1024;
+const MAX_HOOK_DETAIL_CHARS = 32 * 1024;
+const MAX_HOOK_PATH_CHARS = 4 * 1024;
+
+type HookOutputEntry = { kind: string; text: string };
+type HookRun = {
+  id: string;
+  threadId: string;
+  turnId: string | null;
+  eventName: string;
+  handlerType: string;
+  executionMode: string;
+  scope: string;
+  sourcePath: string;
+  source: string;
+  status: string;
+  statusMessage: string | null;
+  startedAt: number;
+  completedAt: number | null;
+  durationMs: number | null;
+  entries: HookOutputEntry[];
+};
+
+type HooksView = "inventory" | "activity";
+
+type RetainedHookInventory = {
+  entries: HooksListEntry[];
+  totalHooks: number;
+  warningCount: number;
+  errorCount: number;
+};
+
+export function HooksDock() {
+  const workspace = useRuntimeWorkspace();
+  const inventoryRequestRef = useRef(0);
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<HooksView>("inventory");
+  const [runs, setRuns] = useState<HookRun[]>([]);
+  const [inventory, setInventory] = useState<HooksListEntry[]>([]);
+  const [inventoryTotalHooks, setInventoryTotalHooks] = useState(0);
+  const [inventoryWarningCount, setInventoryWarningCount] = useState(0);
+  const [inventoryErrorCount, setInventoryErrorCount] = useState(0);
+  const [inventoryLoaded, setInventoryLoaded] = useState(false);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || view !== "activity") return;
+
+    return appServerClient.onNotification((notification) => {
+      if (notification.method !== HOOK_STARTED && notification.method !== HOOK_COMPLETED) return;
+      const run = parseHookNotification(notification.params);
+      if (!run) return;
+      setRuns((current) => upsertHookRun(current, run));
+    });
+  }, [open, view]);
+
+  const loadInventory = useCallback(async () => {
+    const requestGeneration = ++inventoryRequestRef.current;
+    if (appServerClient.getSnapshot().phase !== "ready") {
+      setInventoryLoading(false);
+      setInventoryError("Connect the Syndrid runtime before loading hooks.");
+      return;
+    }
+
+    const cwd = workspace?.cwd.trim();
+    if (!cwd) {
+      setInventory([]);
+      setInventoryTotalHooks(0);
+      setInventoryWarningCount(0);
+      setInventoryErrorCount(0);
+      setInventoryLoaded(true);
+      setInventoryLoading(false);
+      setInventoryError(null);
+      return;
+    }
+
+    const requestedThreadId = workspace?.threadId ?? null;
+    setInventoryLoading(true);
+    setInventoryError(null);
+    try {
+      const result = await appServerClient.listHooks({ cwds: [cwd] });
+      if (inventoryRequestRef.current !== requestGeneration) return;
+      const current = appServerClient.getWorkspaceSnapshot();
+      if (current?.threadId !== requestedThreadId || current.cwd !== cwd) return;
+      const retained = retainHookInventory(result.data);
+      setInventory(retained.entries);
+      setInventoryTotalHooks(retained.totalHooks);
+      setInventoryWarningCount(retained.warningCount);
+      setInventoryErrorCount(retained.errorCount);
+      setInventoryLoaded(true);
+    } catch (cause) {
+      if (inventoryRequestRef.current !== requestGeneration) return;
+      setInventoryError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (inventoryRequestRef.current === requestGeneration) {
+        setInventoryLoading(false);
+      }
+    }
+  }, [workspace?.cwd, workspace?.threadId]);
+
+  useEffect(() => {
+    setInventory([]);
+    setInventoryTotalHooks(0);
+    setInventoryWarningCount(0);
+    setInventoryErrorCount(0);
+    setInventoryLoaded(false);
+    setInventoryError(null);
+    if (open && view === "inventory") {
+      void loadInventory();
+    } else {
+      inventoryRequestRef.current += 1;
+      setInventoryLoading(false);
+    }
+  }, [loadInventory, open, view, workspace?.cwd, workspace?.threadId]);
+
+  useEffect(() => {
+    if (!open || view !== "activity") setRuns([]);
+  }, [open, view]);
+
+  const runningCount = useMemo(
+    () => runs.filter((run) => run.status === "running").length,
+    [runs],
+  );
+  const recent = useMemo(() => runs.slice(-MAX_VISIBLE_RUNS).reverse(), [runs]);
+  const hooks = useMemo(
+    () => inventory.flatMap((entry) => entry.hooks).sort(compareHooks),
+    [inventory],
+  );
+  const enabledCount = useMemo(() => hooks.filter((hook) => hook.enabled).length, [hooks]);
+  const cwd = workspace?.cwd ?? null;
+
+  return (
+    <aside className="hooks-dock" aria-label="Hooks">
+      <button className="hooks-toggle" onClick={() => setOpen((value) => !value)} type="button">
+        <span aria-hidden="true">↯</span>
+        Hooks
+        <span>{runningCount > 0 ? `${runningCount} running` : inventoryLoaded ? inventoryTotalHooks : runs.length}</span>
+      </button>
+      {open && (
+        <section className="hooks-panel">
+          <header>
+            <span>
+              <strong>Hooks</strong>
+              <small title={cwd ?? undefined}>{cwd ?? "Selected session workspace"}</small>
+            </span>
+            {view === "inventory" ? (
+              <button disabled={inventoryLoading} onClick={() => void loadInventory()} type="button">
+                {inventoryLoading ? "Loading…" : "Refresh"}
+              </button>
+            ) : (
+              <button disabled={runs.length === 0} onClick={() => setRuns([])} type="button">
+                Clear
+              </button>
+            )}
+          </header>
+
+          <nav className="hooks-tabs" aria-label="Hook views">
+            <button
+              aria-pressed={view === "inventory"}
+              className={view === "inventory" ? "active" : ""}
+              onClick={() => setView("inventory")}
+              type="button"
+            >
+              Inventory {inventoryLoaded ? `· ${inventoryTotalHooks}` : ""}
+            </button>
+            <button
+              aria-pressed={view === "activity"}
+              className={view === "activity" ? "active" : ""}
+              onClick={() => setView("activity")}
+              type="button"
+            >
+              Activity · {runs.length}
+            </button>
+          </nav>
+
+          {view === "inventory" ? (
+            <HookInventory
+              cwd={cwd}
+              error={inventoryError}
+              hooks={hooks}
+              loaded={inventoryLoaded}
+              loading={inventoryLoading}
+              totalHooks={inventoryTotalHooks}
+            />
+          ) : (
+            <HookActivity recent={recent} />
+          )}
+
+          <footer>
+            {view === "inventory" ? (
+              <>
+                <span>
+                  {enabledCount} enabled in retained catalog · explicit runtime discovery · no polling
+                </span>
+                {(inventoryWarningCount > 0 || inventoryErrorCount > 0) && (
+                  <em>
+                    {inventoryWarningCount > 0
+                      ? `${inventoryWarningCount} warning${inventoryWarningCount === 1 ? "" : "s"}`
+                      : ""}
+                    {inventoryWarningCount > 0 && inventoryErrorCount > 0 ? " · " : ""}
+                    {inventoryErrorCount > 0
+                      ? `${inventoryErrorCount} error${inventoryErrorCount === 1 ? "" : "s"}`
+                      : ""}
+                  </em>
+                )}
+              </>
+            ) : (
+              <span>Visible-only event stream · retains {MAX_RETAINED_RUNS} runs · no polling</span>
+            )}
+          </footer>
+        </section>
+      )}
+    </aside>
+  );
+}
+
+function HookInventory({
+  cwd,
+  error,
+  hooks,
+  loaded,
+  loading,
+  totalHooks,
+}: {
+  cwd: string | null;
+  error: string | null;
+  hooks: HookMetadata[];
+  loaded: boolean;
+  loading: boolean;
+  totalHooks: number;
+}) {
+  if (error) return <div className="hooks-empty hooks-error">{error}</div>;
+  if (loading && !loaded) return <div className="hooks-empty">Loading runtime hook inventory…</div>;
+  if (!cwd) return <div className="hooks-empty">No selected session workspace reported.</div>;
+  if (loaded && totalHooks === 0) return <div className="hooks-empty">No hooks reported for this workspace.</div>;
+
+  return (
+    <div className="hooks-list hook-inventory-list">
+      {hooks.slice(0, MAX_VISIBLE_HOOKS).map((hook) => (
+        <HookInventoryCard hook={hook} key={hook.key} />
+      ))}
+      {totalHooks > MAX_VISIBLE_HOOKS && (
+        <div className="hooks-empty compact">
+          Showing {Math.min(MAX_VISIBLE_HOOKS, hooks.length)} of {totalHooks} hooks.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HookInventoryCard({ hook }: { hook: HookMetadata }) {
+  const trustLabel = formatToken(hook.trustStatus);
+  return (
+    <article className={`hook-card hook-inventory-card ${hook.enabled ? "hook-enabled" : "hook-disabled"}`}>
+      <div className="hook-card-head">
+        <strong>{formatToken(hook.eventName)}</strong>
+        <em className={`hook-trust hook-trust-${hook.trustStatus}`}>{trustLabel}</em>
+      </div>
+      <div className="hook-meta">
+        <span>{formatToken(hook.handlerType)}</span>
+        <span>{formatToken(hook.source)}</span>
+        <span>{hook.isManaged ? "Managed" : hook.enabled ? "Enabled" : "Disabled"}</span>
+      </div>
+      <code title={hook.sourcePath}>{hook.sourcePath}</code>
+      {hook.matcher && <p className="hook-command"><b>Match</b> {hook.matcher}</p>}
+      {hook.command && <p className="hook-command"><b>Command</b> {hook.command}</p>}
+      <footer>
+        {hook.pluginId && <span>{hook.pluginId}</span>}
+        <span>{formatTimeout(hook.timeoutSec)}</span>
+      </footer>
+    </article>
+  );
+}
+
+function HookActivity({ recent }: { recent: HookRun[] }) {
+  return (
+    <div className="hooks-list">
+      {recent.length === 0 ? (
+        <div className="hooks-empty">Hook runs appear here while this activity view is open.</div>
+      ) : recent.map((run) => (
+        <article className={`hook-card hook-${run.status}`} key={run.id}>
+          <div className="hook-card-head">
+            <strong>{formatToken(run.eventName)}</strong>
+            <em>{formatToken(run.status)}</em>
+          </div>
+          <div className="hook-meta">
+            <span>{formatToken(run.handlerType)}</span>
+            <span>{formatToken(run.executionMode)}</span>
+            <span>{formatToken(run.source)}</span>
+          </div>
+          <code title={run.sourcePath}>{run.sourcePath}</code>
+          {run.statusMessage && <p>{run.statusMessage}</p>}
+          {run.entries.slice(0, 3).map((entry, index) => (
+            <p className="hook-entry" key={`${run.id}:${index}`}>
+              <b>{formatToken(entry.kind)}</b> {entry.text}
+            </p>
+          ))}
+          <footer>
+            <span title={run.threadId}>{run.threadId.slice(0, 8)}</span>
+            {run.turnId && <span title={run.turnId}>{run.turnId.slice(0, 8)}</span>}
+            {run.durationMs !== null && <span>{formatDuration(run.durationMs)}</span>}
+          </footer>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function retainHookInventory(data: HooksListEntry[]): RetainedHookInventory {
+  let remainingHooks = MAX_RETAINED_HOOKS;
+  let totalHooks = 0;
+  let warningCount = 0;
+  let errorCount = 0;
+  const entries: HooksListEntry[] = [];
+
+  for (const entry of data) {
+    totalHooks += entry.hooks.length;
+    warningCount += entry.warnings.length;
+    errorCount += entry.errors.length;
+    if (remainingHooks <= 0) continue;
+
+    const hooks = entry.hooks.slice(0, remainingHooks).map(boundHookMetadata);
+    remainingHooks -= hooks.length;
+    if (hooks.length === 0) continue;
+    entries.push({
+      cwd: boundText(entry.cwd, MAX_HOOK_PATH_CHARS),
+      hooks,
+      // The current UI only exposes aggregate discovery counts. Do not retain
+      // potentially large warning/error payloads merely to render those counts.
+      warnings: [],
+      errors: [],
+    });
+  }
+
+  return { entries, totalHooks, warningCount, errorCount };
+}
+
+function boundHookMetadata(hook: HookMetadata): HookMetadata {
+  return {
+    ...hook,
+    handlerType: boundText(hook.handlerType, MAX_HOOK_LABEL_CHARS),
+    matcher: hook.matcher === null ? null : boundText(hook.matcher, MAX_HOOK_DETAIL_CHARS),
+    command: hook.command === null ? null : boundText(hook.command, MAX_HOOK_DETAIL_CHARS),
+    statusMessage: hook.statusMessage === null
+      ? null
+      : boundText(hook.statusMessage, MAX_HOOK_DETAIL_CHARS),
+    sourcePath: boundText(hook.sourcePath, MAX_HOOK_PATH_CHARS),
+    source: boundText(hook.source, MAX_HOOK_LABEL_CHARS),
+    pluginId: hook.pluginId === null ? null : boundText(hook.pluginId, MAX_HOOK_LABEL_CHARS),
+  };
+}
+
+function compareHooks(a: HookMetadata, b: HookMetadata): number {
+  const eventOrder = a.eventName.localeCompare(b.eventName, undefined, { sensitivity: "base" });
+  if (eventOrder !== 0) return eventOrder;
+  return a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function parseHookNotification(value: unknown): HookRun | null {
+  if (!isRecord(value) || typeof value.threadId !== "string" || !isRecord(value.run)) return null;
+  const run = value.run;
+  if (
+    typeof run.id !== "string" ||
+    typeof run.eventName !== "string" ||
+    typeof run.handlerType !== "string" ||
+    typeof run.executionMode !== "string" ||
+    typeof run.scope !== "string" ||
+    typeof run.sourcePath !== "string" ||
+    typeof run.source !== "string" ||
+    typeof run.status !== "string"
+  ) return null;
+
+  const entries: HookOutputEntry[] = [];
+  if (Array.isArray(run.entries)) {
+    const entryCount = Math.min(run.entries.length, MAX_RETAINED_ENTRIES_PER_RUN);
+    for (let index = 0; index < entryCount; index += 1) {
+      const entry = run.entries[index];
+      if (!isRecord(entry) || typeof entry.kind !== "string" || typeof entry.text !== "string") continue;
+      entries.push({
+        kind: boundText(entry.kind, MAX_HOOK_LABEL_CHARS),
+        text: boundText(entry.text, MAX_HOOK_DETAIL_CHARS),
+      });
+    }
+  }
+
+  return {
+    id: run.id,
+    threadId: value.threadId,
+    turnId: typeof value.turnId === "string" ? value.turnId : null,
+    eventName: boundText(run.eventName, MAX_HOOK_LABEL_CHARS),
+    handlerType: boundText(run.handlerType, MAX_HOOK_LABEL_CHARS),
+    executionMode: boundText(run.executionMode, MAX_HOOK_LABEL_CHARS),
+    scope: boundText(run.scope, MAX_HOOK_LABEL_CHARS),
+    sourcePath: boundText(run.sourcePath, MAX_HOOK_PATH_CHARS),
+    source: boundText(run.source, MAX_HOOK_LABEL_CHARS),
+    status: boundText(run.status, MAX_HOOK_LABEL_CHARS),
+    statusMessage: typeof run.statusMessage === "string"
+      ? boundText(run.statusMessage, MAX_HOOK_DETAIL_CHARS)
+      : null,
+    startedAt: finiteNumber(run.startedAt) ?? Date.now(),
+    completedAt: finiteNumber(run.completedAt),
+    durationMs: finiteNumber(run.durationMs),
+    entries,
+  };
+}
+
+function upsertHookRun(current: HookRun[], next: HookRun): HookRun[] {
+  const index = current.findIndex((run) => run.id === next.id);
+  const updated = index === -1
+    ? [...current, next]
+    : current.map((run, runIndex) => runIndex === index ? next : run);
+  return updated.slice(-MAX_RETAINED_RUNS);
+}
+
+function boundText(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function formatToken(value: string): string {
+  return value.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (char) => char.toUpperCase());
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.max(0, Math.round(ms))} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+function formatTimeout(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "No timeout";
+  return `${seconds}s timeout`;
+}

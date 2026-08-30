@@ -1,0 +1,112 @@
+.terminal-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 41;
+  width: min(820px, calc(100vw - 420px));
+  min-width: 440px;
+  transform: translateX(-50%);
+  font: 12px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.terminal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: rgba(20, 22, 25, 0.94);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+
+.terminal-toggle:hover { color: var(--text, #e8edf2); background: rgba(28, 31, 35, .96); }
+.terminal-live { font-size: 8px; color: #9bd3ad; text-transform: uppercase; letter-spacing: .08em; }
+
+.terminal-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 12px;
+  background: rgba(18, 20, 23, 0.99);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+}
+
+.terminal-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  padding: 11px 13px;
+}
+
+.terminal-panel > header > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.terminal-panel > header strong { font-size: 11px; font-weight: 600; }
+.terminal-panel > header small { overflow: hidden; color: var(--faint, #666f79); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-panel > header > div { display: flex; gap: 5px; }
+.terminal-panel button { border: 0; border-radius: 6px; padding: 5px 8px; background: transparent; color: var(--muted, #9099a3); font-size: 9px; cursor: pointer; }
+.terminal-panel button:hover:not(:disabled) { background: rgba(255, 255, 255, .05); color: var(--text, #e8edf2); }
+.terminal-panel button:disabled { opacity: .4; cursor: not-allowed; }
+
+.terminal-output {
+  box-sizing: border-box;
+  width: 100%;
+  height: min(390px, 50vh);
+  margin: 0;
+  overflow: auto;
+  border: 0;
+  padding: 15px 16px;
+  background: #101214;
+  color: #d7dde3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 11px/1.6 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  scrollbar-gutter: stable;
+}
+
+.terminal-output:focus { outline: 1px solid rgba(127, 149, 255, .28); outline-offset: -1px; }
+
+.terminal-input-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, .012);
+}
+
+.terminal-input-row > span { color: #9bd3ad; font: 11px/1 "SFMono-Regular", Consolas, monospace; }
+.terminal-input-row input {
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text, #e8edf2);
+  font: 11px/1.45 "SFMono-Regular", Consolas, monospace;
+}
+.terminal-input-row input::placeholder { color: var(--faint, #626b75); }
+
+.terminal-error {
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  padding: 8px 12px;
+  background: rgba(230, 166, 166, .035);
+  color: #e6a6a6;
+  font-size: 9px;
+}
+
+.terminal-panel > footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 7px 12px;
+  color: var(--faint, #626b75);
+  font-size: 8px;
+}
+
+@media (max-width: 980px) {
+  .terminal-dock { width: calc(100vw - 32px); min-width: 0; bottom: 72px; }
+}

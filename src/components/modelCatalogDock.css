@@ -1,0 +1,125 @@
+.model-catalog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .46);
+  backdrop-filter: blur(5px);
+}
+
+.model-catalog-panel {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid var(--border, rgba(255,255,255,.075));
+  border-radius: 11px;
+  background: var(--panel, #171717);
+  color: var(--text, #ececec);
+  box-shadow: var(--shadow-lg, 0 18px 55px rgba(0,0,0,.28));
+  font: 11px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.model-catalog-panel > header,
+.model-catalog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px 8px;
+}
+
+.model-catalog-panel > header > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-catalog-header-actions { display: flex; flex: 0 0 auto; gap: 4px; }
+.model-catalog-panel > header strong { font-size: 11px; font-weight: 620; }
+.model-catalog-panel > header small,
+.model-catalog-actions small,
+.model-catalog-panel > footer { color: var(--faint, #737373); font-size: 8px; }
+
+.model-catalog-panel button {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: transparent;
+  color: var(--muted, #a3a3a3);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.model-catalog-panel button:hover:not(:disabled) {
+  border-color: var(--border, rgba(255,255,255,.075));
+  background: var(--surface-hover, rgba(255,255,255,.055));
+  color: var(--text, #ececec);
+}
+
+.model-catalog-panel button:disabled { opacity: .45; cursor: not-allowed; }
+
+.model-catalog-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 5px 10px 8px;
+}
+
+.model-catalog-search input {
+  min-width: 0;
+  border: 1px solid var(--border, rgba(255,255,255,.075));
+  border-radius: 7px;
+  padding: 7px 9px;
+  outline: none;
+  background: var(--surface, #1f1f1f);
+  color: var(--text, #ececec);
+  font: 9px/1.4 "SFMono-Regular", Consolas, monospace;
+}
+
+.model-catalog-search input:focus { border-color: var(--border-strong, rgba(255,255,255,.12)); }
+.model-catalog-search input::placeholder { color: var(--faint, #737373); }
+
+.model-catalog-list {
+  max-height: min(570px, 66vh);
+  overflow: auto;
+  padding: 2px 10px 8px;
+  scrollbar-gutter: stable;
+}
+
+.model-catalog-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.075));
+  padding: 9px 4px;
+}
+.model-catalog-list article:first-child { border-top: 0; }
+.model-catalog-list article:hover { background: var(--surface-hover, rgba(255,255,255,.055)); }
+.model-catalog-list article > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.model-catalog-list strong { overflow: hidden; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.model-catalog-list code { overflow: hidden; color: var(--muted, #a3a3a3); font: 8px/1.35 "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.model-catalog-list small { color: var(--faint, #737373); font-size: 8px; }
+.model-catalog-list article > div > small { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.model-catalog-list article > span { display: flex; align-items: flex-end; flex-direction: column; gap: 4px; }
+.model-catalog-list em {
+  color: var(--faint, #737373);
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.model-catalog-state { padding: 32px 12px; color: var(--faint, #737373); text-align: center; }
+.model-catalog-state.error { color: var(--danger, #e37b7b); }
+.model-catalog-actions { border-top: 1px solid var(--border, rgba(255,255,255,.075)); }
+.model-catalog-panel > footer { border-top: 1px solid var(--border, rgba(255,255,255,.075)); padding: 8px 10px; }
+
+@media (max-width: 720px) {
+  .model-catalog-backdrop { padding: 8px; }
+  .model-catalog-panel { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+  .model-catalog-list article { grid-template-columns: 1fr; }
+  .model-catalog-list article > span { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+}

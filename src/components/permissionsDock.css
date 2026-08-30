@@ -1,0 +1,161 @@
+.permissions-dock {
+  position: fixed;
+  right: 16px;
+  top: 156px;
+  z-index: 43;
+  width: min(410px, calc(100vw - 32px));
+  font: 11px/1.4 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #e8edf2);
+}
+
+.permissions-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-height: 32px;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: rgba(13, 16, 20, .96);
+  color: var(--muted, #87919c);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .3);
+  cursor: pointer;
+}
+
+.permissions-toggle:hover { color: var(--text, #e8edf2); border-color: #3a4450; }
+.permissions-toggle > span:last-child { color: var(--faint, #5d6670); font-size: 8px; }
+
+.permissions-panel {
+  margin-top: 7px;
+  max-height: min(700px, calc(100vh - 210px));
+  overflow: auto;
+  border: 1px solid var(--border-strong, #2b333c);
+  border-radius: 11px;
+  background: rgba(10, 13, 16, .99);
+  box-shadow: 0 18px 56px rgba(0, 0, 0, .48);
+}
+
+.permissions-panel > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border, #20262d);
+  padding: 10px 11px;
+  background: rgba(10, 13, 16, .99);
+}
+
+.permissions-panel > header > span,
+.permissions-section > header {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.permissions-panel > header strong,
+.permissions-section > header strong { font-size: 10px; }
+.permissions-panel > header small,
+.permissions-section > header small {
+  overflow: hidden;
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+  text-overflow: ellipsis;
+}
+
+.permissions-panel button {
+  border: 1px solid var(--border, #20262d);
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: transparent;
+  color: var(--muted, #87919c);
+  font-size: 9px;
+  cursor: pointer;
+}
+.permissions-panel button:hover:not(:disabled) { color: var(--text, #e8edf2); border-color: #3a4450; }
+.permissions-panel button:disabled { opacity: .45; cursor: not-allowed; }
+
+.permissions-section + .permissions-section { border-top: 1px solid var(--border, #20262d); }
+.permissions-section > header { padding: 9px 10px 5px; }
+.permissions-section-header-row {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.permissions-section-header-row > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.permissions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--border, #20262d);
+}
+.permissions-grid > div { min-width: 0; padding: 8px 9px; background: var(--panel-2, #11151a); }
+.permissions-grid dt { color: var(--faint, #5d6670); font-size: 7px; letter-spacing: .05em; text-transform: uppercase; }
+.permissions-grid dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--text, #e8edf2);
+  font: 9px/1.4 "SFMono-Regular", Consolas, monospace;
+  text-overflow: ellipsis;
+}
+
+.permissions-roots { display: flex; flex-direction: column; gap: 4px; padding: 8px 9px; }
+.permissions-roots strong { font-size: 8px; }
+.permissions-roots code {
+  overflow: hidden;
+  color: var(--muted, #87919c);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.permissions-roots small { color: var(--faint, #5d6670); font-size: 8px; }
+
+.permission-profile-list { display: grid; gap: 1px; max-height: 260px; overflow: auto; background: var(--border, #20262d); }
+.permission-profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 9px;
+  background: var(--panel-2, #11151a);
+}
+.permission-profile-row.current { box-shadow: inset 2px 0 0 var(--accent, #7f95ff); }
+.permission-profile-row > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.permission-profile-row strong {
+  overflow: hidden;
+  font: 9px/1.4 "SFMono-Regular", Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.permission-profile-row small { color: var(--faint, #5d6670); font-size: 8px; }
+.permission-profile-row > span { flex: 0 0 auto; border-radius: 999px; padding: 2px 5px; font-size: 7px; }
+.permission-profile-row > span.allowed { background: rgba(91, 170, 112, .12); color: #9dcaaa; }
+.permission-profile-row > span.blocked { background: rgba(203, 105, 105, .1); color: #d9a1a1; }
+.permission-profile-more { display: block; width: calc(100% - 16px); margin: 7px 8px 9px; }
+
+.permissions-state { padding: 20px 12px; color: var(--faint, #5d6670); text-align: center; }
+.permissions-state.compact { padding: 12px 10px; font-size: 8px; }
+.permissions-state.error { color: #e6a6a6; }
+.permissions-panel > footer {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid var(--border, #20262d);
+  padding: 7px 9px;
+  background: rgba(10, 13, 16, .99);
+  color: var(--faint, #5d6670);
+  font-size: 8px;
+}
+
+@media (max-width: 720px) {
+  .permissions-dock { right: 8px; top: 116px; width: calc(100vw - 16px); }
+  .permissions-panel { max-height: calc(100vh - 164px); }
+  .permissions-grid { grid-template-columns: 1fr; }
+  .permissions-section-header-row { align-items: flex-start; }
+}

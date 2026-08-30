@@ -1,0 +1,143 @@
+.background-processes-dock {
+  position: fixed;
+  right: 18px;
+  bottom: 72px;
+  z-index: 43;
+  width: min(440px, calc(100vw - 32px));
+  font: 11px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #ececef);
+}
+
+.background-processes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(31,32,35,.94);
+  color: var(--muted, #a2a5aa);
+  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+  cursor: pointer;
+}
+
+.background-processes-toggle:hover { color: var(--text, #ececef); background: rgba(38,39,42,.98); }
+.background-processes-toggle > span:last-child { color: var(--faint, #777a80); font-size: 9px; }
+
+.background-processes-panel {
+  margin-top: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  background: rgba(30,31,34,.985);
+  box-shadow: 0 18px 48px rgba(0,0,0,.30);
+}
+
+.background-processes-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px 10px;
+}
+
+.background-processes-panel > header > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.background-processes-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.background-processes-panel > header strong { font-size: 12px; font-weight: 650; }
+.background-processes-panel > header small { overflow: hidden; color: var(--faint, #777a80); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.background-processes-panel button {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: rgba(255,255,255,.045);
+  color: var(--muted, #a2a5aa);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.background-processes-panel button:hover:not(:disabled) { color: var(--text, #ececef); background: rgba(255,255,255,.075); }
+.background-processes-panel button:disabled { opacity: .4; cursor: not-allowed; }
+.background-processes-panel button.danger { background: rgba(190,70,70,.08); color: #e5a5a5; }
+.background-processes-panel button.danger:hover:not(:disabled) { background: rgba(190,70,70,.14); color: #efb0b0; }
+
+.background-processes-summary {
+  display: flex;
+  gap: 14px;
+  padding: 3px 13px 9px;
+  color: var(--faint, #777a80);
+  font-size: 8px;
+}
+
+.background-processes-notice {
+  margin: 0 13px 8px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: rgba(255,255,255,.025);
+  color: var(--muted, #a2a5aa);
+  font-size: 8px;
+}
+
+.background-processes-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  padding: 8px 10px;
+}
+
+.background-processes-filter input,
+.background-processes-filter select {
+  min-width: 0;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+  background: rgba(255,255,255,.035);
+  color: var(--text, #ececef);
+  font: 9px/1.4 "SFMono-Regular", Consolas, monospace;
+}
+
+.background-processes-filter input { flex: 1; }
+.background-processes-filter select { max-width: 126px; flex: 0 1 auto; }
+.background-processes-filter input:focus,
+.background-processes-filter select:focus { box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); }
+.background-processes-filter input::placeholder { color: var(--faint, #777a80); }
+.background-processes-filter small { flex: 0 0 auto; color: var(--faint, #777a80); font-size: 8px; }
+
+.background-processes-list { max-height: min(470px, 58vh); overflow: auto; padding: 5px 8px 8px; }
+.background-process-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; padding: 9px 6px; border-bottom: 1px solid rgba(255,255,255,.05); }
+.background-process-row:last-child { border-bottom: 0; }
+.background-process-row:hover { background: rgba(255,255,255,.025); }
+.background-process-command { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.background-process-command strong,
+.background-process-command small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.background-process-command strong { font: 9px/1.4 "SFMono-Regular", Consolas, monospace; }
+.background-process-command small { color: var(--faint, #777a80); font-size: 8px; }
+.background-process-row > button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+
+.background-process-meta { display: flex; min-width: 0; flex-wrap: wrap; gap: 4px 10px; color: var(--faint, #777a80); font-size: 8px; }
+.background-process-meta code { color: var(--muted, #a2a5aa); font-size: 8px; }
+.background-processes-state { padding: 24px 12px; color: var(--faint, #777a80); text-align: center; }
+.background-processes-state.error { color: #e5a5a5; }
+.background-processes-more { display: block; width: calc(100% - 8px); margin: 6px 4px 2px; }
+.background-processes-panel > footer { border-top: 1px solid rgba(255,255,255,.055); padding: 8px 12px; color: var(--faint, #777a80); font-size: 8px; }
+
+@media (max-width: 720px) {
+  .background-processes-dock { right: 8px; bottom: 154px; width: calc(100vw - 16px); }
+  .background-processes-panel > header { align-items: flex-start; }
+  .background-processes-header-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .background-processes-filter { flex-wrap: wrap; }
+  .background-processes-filter input { flex-basis: 100%; }
+  .background-processes-filter select { max-width: none; flex: 1; }
+}

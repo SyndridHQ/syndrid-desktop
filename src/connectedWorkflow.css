@@ -1,0 +1,149 @@
+/* Connected-session polish lives separately from the shell tokens so the workbench
+   can keep a sparse onboarding state while real runtime sessions prioritize the
+   conversation. This layer is presentation-only; SyndridCLI remains authoritative. */
+
+.app-shell:has(.runtime-pill.runtime-ready):has(.thread-preview) .hero-card {
+  display: none;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready):has(.thread-preview) .conversation {
+  padding-top: 18px;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "header actions"
+    "title actions"
+    "path actions";
+  column-gap: 20px;
+  align-items: center;
+  margin-top: 0;
+  padding: 4px 4px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-header {
+  grid-area: header;
+  justify-content: flex-start;
+  min-width: 0;
+  margin-bottom: 3px;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-header .eyebrow {
+  display: none;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .live-badge {
+  color: #747474;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.045em;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-preview h3 {
+  grid-area: title;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #e9e9e9;
+  font-size: 13px;
+  font-weight: 610;
+  letter-spacing: -0.012em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-preview > p {
+  grid-area: path;
+  min-width: 0;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #6f6f6f;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-actions {
+  grid-area: actions;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #737373;
+  font-size: 9px;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-actions > span:first-child {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .thread-actions .healthy {
+  color: #7d9d89;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .message-list {
+  gap: 22px;
+  margin-top: 28px;
+  padding-bottom: 12px;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .message-assistant .message-meta {
+  margin-bottom: 3px;
+  color: #666;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .message-assistant p {
+  margin-top: 0;
+  color: #dedede;
+  font-size: 12.5px;
+  line-height: 1.72;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .message-user {
+  background: #2b2b2b;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .streaming-badge {
+  color: #88a693;
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .composer-shell {
+  margin-bottom: 16px;
+  border-color: rgba(255, 255, 255, 0.105);
+  background: #272727;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.app-shell:has(.runtime-pill.runtime-ready) .composer-shell:focus-within {
+  border-color: rgba(255, 255, 255, 0.17);
+}
+
+@media (max-width: 760px) {
+  .app-shell:has(.runtime-pill.runtime-ready) .thread-preview {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "header"
+      "title"
+      "path"
+      "actions";
+  }
+
+  .app-shell:has(.runtime-pill.runtime-ready) .thread-actions {
+    align-items: flex-start;
+    margin-top: 8px;
+  }
+}

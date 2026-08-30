@@ -1,0 +1,105 @@
+.runtime-activity-dock {
+  position: fixed;
+  right: 12px;
+  bottom: 34px;
+  z-index: 40;
+  width: min(360px, calc(100vw - 24px));
+  font: 11px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text, #ececec);
+}
+
+.runtime-activity-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--border, rgba(255,255,255,.075));
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: var(--panel, #171717);
+  color: var(--muted, #a3a3a3);
+  cursor: pointer;
+}
+.runtime-activity-toggle:hover { background: var(--surface-hover, rgba(255,255,255,.055)); color: var(--text, #ececec); }
+
+.runtime-activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint, #737373);
+}
+.runtime-activity-dot.busy { background: var(--success, #72c899); }
+.runtime-activity-count { color: var(--faint, #737373); font-size: 9px; }
+
+.runtime-activity-panel {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border, rgba(255,255,255,.075));
+  border-radius: 10px;
+  background: var(--panel, #171717);
+  box-shadow: var(--shadow-lg, 0 18px 55px rgba(0,0,0,.28));
+}
+.runtime-activity-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px 9px;
+}
+.runtime-activity-panel > header div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.runtime-activity-panel > header strong { font-size: 11px; font-weight: 620; }
+.runtime-activity-panel > header small { color: var(--faint, #737373); font-size: 9px; }
+.runtime-activity-panel > header button {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 7px;
+  background: transparent;
+  color: var(--muted, #a3a3a3);
+  font-size: 9px;
+  cursor: pointer;
+}
+.runtime-activity-panel > header button:hover:not(:disabled) {
+  border-color: var(--border, rgba(255,255,255,.075));
+  background: var(--surface-hover, rgba(255,255,255,.055));
+  color: var(--text, #ececec);
+}
+.runtime-activity-panel > header button:disabled { cursor: not-allowed; opacity: .45; }
+
+.runtime-activity-list {
+  display: flex;
+  max-height: min(440px, 56vh);
+  flex-direction: column;
+  overflow: auto;
+  padding: 2px 8px 8px;
+}
+.runtime-activity-empty { padding: 22px 12px; color: var(--faint, #737373); text-align: center; }
+.runtime-activity-card {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.075));
+  padding: 9px 4px;
+  background: transparent;
+}
+.runtime-activity-card:first-child { border-top: 0; }
+.runtime-activity-card:hover { background: var(--surface-hover, rgba(255,255,255,.055)); }
+.runtime-activity-card.phase-running { background: rgba(127,149,255,.045); }
+.runtime-activity-card-head,
+.runtime-activity-card footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.runtime-activity-card-head span {
+  color: var(--accent, #7f95ff);
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.runtime-activity-card-head em { color: var(--faint, #737373); font-size: 8px; font-style: normal; }
+.runtime-activity-card > strong,
+.runtime-activity-card > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-activity-card > strong { color: var(--text, #ececec); font: 10px/1.4 "SFMono-Regular", Consolas, monospace; }
+.runtime-activity-card > small { color: var(--muted, #a3a3a3); font-size: 9px; }
+.runtime-activity-card footer { color: var(--faint, #737373); font-size: 8px; }
+
+@media (max-width: 720px) {
+  .runtime-activity-dock { right: 8px; bottom: 30px; width: calc(100vw - 16px); }
+}
