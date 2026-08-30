@@ -8,7 +8,14 @@ const deferredChunkGroups: ReadonlyArray<readonly [string, readonly string[]]> =
   ],
   [
     "deferred-runtime-management",
-    ["ProviderDock", "McpServerDock", "PermissionsDock", "BackgroundProcessesDock", "HooksDock"],
+    [
+      "ProviderDock",
+      "McpServerDock",
+      "PermissionsDock",
+      "BackgroundProcessesDock",
+      "HooksDock",
+      "ModelCatalogDock",
+    ],
   ],
   [
     "deferred-session-inspection",
