@@ -1,9 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { ApprovalDock } from "./components/ApprovalDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
+import { DeferredApprovalDock } from "./components/DeferredApprovalDock";
 import { DeferredModelCatalog } from "./components/DeferredModelCatalog";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
 import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
@@ -34,7 +34,7 @@ createRoot(rootElement).render(
       <ConversationFollowBridge />
       <CommandPalette />
       <KeyboardShortcuts />
-      <ApprovalDock />
+      <DeferredApprovalDock />
       <RuntimeInputDock />
       <McpElicitationDock />
       <DeferredWarningsDock />
