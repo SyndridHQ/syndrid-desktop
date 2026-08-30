@@ -14,53 +14,62 @@ export interface ConversationMessage {
 
 type Listener = () => void;
 
-const MAX_MESSAGES = 200;
+const MAX_MESSAGES_PER_THREAD = 200;
+const MAX_CACHED_THREAD_SNAPSHOTS = 24;
 const EMPTY_MESSAGES: readonly ConversationMessage[] = [];
 const threadListeners = new Map<string, Set<Listener>>();
 const threadSnapshots = new Map<string, readonly ConversationMessage[]>();
-let messages: readonly ConversationMessage[] = [];
+const threadRecency = new Map<string, true>();
 
-function sameMessages(
-  left: readonly ConversationMessage[],
-  right: readonly ConversationMessage[],
-): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((message, index) => message === right[index]);
-}
-
-function publish(next: readonly ConversationMessage[]): void {
-  if (next === messages) return;
-  messages = next;
-
-  const grouped = new Map<string, ConversationMessage[]>();
-  for (const message of next) {
-    const bucket = grouped.get(message.threadId);
-    if (bucket) {
-      bucket.push(message);
-    } else {
-      grouped.set(message.threadId, [message]);
-    }
-  }
-
-  const threadIds = new Set([...threadSnapshots.keys(), ...grouped.keys()]);
-  for (const threadId of threadIds) {
-    const previous = threadSnapshots.get(threadId) ?? EMPTY_MESSAGES;
-    const candidate = grouped.get(threadId) ?? EMPTY_MESSAGES;
-    if (sameMessages(previous, candidate)) continue;
-
-    if (candidate.length === 0) {
-      threadSnapshots.delete(threadId);
-    } else {
-      threadSnapshots.set(threadId, candidate);
-    }
-    for (const listener of threadListeners.get(threadId) ?? []) listener();
-  }
-}
-
-function trimConversation(
+function trimThread(
   next: readonly ConversationMessage[],
 ): readonly ConversationMessage[] {
-  return next.length > MAX_MESSAGES ? next.slice(-MAX_MESSAGES) : next;
+  return next.length > MAX_MESSAGES_PER_THREAD
+    ? next.slice(-MAX_MESSAGES_PER_THREAD)
+    : next;
+}
+
+function touchThread(threadId: string): void {
+  threadRecency.delete(threadId);
+  threadRecency.set(threadId, true);
+}
+
+function isThreadProtected(threadId: string): boolean {
+  if ((threadListeners.get(threadId)?.size ?? 0) > 0) return true;
+  return (threadSnapshots.get(threadId) ?? EMPTY_MESSAGES).some(
+    (message) => message.streaming,
+  );
+}
+
+function pruneInactiveThreads(): void {
+  if (threadSnapshots.size <= MAX_CACHED_THREAD_SNAPSHOTS) return;
+
+  for (const threadId of threadRecency.keys()) {
+    if (threadSnapshots.size <= MAX_CACHED_THREAD_SNAPSHOTS) return;
+    if (isThreadProtected(threadId)) continue;
+
+    threadSnapshots.delete(threadId);
+    threadRecency.delete(threadId);
+  }
+}
+
+function publishThread(
+  threadId: string,
+  next: readonly ConversationMessage[],
+): void {
+  const previous = threadSnapshots.get(threadId) ?? EMPTY_MESSAGES;
+  if (next === previous) return;
+
+  if (next.length === 0) {
+    threadSnapshots.delete(threadId);
+    threadRecency.delete(threadId);
+  } else {
+    threadSnapshots.set(threadId, trimThread(next));
+    touchThread(threadId);
+  }
+
+  for (const listener of threadListeners.get(threadId) ?? []) listener();
+  pruneInactiveThreads();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -123,21 +132,16 @@ function messagesFromThread(thread: ThreadSummary): ConversationMessage[] {
 function mergeThreadHistory(
   current: readonly ConversationMessage[],
   history: readonly ConversationMessage[],
-  threadId: string,
 ): readonly ConversationMessage[] {
-  const otherThreads = current.filter((message) => message.threadId !== threadId);
-  const liveThreadMessages = current.filter(
-    (message) => message.threadId === threadId,
-  );
   const merged = new Map<string, ConversationMessage>();
 
   for (const message of history) merged.set(message.id, message);
-  for (const message of liveThreadMessages) merged.set(message.id, message);
+  for (const message of current) merged.set(message.id, message);
 
-  return trimConversation([...otherThreads, ...merged.values()]);
+  return trimThread([...merged.values()]);
 }
 
-function applyAgentDeltasToMessages(
+function applyAgentDeltasToThread(
   current: readonly ConversationMessage[],
   deltas: readonly AgentMessageDeltaNotification[],
 ): readonly ConversationMessage[] {
@@ -171,7 +175,7 @@ function applyAgentDeltasToMessages(
     };
   }
 
-  return trimConversation(next);
+  return trimThread(next);
 }
 
 export const conversationStore = {
@@ -180,9 +184,11 @@ export const conversationStore = {
     const listeners = threadListeners.get(threadId) ?? new Set<Listener>();
     listeners.add(listener);
     threadListeners.set(threadId, listeners);
+    if (threadSnapshots.has(threadId)) touchThread(threadId);
     return () => {
       listeners.delete(listener);
       if (listeners.size === 0) threadListeners.delete(threadId);
+      pruneInactiveThreads();
     };
   },
 
@@ -191,32 +197,46 @@ export const conversationStore = {
   },
 
   mergeThread(thread: ThreadSummary): void {
-    publish(
-      mergeThreadHistory(messages, messagesFromThread(thread), thread.id),
-    );
+    const current = threadSnapshots.get(thread.id) ?? EMPTY_MESSAGES;
+    publishThread(thread.id, mergeThreadHistory(current, messagesFromThread(thread)));
   },
 
   addUserMessage(message: ConversationMessage): void {
-    publish(trimConversation([...messages, message]));
+    const current = threadSnapshots.get(message.threadId) ?? EMPTY_MESSAGES;
+    publishThread(message.threadId, trimThread([...current, message]));
   },
 
   applyAgentDeltas(deltas: readonly AgentMessageDeltaNotification[]): void {
-    publish(applyAgentDeltasToMessages(messages, deltas));
+    if (deltas.length === 0) return;
+
+    const deltasByThread = new Map<string, AgentMessageDeltaNotification[]>();
+    for (const delta of deltas) {
+      const threadDeltas = deltasByThread.get(delta.threadId);
+      if (threadDeltas) {
+        threadDeltas.push(delta);
+      } else {
+        deltasByThread.set(delta.threadId, [delta]);
+      }
+    }
+
+    for (const [threadId, threadDeltas] of deltasByThread) {
+      const current = threadSnapshots.get(threadId) ?? EMPTY_MESSAGES;
+      publishThread(
+        threadId,
+        applyAgentDeltasToThread(current, threadDeltas),
+      );
+    }
   },
 
   markTurnComplete(threadId: string, turnId: string): void {
+    const current = threadSnapshots.get(threadId) ?? EMPTY_MESSAGES;
     let changed = false;
-    const next = messages.map((message) => {
-      if (
-        message.threadId !== threadId ||
-        message.turnId !== turnId ||
-        !message.streaming
-      ) {
-        return message;
-      }
+    const next = current.map((message) => {
+      if (message.turnId !== turnId || !message.streaming) return message;
       changed = true;
       return { ...message, streaming: false };
     });
-    if (changed) publish(next);
+    if (changed) publishThread(threadId, next);
+    else pruneInactiveThreads();
   },
 };
