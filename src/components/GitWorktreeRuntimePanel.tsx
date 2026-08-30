@@ -25,9 +25,11 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
+  const requestInFlight = useRef(false);
 
   useEffect(() => {
     generation.current += 1;
+    requestInFlight.current = false;
     setInventory(null);
     setLoading(false);
     setStale(false);
@@ -44,12 +46,13 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
   }, [inventory, threadId]);
 
   const load = useCallback(async () => {
-    if (loading) return;
+    if (requestInFlight.current) return;
     if (appServerClient.getSnapshot().phase !== "ready") {
       setError("Connect the Syndrid runtime before loading linked worktrees.");
       return;
     }
 
+    requestInFlight.current = true;
     const requestGeneration = ++generation.current;
     setLoading(true);
     setError(null);
@@ -75,6 +78,9 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     } finally {
+      if (requestGeneration === generation.current) {
+        requestInFlight.current = false;
+      }
       const selectedWorkspace = appServerClient.getWorkspaceSnapshot();
       if (
         requestGeneration === generation.current &&
@@ -84,7 +90,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
         setLoading(false);
       }
     }
-  }, [cwd, loading, threadId]);
+  }, [cwd, threadId]);
 
   return (
     <GitWorktreePanel
