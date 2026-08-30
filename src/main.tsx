@@ -5,6 +5,7 @@ import { ApprovalDock } from "./components/ApprovalDock";
 import { BackgroundProcessesDock } from "./components/BackgroundProcessesDock";
 import { CommandPalette } from "./components/CommandPalette";
 import { ContextDock } from "./components/ContextDock";
+import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
 import { DiagnosticsDock } from "./components/DiagnosticsDock";
 import { GitDock } from "./components/GitDock";
 import { GoalDock } from "./components/GoalDock";
@@ -43,6 +44,7 @@ createRoot(rootElement).render(
     <WorkbenchErrorBoundary>
       <App bootStartedAt={bootStartedAt} />
       <PrimaryNavigationBridge />
+      <ConversationFollowBridge />
       <CommandPalette />
       <KeyboardShortcuts />
       <ApprovalDock />
