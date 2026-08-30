@@ -7,7 +7,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { ContextDock } from "./components/ContextDock";
 import { ConversationFollowBridge } from "./components/ConversationFollowBridge";
 import { DeferredPrimaryDocks } from "./components/DeferredPrimaryDocks";
-import { DiagnosticsDock } from "./components/DiagnosticsDock";
+import { DeferredUtilityDocks } from "./components/DeferredUtilityDocks";
 import { GoalDock } from "./components/GoalDock";
 import { HooksDock } from "./components/HooksDock";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
@@ -18,12 +18,10 @@ import { PermissionsDock } from "./components/PermissionsDock";
 import { PlanDock } from "./components/PlanDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { ProviderDock } from "./components/ProviderDock";
-import { ReviewDock } from "./components/ReviewDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { SessionHistoryDock } from "./components/SessionHistoryDock";
 import { SubagentsDock } from "./components/SubagentsDock";
-import { TerminalDock } from "./components/TerminalDock";
 import { WarningsDock } from "./components/WarningsDock";
 import { WorkbenchErrorBoundary } from "./components/WorkbenchErrorBoundary";
 import "./styles.css";
@@ -41,6 +39,7 @@ createRoot(rootElement).render(
     <WorkbenchErrorBoundary>
       <App bootStartedAt={bootStartedAt} />
       <DeferredPrimaryDocks />
+      <DeferredUtilityDocks />
       <PrimaryNavigationBridge />
       <ConversationFollowBridge />
       <CommandPalette />
@@ -52,8 +51,6 @@ createRoot(rootElement).render(
       <ProviderDock />
       <ModelCatalogDock />
       <PermissionsDock />
-      <ReviewDock />
-      <TerminalDock />
       <BackgroundProcessesDock />
       <SubagentsDock />
       <SessionHistoryDock />
@@ -61,7 +58,6 @@ createRoot(rootElement).render(
       <PlanDock />
       <GoalDock />
       <HooksDock />
-      <DiagnosticsDock />
       <WarningsDock />
       <RuntimeActivityDock />
     </WorkbenchErrorBoundary>
