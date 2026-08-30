@@ -12,12 +12,10 @@ import { GoalDock } from "./components/GoalDock";
 import { HooksDock } from "./components/HooksDock";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
-import { McpServerDock } from "./components/McpServerDock";
 import { ModelCatalogDock } from "./components/ModelCatalogDock";
 import { PermissionsDock } from "./components/PermissionsDock";
 import { PlanDock } from "./components/PlanDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
-import { ProviderDock } from "./components/ProviderDock";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
 import { SessionHistoryDock } from "./components/SessionHistoryDock";
@@ -47,8 +45,6 @@ createRoot(rootElement).render(
       <ApprovalDock />
       <RuntimeInputDock />
       <McpElicitationDock />
-      <McpServerDock />
-      <ProviderDock />
       <ModelCatalogDock />
       <PermissionsDock />
       <BackgroundProcessesDock />
