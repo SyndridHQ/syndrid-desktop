@@ -1,6 +1,21 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const deferredChunkGroups: ReadonlyArray<readonly [string, readonly string[]]> = [
+  [
+    "deferred-execution",
+    ["TerminalDock", "ReviewDock", "DiagnosticsDock"],
+  ],
+  [
+    "deferred-runtime-management",
+    ["ProviderDock", "McpServerDock", "PermissionsDock", "BackgroundProcessesDock", "HooksDock"],
+  ],
+  [
+    "deferred-session-inspection",
+    ["SessionHistoryDock", "SubagentsDock", "ContextDock", "GoalDock", "PlanDock"],
+  ],
+];
+
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
@@ -16,5 +31,18 @@ export default defineConfig({
     target: "es2022",
     sourcemap: true,
     chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replaceAll("\\", "/");
+          for (const [chunkName, modules] of deferredChunkGroups) {
+            if (modules.some((moduleName) => normalized.includes(`/components/${moduleName}.`))) {
+              return chunkName;
+            }
+          }
+          return undefined;
+        },
+      },
+    },
   },
 });
