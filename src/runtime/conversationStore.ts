@@ -15,9 +15,11 @@ export interface ConversationMessage {
 type Listener = () => void;
 
 const MAX_MESSAGES_PER_THREAD = 200;
+const MAX_CACHED_THREAD_SNAPSHOTS = 24;
 const EMPTY_MESSAGES: readonly ConversationMessage[] = [];
 const threadListeners = new Map<string, Set<Listener>>();
 const threadSnapshots = new Map<string, readonly ConversationMessage[]>();
+const threadRecency = new Map<string, true>();
 
 function trimThread(
   next: readonly ConversationMessage[],
@@ -25,6 +27,30 @@ function trimThread(
   return next.length > MAX_MESSAGES_PER_THREAD
     ? next.slice(-MAX_MESSAGES_PER_THREAD)
     : next;
+}
+
+function touchThread(threadId: string): void {
+  threadRecency.delete(threadId);
+  threadRecency.set(threadId, true);
+}
+
+function isThreadProtected(threadId: string): boolean {
+  if ((threadListeners.get(threadId)?.size ?? 0) > 0) return true;
+  return (threadSnapshots.get(threadId) ?? EMPTY_MESSAGES).some(
+    (message) => message.streaming,
+  );
+}
+
+function pruneInactiveThreads(): void {
+  if (threadSnapshots.size <= MAX_CACHED_THREAD_SNAPSHOTS) return;
+
+  for (const threadId of threadRecency.keys()) {
+    if (threadSnapshots.size <= MAX_CACHED_THREAD_SNAPSHOTS) return;
+    if (isThreadProtected(threadId)) continue;
+
+    threadSnapshots.delete(threadId);
+    threadRecency.delete(threadId);
+  }
 }
 
 function publishThread(
@@ -36,11 +62,14 @@ function publishThread(
 
   if (next.length === 0) {
     threadSnapshots.delete(threadId);
+    threadRecency.delete(threadId);
   } else {
     threadSnapshots.set(threadId, trimThread(next));
+    touchThread(threadId);
   }
 
   for (const listener of threadListeners.get(threadId) ?? []) listener();
+  pruneInactiveThreads();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,9 +184,11 @@ export const conversationStore = {
     const listeners = threadListeners.get(threadId) ?? new Set<Listener>();
     listeners.add(listener);
     threadListeners.set(threadId, listeners);
+    if (threadSnapshots.has(threadId)) touchThread(threadId);
     return () => {
       listeners.delete(listener);
       if (listeners.size === 0) threadListeners.delete(threadId);
+      pruneInactiveThreads();
     };
   },
 
@@ -206,5 +237,6 @@ export const conversationStore = {
       return { ...message, streaming: false };
     });
     if (changed) publishThread(threadId, next);
+    else pruneInactiveThreads();
   },
 };
