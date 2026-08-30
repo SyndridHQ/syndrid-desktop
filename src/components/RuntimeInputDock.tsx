@@ -3,6 +3,7 @@ import {
   appServerClient,
   type RuntimeServerRequest,
 } from "../runtime/appServerClient";
+import { useRuntimeWorkspace } from "../runtime/useRuntimeWorkspace";
 import "./runtimeInputDock.css";
 
 const TOOL_USER_INPUT = "item/tool/requestUserInput";
@@ -36,7 +37,11 @@ export function RuntimeInputDock() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState<RuntimeServerRequest["id"] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const current = queue[0] ?? null;
+  const workspace = useRuntimeWorkspace();
+  const current = useMemo(
+    () => inputForThread(queue, workspace?.threadId ?? null),
+    [queue, workspace?.threadId],
+  );
   const currentRequestIdRef = useRef<RuntimeServerRequest["id"] | null>(null);
   currentRequestIdRef.current = current?.request.id ?? null;
 
@@ -80,6 +85,7 @@ export function RuntimeInputDock() {
   if (!current) return null;
 
   const submitting = submittingId === current.request.id;
+  const activeSessionFirst = current.threadId === workspace?.threadId;
 
   const submit = async () => {
     if (!canSubmit || submitting) return;
@@ -121,7 +127,9 @@ export function RuntimeInputDock() {
           <span>Input requested</span>
           <strong>{current.questions[0]?.header || "Syndrid needs input"}</strong>
         </div>
-        {queue.length > 1 && <em>{queue.length} pending</em>}
+        {queue.length > 1 && (
+          <em>{queue.length} pending{activeSessionFirst ? " · active session first" : ""}</em>
+        )}
       </header>
 
       <div className="runtime-input-body">
@@ -179,6 +187,17 @@ export function RuntimeInputDock() {
       </footer>
     </section>
   );
+}
+
+function inputForThread(
+  queue: RuntimeInputRequest[],
+  threadId: string | null,
+): RuntimeInputRequest | null {
+  if (threadId !== null) {
+    const activeInput = queue.find((request) => request.threadId === threadId);
+    if (activeInput) return activeInput;
+  }
+  return queue[0] ?? null;
 }
 
 function normalizeInputRequest(request: RuntimeServerRequest): RuntimeInputRequest | null {
