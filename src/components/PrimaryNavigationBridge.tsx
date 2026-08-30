@@ -11,15 +11,6 @@ type SurfaceToggle = {
   railTitles: readonly string[];
 };
 
-const actions: RailAction[] = [
-  { title: "Workspace", run: () => open(".workspace-files-toggle", ".workspace-files-panel") },
-  { title: "Agent", run: () => focus(".composer-input") },
-  { title: "Changes", run: () => open(".git-toggle", ".git-panel") },
-  { title: "Git", run: () => open(".git-toggle", ".git-panel") },
-  { title: "Extensions", run: () => open(".skills-toggle", ".skills-panel") },
-  { title: "Settings", run: () => open(".settings-toggle", ".settings-panel") },
-];
-
 const surfaceToggles: SurfaceToggle[] = [
   {
     toggleSelector: ".workspace-files-toggle",
@@ -40,6 +31,36 @@ const surfaceToggles: SurfaceToggle[] = [
     toggleSelector: ".settings-toggle",
     panelSelector: ".settings-panel",
     railTitles: ["Settings"],
+  },
+];
+
+const actions: RailAction[] = [
+  {
+    title: "Workspace",
+    run: () => selectSurface(".workspace-files-toggle", ".workspace-files-panel"),
+  },
+  {
+    title: "Agent",
+    run: () => {
+      closePrimarySurfaces();
+      return focus(".composer-input");
+    },
+  },
+  {
+    title: "Changes",
+    run: () => selectSurface(".git-toggle", ".git-panel"),
+  },
+  {
+    title: "Git",
+    run: () => selectSurface(".git-toggle", ".git-panel"),
+  },
+  {
+    title: "Extensions",
+    run: () => selectSurface(".skills-toggle", ".skills-panel"),
+  },
+  {
+    title: "Settings",
+    run: () => selectSurface(".settings-toggle", ".settings-panel"),
   },
 ];
 
@@ -105,9 +126,18 @@ function activateRailButton(button: HTMLButtonElement): void {
   button.setAttribute("aria-current", "page");
 }
 
-function open(toggleSelector: string, panelSelector: string): boolean {
+function selectSurface(toggleSelector: string, panelSelector: string): boolean {
+  closePrimarySurfaces(panelSelector);
   if (document.querySelector(panelSelector)) return true;
   return click(toggleSelector);
+}
+
+function closePrimarySurfaces(exceptPanelSelector?: string): void {
+  for (const surface of surfaceToggles) {
+    if (surface.panelSelector === exceptPanelSelector) continue;
+    if (!document.querySelector(surface.panelSelector)) continue;
+    click(surface.toggleSelector);
+  }
 }
 
 function click(selector: string): boolean {
