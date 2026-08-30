@@ -16,6 +16,10 @@ type Command = {
   run: () => void;
 };
 
+type CommandPaletteProps = {
+  initiallyOpen?: boolean;
+};
+
 const commands: Command[] = [
   {
     id: "focus-composer",
@@ -192,8 +196,8 @@ const commands: Command[] = [
   },
 ];
 
-export function CommandPalette() {
-  const [open, setOpen] = useState(false);
+export function CommandPalette({ initiallyOpen = false }: CommandPaletteProps) {
+  const [open, setOpen] = useState(initiallyOpen);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

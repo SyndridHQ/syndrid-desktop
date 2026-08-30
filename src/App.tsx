@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -53,6 +54,7 @@ export function App({ bootStartedAt }: AppProps) {
   const [shellReadyMs, setShellReadyMs] = useState<number | null>(null);
   const [selectedThread, setSelectedThread] = useState<ThreadSummary | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const activeThreadIdRef = useRef<string | null>(null);
   const [activeModel, setActiveModel] = useState<string | null>(null);
   const [creatingThread, setCreatingThread] = useState(false);
   const [draft, setDraft] = useState("");
@@ -62,44 +64,101 @@ export function App({ bootStartedAt }: AppProps) {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() =>
+    activeThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    const shellFrame = requestAnimationFrame(() =>
       setShellReadyMs(performance.now() - bootStartedAt),
     );
+    let runtimeFrame: number | null = null;
+    let pendingDeltas: AgentMessageDeltaNotification[] = [];
+    let pendingNotifications = 0;
+
+    const flushRuntimeProjection = () => {
+      runtimeFrame = null;
+      const deltas = pendingDeltas;
+      const notificationDelta = pendingNotifications;
+      pendingDeltas = [];
+      pendingNotifications = 0;
+
+      if (notificationDelta > 0) {
+        setNotificationCount((count) => count + notificationDelta);
+      }
+      if (deltas.length > 0) {
+        setMessages((current) => applyAgentDeltas(current, deltas));
+      }
+    };
+
+    const scheduleRuntimeProjection = () => {
+      if (runtimeFrame !== null || document.visibilityState === "hidden") return;
+      runtimeFrame = requestAnimationFrame(flushRuntimeProjection);
+    };
+
+    const flushBeforeTurnCompletion = (event: TurnLifecycleNotification) => {
+      if (runtimeFrame !== null) {
+        cancelAnimationFrame(runtimeFrame);
+        runtimeFrame = null;
+      }
+      const deltas = pendingDeltas;
+      const notificationDelta = pendingNotifications;
+      pendingDeltas = [];
+      pendingNotifications = 0;
+
+      if (notificationDelta > 0) {
+        setNotificationCount((count) => count + notificationDelta);
+      }
+      setMessages((current) =>
+        markTurnComplete(
+          deltas.length > 0 ? applyAgentDeltas(current, deltas) : current,
+          event.threadId,
+          event.turn.id,
+        ),
+      );
+    };
+
     const offNotification = appServerClient.onNotification((notification) => {
-      setNotificationCount((count) => count + 1);
+      pendingNotifications += 1;
       handleRuntimeNotification(notification, {
         onAgentDelta: (delta) => {
-          setMessages((current) => upsertAgentDelta(current, delta));
+          pendingDeltas.push(delta);
         },
         onTurnStarted: (event) => {
-          if (event.threadId === activeThreadId) {
+          if (event.threadId === activeThreadIdRef.current) {
             setActiveTurnId(event.turn.id);
           }
         },
         onTurnCompleted: (event) => {
-          if (event.threadId === activeThreadId) {
+          if (event.threadId === activeThreadIdRef.current) {
             setSendingTurn(false);
             setInterruptingTurn(false);
             setActiveTurnId((current) =>
               current === event.turn.id ? null : current,
             );
-            setMessages((current) =>
-              markTurnComplete(current, event.threadId, event.turn.id),
-            );
+            flushBeforeTurnCompletion(event);
           }
         },
       });
+      scheduleRuntimeProjection();
     });
     const offLog = appServerClient.onLog((line) => {
       setRuntimeLogs((logs) => [...logs.slice(-39), line]);
     });
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && (pendingDeltas.length > 0 || pendingNotifications > 0)) {
+        scheduleRuntimeProjection();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(shellFrame);
+      if (runtimeFrame !== null) cancelAnimationFrame(runtimeFrame);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       offNotification();
       offLog();
     };
-  }, [activeThreadId, bootStartedAt]);
+  }, [bootStartedAt]);
 
   const loadRuntimeCatalogs = useCallback(async () => {
     try {
@@ -187,6 +246,7 @@ export function App({ bootStartedAt }: AppProps) {
     try {
       const result = await appServerClient.startThread();
       setSelectedThread(result.thread);
+      activeThreadIdRef.current = result.thread.id;
       setActiveThreadId(result.thread.id);
       setActiveModel(`${result.modelProvider} / ${result.model}`);
       setThreads((current) => [
@@ -223,6 +283,7 @@ export function App({ bootStartedAt }: AppProps) {
     try {
       const result = await appServerClient.resumeThread(selectedThread.id);
       setSelectedThread(result.thread);
+      activeThreadIdRef.current = result.thread.id;
       setActiveThreadId(result.thread.id);
       setActiveModel(`${result.modelProvider} / ${result.model}`);
       setMessages((current) =>
@@ -823,36 +884,41 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function upsertAgentDelta(
+function applyAgentDeltas(
   current: ConversationMessage[],
-  delta: AgentMessageDeltaNotification,
+  deltas: readonly AgentMessageDeltaNotification[],
 ): ConversationMessage[] {
-  const id = `assistant-${delta.itemId}`;
-  const index = current.findIndex((message) => message.id === id);
+  if (deltas.length === 0) return current;
 
-  if (index === -1) {
-    return trimConversation([
-      ...current,
-      {
+  const next = [...current];
+  const indexById = new Map(next.map((message, index) => [message.id, index]));
+
+  for (const delta of deltas) {
+    const id = `assistant-${delta.itemId}`;
+    const index = indexById.get(id);
+    if (index === undefined) {
+      indexById.set(id, next.length);
+      next.push({
         id,
         threadId: delta.threadId,
         turnId: delta.turnId,
         role: "assistant",
         text: delta.delta,
         streaming: true,
-      },
-    ]);
+      });
+      continue;
+    }
+
+    const existing = next[index];
+    if (!existing) continue;
+    next[index] = {
+      ...existing,
+      text: `${existing.text}${delta.delta}`,
+      streaming: true,
+    };
   }
 
-  const next = [...current];
-  const existing = next[index];
-  if (!existing) return current;
-  next[index] = {
-    ...existing,
-    text: `${existing.text}${delta.delta}`,
-    streaming: true,
-  };
-  return next;
+  return trimConversation(next);
 }
 
 function markTurnComplete(

@@ -1,67 +1,51 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import "./keyboardShortcuts.css";
 
-type Shortcut = {
+type KeyboardShortcutsProps = {
+  onClose: () => void;
+};
+
+type ShortcutDisplay = {
   id: string;
   label: string;
   detail: string;
   keys: string[];
-  matches: (event: KeyboardEvent) => boolean;
-  run: () => void;
 };
 
-const shortcutDefinitions: Omit<Shortcut, "keys">[] = [
-  {
-    id: "files",
-    label: "Workspace files",
-    detail: "Toggle the runtime-backed workspace browser",
-    matches: (event) => isPrimaryMod(event) && event.shiftKey && event.key.toLowerCase() === "e",
-    run: () => clickElement(".workspace-files-toggle"),
-  },
-  {
-    id: "source-control",
-    label: "Source control",
-    detail: "Toggle the selected-session Git surface",
-    matches: (event) => isPrimaryMod(event) && event.shiftKey && event.key.toLowerCase() === "g",
-    run: () => clickElement(".git-toggle"),
-  },
-  {
-    id: "terminal",
-    label: "Terminal",
-    detail: "Toggle the Syndrid-owned native PTY console",
-    matches: (event) => isPrimaryMod(event) && !event.shiftKey && event.key === "`",
-    run: () => clickElement(".terminal-toggle"),
-  },
-  {
-    id: "settings",
-    label: "Desktop settings",
-    detail: "Toggle native runtime supervision settings",
-    matches: (event) => isPrimaryMod(event) && !event.shiftKey && event.key === ",",
-    run: () => clickElement(".settings-toggle"),
-  },
-];
-
-export function KeyboardShortcuts() {
-  const [open, setOpen] = useState(false);
+export function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const modLabel = useMemo(() => (isApplePlatform() ? "⌘" : "Ctrl"), []);
-  const shortcuts = useMemo<Shortcut[]>(
+  const shortcuts = useMemo<ShortcutDisplay[]>(
     () => [
       {
-        ...shortcutDefinitions[0]!,
+        id: "agent",
+        label: "Agent workspace",
+        detail: "Close primary tool surfaces and return focus to the Syndrid composer",
+        keys: [modLabel, "Shift", "A"],
+      },
+      {
+        id: "files",
+        label: "Workspace files",
+        detail: "Toggle the runtime-backed workspace browser",
         keys: [modLabel, "Shift", "E"],
       },
       {
-        ...shortcutDefinitions[1]!,
+        id: "source-control",
+        label: "Source control",
+        detail: "Toggle the selected-session Git surface",
         keys: [modLabel, "Shift", "G"],
       },
       {
-        ...shortcutDefinitions[2]!,
+        id: "terminal",
+        label: "Terminal",
+        detail: "Toggle the Syndrid-owned native PTY console",
         keys: [modLabel, "`"],
       },
       {
-        ...shortcutDefinitions[3]!,
+        id: "settings",
+        label: "Desktop settings",
+        detail: "Toggle native runtime supervision settings",
         keys: [modLabel, ","],
       },
     ],
@@ -69,13 +53,6 @@ export function KeyboardShortcuts() {
   );
 
   useEffect(() => {
-    const openHelp = () => setOpen(true);
-    window.addEventListener("syndrid:open-shortcuts", openHelp);
-    return () => window.removeEventListener("syndrid:open-shortcuts", openHelp);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
     previousFocusRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
@@ -86,58 +63,21 @@ export function KeyboardShortcuts() {
       previousFocusRef.current = null;
       if (previousFocus?.isConnected) previousFocus.focus();
     };
-  }, [open]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && open) {
-        event.preventDefault();
-        setOpen(false);
-        return;
-      }
-
-      if (open && event.key === "Tab") {
-        event.preventDefault();
-        closeButtonRef.current?.focus();
-        return;
-      }
-
-      if (open && isPrimaryMod(event) && event.key.toLowerCase() === "k") {
-        setOpen(false);
-        return;
-      }
-
-      if (
-        isPrimaryMod(event) &&
-        !event.shiftKey &&
-        event.key === "/" &&
-        !isEditableTarget(event.target)
-      ) {
-        event.preventDefault();
-        setOpen((current) => !current);
-        return;
-      }
-
-      if (open || isEditableTarget(event.target)) return;
-      const shortcut = shortcuts.find((entry) => entry.matches(event));
-      if (!shortcut) return;
-      event.preventDefault();
-      shortcut.run();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, shortcuts]);
-
-  if (!open) return null;
+  }, []);
 
   return (
     <div
       aria-labelledby="keyboard-shortcuts-title"
       aria-modal="true"
       className="keyboard-shortcuts-backdrop"
+      onKeyDown={(event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          closeButtonRef.current?.focus();
+        }
+      }}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) setOpen(false);
+        if (event.target === event.currentTarget) onClose();
       }}
       role="dialog"
     >
@@ -147,7 +87,7 @@ export function KeyboardShortcuts() {
             <strong id="keyboard-shortcuts-title">Keyboard shortcuts</strong>
             <small>Workbench controls only · runtime behavior stays in SyndridCLI</small>
           </span>
-          <button onClick={() => setOpen(false)} ref={closeButtonRef} type="button">
+          <button onClick={onClose} ref={closeButtonRef} type="button">
             Close
           </button>
         </header>
@@ -197,26 +137,6 @@ function ShortcutRow({ detail, keys, label }: { detail: string; keys: string[]; 
   );
 }
 
-function isPrimaryMod(event: KeyboardEvent): boolean {
-  if (event.altKey) return false;
-  return isApplePlatform() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-}
-
 function isApplePlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  );
-}
-
-function clickElement(selector: string): void {
-  const element = document.querySelector<HTMLElement>(selector);
-  if (element && !element.hasAttribute("disabled")) element.click();
 }

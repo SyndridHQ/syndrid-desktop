@@ -83,12 +83,18 @@ export function PrimaryNavigationBridge() {
       cleanups.push(() => button.removeEventListener("click", onClick));
     }
 
-    for (const surface of surfaceToggles) {
-      const toggle = document.querySelector<HTMLElement>(surface.toggleSelector);
-      if (!toggle) continue;
-      const onToggle = () => {
-        // React handles the dock toggle later in the same click dispatch. Reconcile
-        // after that state update without introducing a MutationObserver or polling.
+    // Dock toggles can now be replaced when a deferred primary surface loads.
+    // Delegate this reconciliation instead of pinning listeners to startup DOM
+    // nodes. Deferred placeholders intentionally do not reconcile: their panel
+    // cannot exist until the requested chunk has finished loading.
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      for (const surface of surfaceToggles) {
+        const toggle = target.closest<HTMLElement>(surface.toggleSelector);
+        if (!toggle || toggle.dataset.deferredPlaceholder === "true") continue;
+
         queueMicrotask(() => {
           if (document.querySelector(surface.panelSelector)) return;
           const active = document.querySelector<HTMLButtonElement>(
@@ -98,10 +104,12 @@ export function PrimaryNavigationBridge() {
           const agent = railButton("Agent");
           if (agent) activateRailButton(agent);
         });
-      };
-      toggle.addEventListener("click", onToggle);
-      cleanups.push(() => toggle.removeEventListener("click", onToggle));
-    }
+        return;
+      }
+    };
+
+    document.addEventListener("click", onDocumentClick);
+    cleanups.push(() => document.removeEventListener("click", onDocumentClick));
 
     return () => {
       for (const cleanup of cleanups) cleanup();
