@@ -59,7 +59,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
       if (
         requestGeneration !== generation.current ||
         selectedWorkspace?.threadId !== threadId ||
-        selectedWorkspace.cwd !== cwd
+        selectedWorkspace?.cwd !== cwd
       ) {
         return;
       }
@@ -70,7 +70,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
       if (
         requestGeneration === generation.current &&
         selectedWorkspace?.threadId === threadId &&
-        selectedWorkspace.cwd === cwd
+        selectedWorkspace?.cwd === cwd
       ) {
         setError(cause instanceof Error ? cause.message : String(cause));
       }
@@ -79,7 +79,7 @@ export function GitWorktreeRuntimePanel({ cwd, threadId }: GitWorktreeRuntimePan
       if (
         requestGeneration === generation.current &&
         selectedWorkspace?.threadId === threadId &&
-        selectedWorkspace.cwd === cwd
+        selectedWorkspace?.cwd === cwd
       ) {
         setLoading(false);
       }
