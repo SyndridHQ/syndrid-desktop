@@ -15,13 +15,46 @@ export interface ConversationMessage {
 type Listener = () => void;
 
 const MAX_MESSAGES = 200;
-const listeners = new Set<Listener>();
+const EMPTY_MESSAGES: readonly ConversationMessage[] = [];
+const threadListeners = new Map<string, Set<Listener>>();
+const threadSnapshots = new Map<string, readonly ConversationMessage[]>();
 let messages: readonly ConversationMessage[] = [];
+
+function sameMessages(
+  left: readonly ConversationMessage[],
+  right: readonly ConversationMessage[],
+): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((message, index) => message === right[index]);
+}
 
 function publish(next: readonly ConversationMessage[]): void {
   if (next === messages) return;
   messages = next;
-  for (const listener of listeners) listener();
+
+  const grouped = new Map<string, ConversationMessage[]>();
+  for (const message of next) {
+    const bucket = grouped.get(message.threadId);
+    if (bucket) {
+      bucket.push(message);
+    } else {
+      grouped.set(message.threadId, [message]);
+    }
+  }
+
+  const threadIds = new Set([...threadSnapshots.keys(), ...grouped.keys()]);
+  for (const threadId of threadIds) {
+    const previous = threadSnapshots.get(threadId) ?? EMPTY_MESSAGES;
+    const candidate = grouped.get(threadId) ?? EMPTY_MESSAGES;
+    if (sameMessages(previous, candidate)) continue;
+
+    if (candidate.length === 0) {
+      threadSnapshots.delete(threadId);
+    } else {
+      threadSnapshots.set(threadId, candidate);
+    }
+    for (const listener of threadListeners.get(threadId) ?? []) listener();
+  }
 }
 
 function trimConversation(
@@ -142,13 +175,19 @@ function applyAgentDeltasToMessages(
 }
 
 export const conversationStore = {
-  subscribe(listener: Listener): () => void {
+  subscribeThread(threadId: string | null, listener: Listener): () => void {
+    if (!threadId) return () => undefined;
+    const listeners = threadListeners.get(threadId) ?? new Set<Listener>();
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    threadListeners.set(threadId, listeners);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) threadListeners.delete(threadId);
+    };
   },
 
-  getSnapshot(): readonly ConversationMessage[] {
-    return messages;
+  getThreadSnapshot(threadId: string | null): readonly ConversationMessage[] {
+    return threadId ? threadSnapshots.get(threadId) ?? EMPTY_MESSAGES : EMPTY_MESSAGES;
   },
 
   mergeThread(thread: ThreadSummary): void {
