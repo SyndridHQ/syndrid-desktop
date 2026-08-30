@@ -1,8 +1,9 @@
 .git-worktrees {
   display: grid;
-  gap: 0.65rem;
-  margin-top: 0.85rem;
+  gap: 8px;
+  margin-top: 10px;
   min-width: 0;
+  color: var(--text, #ececec);
 }
 
 .git-worktrees-heading,
@@ -14,7 +15,8 @@
 
 .git-worktrees-heading {
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 10px;
+  padding: 0 2px;
 }
 
 .git-worktrees-heading > span,
@@ -23,10 +25,12 @@
   min-width: 0;
 }
 
+.git-worktrees-heading strong { font-size: 10px; font-weight: 620; }
 .git-worktrees-heading small,
 .git-worktree-primary small,
 .git-worktrees-filter small {
-  color: var(--text-muted);
+  color: var(--faint, #737373);
+  font-size: 8px;
 }
 
 .git-worktrees-heading button,
@@ -35,32 +39,38 @@
 }
 
 .git-worktrees-state {
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.65rem;
-  color: var(--text-muted);
-  padding: 0.75rem;
+  padding: 14px 4px;
+  color: var(--faint, #737373);
+  text-align: center;
 }
 
 .git-worktrees-state.compact {
-  padding: 0.55rem 0.65rem;
+  padding: 8px 4px;
+  text-align: left;
 }
 
 .git-worktrees-state.error {
-  color: var(--danger-text);
+  color: var(--danger, #e37b7b);
 }
 
 .git-worktrees-filter {
-  gap: 0.5rem;
+  gap: 6px;
 }
 
 .git-worktrees-filter input {
   min-width: 0;
   flex: 1 1 auto;
+  border: 1px solid var(--border, rgba(255,255,255,.075));
+  border-radius: 7px;
+  padding: 6px 8px;
+  outline: none;
+  background: var(--surface, #1f1f1f);
+  color: var(--text, #ececec);
 }
+.git-worktrees-filter input:focus { border-color: var(--border-strong, rgba(255,255,255,.12)); }
 
 .git-worktrees-list {
   display: grid;
-  gap: 0.4rem;
   max-height: min(38vh, 26rem);
   overflow: auto;
   overscroll-behavior: contain;
@@ -68,23 +78,27 @@
 
 .git-worktree-row {
   justify-content: space-between;
-  gap: 0.75rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.6rem;
-  padding: 0.55rem 0.65rem;
+  gap: 10px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.075));
+  padding: 9px 4px;
 }
+.git-worktree-row:first-child { border-top: 0; }
+.git-worktree-row:hover { background: var(--surface-hover, rgba(255,255,255,.055)); }
 
 .git-worktree-row.current {
-  border-color: var(--border-strong);
+  background: rgba(127,149,255,.045);
 }
 
 .git-worktree-primary {
-  gap: 0.15rem;
+  gap: 2px;
   flex: 1 1 auto;
 }
 
 .git-worktree-path {
   overflow: hidden;
+  color: var(--text, #ececec);
+  font-size: 9px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -100,16 +114,15 @@
   flex: 0 0 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.3rem;
+  gap: 6px;
 }
 
 .git-worktree-badges span {
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  color: var(--text-muted);
-  font-size: 0.72rem;
+  color: var(--faint, #737373);
+  font-size: 7px;
+  letter-spacing: .04em;
   line-height: 1.35;
-  padding: 0.08rem 0.38rem;
+  text-transform: uppercase;
 }
 
 @media (max-width: 720px) {
