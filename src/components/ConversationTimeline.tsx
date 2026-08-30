@@ -1,4 +1,4 @@
-import { memo, useMemo, useSyncExternalStore } from "react";
+import { memo, useCallback, useSyncExternalStore } from "react";
 import {
   conversationStore,
   type ConversationMessage,
@@ -29,17 +29,18 @@ const ConversationMessageCard = memo(function ConversationMessageCard({
 export function ConversationTimeline({
   threadId,
 }: ConversationTimelineProps) {
-  const messages = useSyncExternalStore(
-    conversationStore.subscribe,
-    conversationStore.getSnapshot,
-    conversationStore.getSnapshot,
+  const subscribe = useCallback(
+    (listener: () => void) => conversationStore.subscribeThread(threadId, listener),
+    [threadId],
   );
-  const selectedMessages = useMemo(
-    () =>
-      threadId
-        ? messages.filter((message) => message.threadId === threadId)
-        : [],
-    [messages, threadId],
+  const getSnapshot = useCallback(
+    () => conversationStore.getThreadSnapshot(threadId),
+    [threadId],
+  );
+  const selectedMessages = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot,
   );
 
   if (selectedMessages.length === 0) return null;
