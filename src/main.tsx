@@ -10,7 +10,6 @@ import { HooksDock } from "./components/HooksDock";
 import { KeyboardShortcuts } from "./components/KeyboardShortcuts";
 import { McpElicitationDock } from "./components/McpElicitationDock";
 import { ModelCatalogDock } from "./components/ModelCatalogDock";
-import { PlanDock } from "./components/PlanDock";
 import { PrimaryNavigationBridge } from "./components/PrimaryNavigationBridge";
 import { RuntimeActivityDock } from "./components/RuntimeActivityDock";
 import { RuntimeInputDock } from "./components/RuntimeInputDock";
@@ -40,7 +39,6 @@ createRoot(rootElement).render(
       <RuntimeInputDock />
       <McpElicitationDock />
       <ModelCatalogDock />
-      <PlanDock />
       <HooksDock />
       <WarningsDock />
       <RuntimeActivityDock />
