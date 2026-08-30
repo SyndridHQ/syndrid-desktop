@@ -6,24 +6,43 @@ import "./conversationFollowBridge.css";
 const FOLLOW_THRESHOLD_PX = 96;
 
 export function ConversationFollowBridge() {
-  const [unreadLiveOutput, setUnreadLiveOutput] = useState(false);
+  const [unreadLiveOutput, setUnreadLiveOutputState] = useState(false);
+  const unreadLiveOutputRef = useRef(false);
   const followsLatestRef = useRef(true);
   const frameRef = useRef<number | null>(null);
   const selectedThreadIdRef = useRef(
     appServerClient.getWorkspaceSnapshot()?.threadId ?? null,
   );
 
-  const scrollToLatest = useCallback((behavior: ScrollBehavior = "auto") => {
-    const conversation = conversationElement();
-    if (!conversation) return;
-
-    conversation.scrollTo({
-      top: conversation.scrollHeight,
-      behavior,
-    });
-    followsLatestRef.current = true;
-    setUnreadLiveOutput(false);
+  const setUnreadLiveOutput = useCallback((value: boolean) => {
+    if (unreadLiveOutputRef.current === value) return;
+    unreadLiveOutputRef.current = value;
+    setUnreadLiveOutputState(value);
   }, []);
+
+  const scrollToLatest = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      const conversation = conversationElement();
+      if (!conversation) return;
+
+      conversation.scrollTo({
+        top: conversation.scrollHeight,
+        behavior,
+      });
+      followsLatestRef.current = true;
+      setUnreadLiveOutput(false);
+    },
+    [setUnreadLiveOutput],
+  );
+
+  const scheduleScrollToLatest = useCallback(() => {
+    if (document.visibilityState === "hidden" || frameRef.current !== null) return;
+
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      scrollToLatest("auto");
+    });
+  }, [scrollToLatest]);
 
   useEffect(() => {
     const conversation = conversationElement();
@@ -40,7 +59,7 @@ export function ConversationFollowBridge() {
     updateFollowState();
     conversation.addEventListener("scroll", updateFollowState, { passive: true });
     return () => conversation.removeEventListener("scroll", updateFollowState);
-  }, []);
+  }, [setUnreadLiveOutput]);
 
   useEffect(() => {
     const offWorkspaceChange = appServerClient.onWorkspaceChange(() => {
@@ -49,11 +68,11 @@ export function ConversationFollowBridge() {
       followsLatestRef.current = true;
       setUnreadLiveOutput(false);
 
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-      frameRef.current = requestAnimationFrame(() => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
-        scrollToLatest("auto");
-      });
+      }
+      scheduleScrollToLatest();
     });
 
     const offNotification = appServerClient.onNotification((notification) => {
@@ -72,19 +91,30 @@ export function ConversationFollowBridge() {
         return;
       }
 
-      if (frameRef.current !== null) return;
-      frameRef.current = requestAnimationFrame(() => {
-        frameRef.current = null;
-        scrollToLatest("auto");
-      });
+      scheduleScrollToLatest();
     });
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        if (frameRef.current !== null) {
+          cancelAnimationFrame(frameRef.current);
+          frameRef.current = null;
+        }
+        return;
+      }
+
+      if (followsLatestRef.current) scheduleScrollToLatest();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       offWorkspaceChange();
       offNotification();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     };
-  }, [scrollToLatest]);
+  }, [scheduleScrollToLatest, setUnreadLiveOutput]);
 
   if (!unreadLiveOutput) return null;
 
